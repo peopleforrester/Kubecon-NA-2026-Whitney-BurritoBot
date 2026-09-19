@@ -71,3 +71,9 @@ the repo's local task inbox until Michael centralizes. Triage and check off.
 - [ ] Ensure the feedback form is accessible from the provisioning page
 - [ ] Create a simple feedback form with Goldilocks-scale questions: pacing (too fast/slow/just right), difficulty level, and friend recommendation
 
+## 2026-09-07 — My recording 202.mp3
+<!-- source: My recording 202.mp3 -->
+- [ ] Add instruction to close out attack me burritbot in step zero or step one of UI
+- [ ] Add banner to attack me cluster stating "this is the community burritbot"
+- [ ] Display community burritbot identification in bold in workshop panel on right side
+
