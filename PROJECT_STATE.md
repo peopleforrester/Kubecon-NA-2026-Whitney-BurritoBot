@@ -245,3 +245,7 @@ passes. **Do not green-wash the scorecard.**
 - `spec/phases/phase-0[1-8]-*.md` — per-phase specs with completion promises
 - Local reuse source: `~/repos/_archive/events/kubeauto-ai-day/` (local-only)
 - Remote reuse source: https://github.com/peopleforrester/kubeauto-ai-day
+
+## 2026-10-15T12:00:00Z · 3.3 · Main fast-forwarded with known test failures
+
+On Michael's instruction, main was fast-forwarded to staging to ship the Dependabot fix with these failures, all present on main before the fix, accepted: test_terraform_plan and test_gke_cluster_is_standard_with_wif_and_nap need live GCP; the credential has expired (invalid_grant).
