@@ -79,3 +79,29 @@ are otherwise kept verbatim: the pre-lifecycle body of
 `presentations/kubecon-na-2026/docs/BUILD-INSTRUCTIONS.md` (listed as
 deviation 3 in its preamble). `tests/test_accepted_talk_title.py`
 keeps the old title from coming back.
+
+## 2026-10-16T18:00:00Z · amendment · conference-knowledge owns event state (issue #36)
+
+Per Michael, 2026-10-03, `peopleforrester/conference-knowledge` is the
+source of truth for conference information: events, CFP dates and
+deadlines, submission status and outcomes, attendance, contacts, the
+speaking record and travel. It replaces conference-management, which
+the entry above cites for the acceptance. This repo reads that
+information there and keeps no copy; changes go to that repo as
+`agent-task` issues.
+
+The event-state header of
+`presentations/kubecon-na-2026/docs/CFP-SUBMISSION.md` (location,
+dates, CFP deadline, submission platform) is replaced with a pointer,
+and `AGENTS.md` gains a "Where things live" section.
+`tests/test_conference_source_of_truth.py` keeps both in place.
+
+Kept, because they are planning inputs or dated history rather than a
+working copy of the event record: the event start date in
+`tests/test_portland_carry_forward.py` (the cold-read gate needs a
+date to compare against, and the comment names its owner), the dates
+in `PORTLAND-CARRY-FORWARD.md` and in the pre-lifecycle body of
+`PROJECT_STATE.md`, the acceptance date in the entry above and in the
+`BUILD-INSTRUCTIONS.md` preamble, and the CFP's "Has This Been
+Presented Before?" answer, which is submitted text. The event name
+and city still identify the delivery in `README.md` and `PLAN.md`.

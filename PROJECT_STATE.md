@@ -31,13 +31,14 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  253 passed, 16 deselected after the #33 accepted-talk-title checks
+  255 passed, 16 deselected after the #36 conference-source checks
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16T11:01:07Z · init-state migrated pre-lifecycle file → Phase 3.3
 - 2026-10-16 · #27 Portland carry-forward: PORTLAND-CARRY-FORWARD.md + runbook Night Before / rule-on-screen / Measurements; 248 static green
 - 2026-10-16 · #33 accepted talk title replaces the old working title repo-wide; 253 static green
+- 2026-10-16 · #36 conference-knowledge owns event state: CFP header becomes a pointer, AGENTS.md gains "Where things live"; 255 static green
 
 ---
 
@@ -61,7 +62,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 253 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33). Zero open Dependabot alerts, zero open PRs.
+- 255 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -206,7 +207,10 @@ commit.
   has a Measurements record
 - Accepted talk title (5), #33: no file carries the old working title,
   and every file that names the talk carries the accepted one
-- **Total: 253 static tests green. Live tests skip cleanly when
+- Conference source of truth (2), #36: the CFP doc keeps no event-state
+  copy and points at conference-knowledge, and AGENTS.md says where
+  conference information lives
+- **Total: 255 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

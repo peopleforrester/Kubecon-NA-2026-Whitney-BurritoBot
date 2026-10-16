@@ -15,7 +15,9 @@ PRESENTATION_DOCS = PROJECT_ROOT / "presentations" / "kubecon-na-2026" / "docs"
 CARRY_FORWARD = PRESENTATION_DOCS / "PORTLAND-CARRY-FORWARD.md"
 RUNBOOK = PRESENTATION_DOCS / "RUNBOOK.md"
 
-# First day of the event. Portland's cold read landed inside the last
+# First day of the event. peopleforrester/conference-knowledge
+# (events/registry.yaml) owns this date; follow it there if it moves.
+# Portland's cold read landed inside the last
 # 72 hours by luck; the scheduled one must sit well clear of that.
 EVENT_START = dt.date(2026, 11, 9)
 COLD_READ_MIN_LEAD_DAYS = 7

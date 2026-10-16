@@ -52,6 +52,15 @@ copy is on GitHub at https://github.com/peopleforrester/kubeauto-ai-day
 — treat the local clone as a convenience, not a dependency. See `docs/KUBEAUTO-REUSE-MAP.md`
 for the per-file copy/adapt/extend/ignore map.
 
+## Where things live
+- Conference information (events, CFP dates and deadlines, submission
+  status, attendance, organizer contacts, speaking record, travel):
+  `peopleforrester/conference-knowledge` (`events/registry.yaml`,
+  `events/cfp_pipeline.yaml`, `speaking/`, `travel/`). Read it there and
+  keep no copy here. To change it, file an `agent-task` issue on that
+  repo; never write into its checkout from this one.
+- The talk itself (content, argument, abstracts, research): talks-knowledge.
+
 ## How To Work
 1. Read this file completely before writing any code.
 2. Read `PROJECT_STATE.md` at session start to reconcile with actual repo state.
