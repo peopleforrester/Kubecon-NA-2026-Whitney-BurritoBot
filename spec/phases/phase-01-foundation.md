@@ -35,10 +35,15 @@ Static (must pass offline):
 - `test_secret_manager_resource`
 - `test_tfvars_example_has_no_real_secrets`
 
-Live (skip when terraform / GCP auth absent):
+Live (fail, naming what is missing, when terraform / GCP auth absent):
 
-- `test_terraform_validate` — `terraform validate` exits 0
-- `test_terraform_plan` — `terraform plan -detailed-exitcode` returns 0 or 2
+- `test_terraform_validate` — `terraform init -backend=false` then
+  `terraform validate` exit 0
+- `test_terraform_plan` — `terraform plan -detailed-exitcode
+  -var delivery=$BURRITBOT_DELIVERY` returns 0 or 2 and the plan labels
+  the cluster and the Secret Manager secret with that slug (needs ADC,
+  the GCS state bucket, and `project_id` from `terraform.tfvars` or
+  `TF_VAR_project_id`)
 - `test_gke_cluster_is_standard_with_wif_and_nap` — cluster API reports
   Standard mode, WIF pool set, NAP enabled
 - `test_nodes_ready` — at least 2 nodes Ready

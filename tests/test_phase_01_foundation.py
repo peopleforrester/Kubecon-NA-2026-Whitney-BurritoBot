@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -133,38 +136,88 @@ def test_tfvars_example_has_no_real_secrets() -> None:
 
 
 # --- Live Terraform checks (fail when terraform is not installed) -----------
+#
+# Each check initialises into its own TF_DATA_DIR under tmp_path, so the
+# backend-less init that validate needs never collides with the GCS-backed
+# init that plan needs, and nothing lands in the checkout's .terraform/.
+
+# GCP label value; mirrors the validation on var.delivery in variables.tf.
+DELIVERY_SLUG = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+DELIVERY_LABEL = "burritbot-io_delivery"
+
+
+def _terraform(args: list[str], data_dir: Path, timeout: int) -> subprocess.CompletedProcess[str]:
+    """Run terraform non-interactively in TERRAFORM_DIR, failing when it is absent."""
+    if shutil.which("terraform") is None:
+        pytest.fail("terraform is not on PATH; the live Terraform checks need it installed")
+    env = {**os.environ, "TF_DATA_DIR": str(data_dir), "TF_IN_AUTOMATION": "1"}
+    return subprocess.run(
+        ["terraform", *args, "-no-color"],
+        cwd=TERRAFORM_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _delivery_slug() -> str:
+    """The delivery the plan labels, from BURRITBOT_DELIVERY; no default."""
+    slug = os.environ.get("BURRITBOT_DELIVERY")
+    if not slug:
+        pytest.fail(
+            "BURRITBOT_DELIVERY is not set; test_terraform_plan passes it as "
+            "`-var delivery=<slug>` (e.g. BURRITBOT_DELIVERY=<event>-<year>)"
+        )
+    if not DELIVERY_SLUG.match(slug):
+        pytest.fail(f"BURRITBOT_DELIVERY={slug!r} is not a GCP label value")
+    return slug
 
 
 @pytest.mark.live
-def test_terraform_validate() -> None:
-    """`terraform validate` passes with no errors."""
-    if shutil.which("terraform") is None:
-        pytest.fail("terraform is not on PATH; the live Terraform checks need it installed")
-    result = subprocess.run(
-        ["terraform", "validate"],
-        cwd=TERRAFORM_DIR,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+def test_terraform_validate(tmp_path: Path) -> None:
+    """`terraform validate` passes after a backend-less init."""
+    init = _terraform(["init", "-backend=false", "-input=false"], tmp_path, timeout=300)
+    assert init.returncode == 0, f"terraform init -backend=false failed: {init.stderr}"
+    result = _terraform(["validate"], tmp_path, timeout=60)
     assert result.returncode == 0, f"terraform validate failed: {result.stderr}"
 
 
 @pytest.mark.live
-def test_terraform_plan() -> None:
-    """`terraform plan` produces no errors (exit 0 or 2)."""
-    if shutil.which("terraform") is None:
-        pytest.fail("terraform is not on PATH; the live Terraform checks need it installed")
-    result = subprocess.run(
-        ["terraform", "plan", "-detailed-exitcode"],
-        cwd=TERRAFORM_DIR,
-        capture_output=True,
-        text=True,
+def test_terraform_plan(tmp_path: Path) -> None:
+    """`terraform plan -var delivery=<slug>` succeeds and labels the cluster with the slug.
+
+    Needs GCP credentials for the GCS backend and the project, and
+    project_id from terraform.tfvars or TF_VAR_project_id.
+    """
+    slug = _delivery_slug()
+    init = _terraform(["init", "-input=false"], tmp_path, timeout=300)
+    assert init.returncode == 0, f"terraform init (GCS backend) failed: {init.stderr}"
+    plan_file = tmp_path / "tfplan"
+    result = _terraform(
+        [
+            "plan",
+            "-input=false",
+            "-detailed-exitcode",
+            f"-var=delivery={slug}",
+            f"-out={plan_file}",
+        ],
+        tmp_path,
         timeout=600,
-        check=False,
     )
     assert result.returncode in (0, 2), f"terraform plan failed: {result.stderr}"
+
+    show = _terraform(["show", "-json", str(plan_file)], tmp_path, timeout=60)
+    assert show.returncode == 0, f"terraform show -json failed: {show.stderr}"
+    changes = {rc["address"]: rc["change"]["after"] for rc in json.loads(show.stdout)["resource_changes"]}
+    cluster = changes.get("google_container_cluster.burritbot")
+    assert cluster is not None, "plan has no google_container_cluster.burritbot"
+    assert cluster["resource_labels"].get(DELIVERY_LABEL) == slug, cluster["resource_labels"]
+    assert cluster["cost_management_config"] == [{"enabled": True}]
+    secret = changes.get("google_secret_manager_secret.vertex_ai")
+    assert secret is not None, "plan has no google_secret_manager_secret.vertex_ai"
+    assert secret["labels"].get(DELIVERY_LABEL) == slug, secret["labels"]
 
 
 # --- Live GCP and cluster assertions ----------------------------------------

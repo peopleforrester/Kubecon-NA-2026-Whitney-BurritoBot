@@ -33,7 +33,7 @@ fixed statically).
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
   (ruff check, then static suite) 519 passed, 44 deselected after the
-  #83 billing export hand-off
+  #84 live Terraform checks
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -71,6 +71,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #60 cold read confirmed (question 130, decided by Michael): Whitney reads on 2026-10-26, paper-read check 2026-10-23; PORTLAND-CARRY-FORWARD.md, PLAN.md and the critical path updated, test pins the date, reader and check, ABSTRACT-READINESS.md takes the new paper-read date; 474 static green
 - 2026-10-16 · #79 attribution correction: decisions.md gains a dated amendment naming hecaton's coordinator, under Michael's standing rules, as the decider of the #24, #26 and #44 draft approvals and the #26 and #45 draft reruns; no earlier entry edited; the stated static count catches up with #76's tests; 497 static green
 - 2026-10-16 · #83 detailed billing export: a console-only step for a Billing Account Administrator or Costs Manager, with no API, gcloud or Terraform resource; no GCP credential or project exists to check or enable it from a run, so it waits on #17 (the identity, project and billing account) and then on Michael; placed on the critical path between #17 and the first Night Before apply (#18); the stated static count catches up with #78's tests; 519 static green
+- 2026-10-16 · #84 live Terraform checks: the skip was already a fail (#62); validate now runs `init -backend=false` first, plan takes `-var delivery=$BURRITBOT_DELIVERY` (no default, fails naming it) after a GCS-backed init and asserts the delivery label and cost allocation in the plan JSON, each in its own TF_DATA_DIR; #59's Terraform validated and offline-planned with Terraform 1.16.6 (decisions.md); the real-project plan waits on #17's credentials; 519 static green
 
 ---
 
