@@ -119,21 +119,24 @@ def _gateway_timeout() -> float:
     return _load(BURRITBOT_APP, "burritbot_app_timeout_budget").GATEWAY_TIMEOUT_SECONDS
 
 
-def _frontend() -> ModuleType:
+def _frontend(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    """Import main.py with the delivery overlay's /chat limits, which it needs to start (question 157)."""
+    monkeypatch.setenv("AUDIENCE_TOKEN_LIMIT", "10/minute")
+    monkeypatch.setenv("AUDIENCE_ADDRESS_LIMIT", "300/minute")
     return _load(FRONTEND_MAIN, "audience_frontend_main_timeout_budget")
 
 
 @pytest.mark.static
 def test_guarded_timeouts_outlast_the_hops_inside_them(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BURRITBOT_GUARDED", raising=False)
-    violations = budget_violations(_docs(GATEWAY_FILE), _gateway_timeout(), _frontend().GUARDED_TIMEOUT_SECONDS)
+    violations = budget_violations(_docs(GATEWAY_FILE), _gateway_timeout(), _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS)
     assert not violations, "\n".join(violations)
 
 
 @pytest.mark.static
 def test_frontend_uses_the_guarded_timeout_on_the_guarded_target(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-guarded")
-    frontend = _frontend()
+    frontend = _frontend(monkeypatch)
     _, _, timeout = frontend._resolve_target()
     assert timeout == frontend.GUARDED_TIMEOUT_SECONDS
 
@@ -141,7 +144,7 @@ def test_frontend_uses_the_guarded_timeout_on_the_guarded_target(monkeypatch: py
 @pytest.mark.static
 def test_frontend_keeps_the_unguarded_timeout_on_the_unguarded_target(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-unguarded")
-    frontend = _frontend()
+    frontend = _frontend(monkeypatch)
     _, _, timeout = frontend._resolve_target()
     assert timeout == frontend.UNGUARDED_TIMEOUT_SECONDS
 
@@ -183,6 +186,6 @@ def test_mutation_short_timeout_is_caught(
     docs = copy.deepcopy(_docs(GATEWAY_FILE))
     mutate(docs)
     gateway_timeout = max(_gateway_timeout() + gateway_delta, 1.0)
-    frontend = frontend_timeout if frontend_timeout is not None else _frontend().GUARDED_TIMEOUT_SECONDS
+    frontend = frontend_timeout if frontend_timeout is not None else _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS
     violations = budget_violations(docs, gateway_timeout, frontend)
     assert any(expected in v for v in violations), violations

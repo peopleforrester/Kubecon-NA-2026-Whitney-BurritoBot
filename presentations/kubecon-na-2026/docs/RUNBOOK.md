@@ -108,13 +108,20 @@ Run this checklist T-60 minutes before the talk. Everything here is
    `200` from `/` with the Feedback button in the header, and open `/qr`
    on the projector laptop: the URL printed under the code is the one
    phones will open.
-   The frontend's `10/minute` limit is per phone address. Behind the GKE
-   Gateway it keys on the client entry the load balancer writes into
-   `X-Forwarded-For`, so the load balancer no longer puts the room in one
-   budget. The venue NAT still can: phones on the same venue Wi-Fi leave
-   through one public address and share its 10 prompts a minute. Phones
-   on cellular each get their own. Watch for `429`s in the first minute
-   of Act 1 and record them under **Room network**.
+   The frontend's `/chat` limit is `10/minute` per browser: the page
+   keeps a random token in `localStorage`, so phones sharing the venue
+   NAT each get their own budget. One address is capped at `300/minute`
+   however many tokens it sends (about 30 phones at the full rate). A
+   phone that sends no token is held to `10/minute` on its address.
+   Behind the GKE Gateway the address is the client entry the load
+   balancer writes into `X-Forwarded-For`. Both numbers live in
+   `presentations/kubecon-na-2026/deploy/audience/delivery-audience.yaml`
+   (`AUDIENCE_TOKEN_LIMIT`, `AUDIENCE_ADDRESS_LIMIT`). To retune at the
+   venue, change them there and let ArgoCD sync; the pod restarts with
+   the new numbers and fresh budgets. Skip `kubectl set env`: the
+   Application self-heals the Deployment back to Git. Watch for `429`s in the first minute of Act 1 and record
+   them under **Room network**. A phone that hits the ceiling is told to
+   wait or switch to cellular.
 
 ---
 
@@ -221,7 +228,7 @@ cells are unmeasured; do not backfill from memory.
 | Record | What to capture | Rehearsal | Day-of |
 |---|---|---|---|
 | Real devices | Audience page on at least one iOS Safari and one Android Chrome phone, on venue Wi-Fi and on cellular: loads, no overlapping elements, prompt submits | — | — |
-| Room network | Venue Wi-Fi held for the whole slot (yes / no / when it dropped); count of `429` responses from the per-address rate limit | — | — |
+| Room network | Venue Wi-Fi held for the whole slot (yes / no / when it dropped); count of `429` responses, per-browser (`phone`) and per-address ceiling (`network`) | — | — |
 | Cost | Spend from provisioning start (Night Before) to teardown complete, GKE and Vertex AI separately, from the billing export queries in `docs/BILLING-EXPORT.md` (read at least three days after teardown) | — | — |
 
 ---

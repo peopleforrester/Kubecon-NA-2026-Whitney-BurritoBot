@@ -18,7 +18,9 @@ spec:
   source:
     repoURL: https://github.com/peopleforrester/burritobot.git
     targetRevision: main
-    path: deploy/audience
+    # The active delivery's overlay of deploy/audience: it sets the /chat
+    # limits per browser token and per address (question 157).
+    path: presentations/kubecon-na-2026/deploy/audience
   destination:
     server: https://kubernetes.default.svc
     namespace: audience

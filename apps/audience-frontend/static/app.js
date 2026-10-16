@@ -1,5 +1,5 @@
 // ABOUTME: Audience phone page behaviour — sends prompts to /chat and lists the replies.
-// ABOUTME: Replies render with textContent only; the 10/minute limit surfaces as a friendly 429 note.
+// ABOUTME: Sends a per-browser token for the /chat limit; replies render with textContent only.
 "use strict";
 
 (function () {
@@ -14,6 +14,27 @@
     "burritbot-unguarded": "unguarded",
     "burritbot-guarded": "guarded",
   };
+
+  // The /chat limit is per browser (question 157): a random token kept in
+  // localStorage, so a reload keeps its budget. Where storage is blocked the
+  // page sends none, and the server holds the phone to its address's budget.
+  const TOKEN_KEY = "burritbot-audience-token";
+  const TOKEN = (function () {
+    try {
+      let token = window.localStorage.getItem(TOKEN_KEY);
+      if (!/^[0-9a-f]{32}$/.test(token || "")) {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        token = Array.from(bytes, function (b) {
+          return b.toString(16).padStart(2, "0");
+        }).join("");
+        window.localStorage.setItem(TOKEN_KEY, token);
+      }
+      return token;
+    } catch (err) {
+      return null;
+    }
+  })();
 
   function addTurn(prompt) {
     const item = document.createElement("li");
@@ -32,9 +53,12 @@
     return { who: who, reply: reply };
   }
 
-  function failureText(status) {
+  function failureText(status, limit) {
+    if (status === 429 && limit === "network") {
+      return "Whoa, this Wi-Fi network has sent a lot of prompts in the last minute. Give it a moment, or switch to cellular.";
+    }
     if (status === 429) {
-      return "Whoa, this network has sent 10 prompts in the last minute. Give it a moment and try again.";
+      return "Whoa, that's a lot of prompts from this phone in the last minute. Give it a moment and try again.";
     }
     if (status === 422) {
       return "That prompt is empty or longer than 2000 characters.";
@@ -56,13 +80,25 @@
     const turn = addTurn(prompt);
     setBusy(true);
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (TOKEN) {
+        headers["X-Audience-Token"] = TOKEN;
+      }
       const resp = await fetch("/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: headers,
         body: JSON.stringify({ prompt: prompt }),
       });
       if (!resp.ok) {
-        turn.reply.textContent = failureText(resp.status);
+        let limit = null;
+        if (resp.status === 429) {
+          limit = await resp.json().then(function (body) {
+            return body.limit;
+          }, function () {
+            return null;
+          });
+        }
+        turn.reply.textContent = failureText(resp.status, limit);
         turn.reply.className = "reply error";
         return;
       }

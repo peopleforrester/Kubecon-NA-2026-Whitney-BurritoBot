@@ -1,5 +1,5 @@
-# ABOUTME: Phase 7 audience rate-limit key tests (#57) — each phone behind the GKE load balancer
-# ABOUTME: gets its own 10/minute budget; X-Forwarded-For is trusted only from Google's LB ranges.
+# ABOUTME: Phase 7 audience address tests (#57) — each phone behind the GKE load balancer is keyed on its own
+# ABOUTME: address (a tokenless phone's budget, and every phone's ceiling); X-Forwarded-For is trusted only from Google's LB ranges.
 
 from __future__ import annotations
 
@@ -25,6 +25,15 @@ GFE_PEER = "35.191.12.34"  # a Google Front End proxy, as the pod sees it
 GFE_PEER_ALT = "130.211.1.2"
 LB_IP = "34.120.10.20"  # the Gateway's forwarding-rule address
 
+# The delivery overlay's numbers (question 157); the app refuses to start without them.
+LIMITS = {"AUDIENCE_TOKEN_LIMIT": "10/minute", "AUDIENCE_ADDRESS_LIMIT": "300/minute"}
+
+
+@pytest.fixture(autouse=True)
+def _limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env, value in LIMITS.items():
+        monkeypatch.setenv(env, value)
+
 
 def _load_backend() -> ModuleType:
     """Import a fresh copy of main.py, so each test gets its own limiter storage."""
@@ -42,10 +51,11 @@ def _request(peer: str, forwarded_for: str | None = None) -> Request:
 
 
 @pytest.mark.static
-def test_limiter_is_keyed_on_client_address() -> None:
+def test_a_tokenless_phone_is_keyed_on_client_address() -> None:
     backend = _load_backend()
-    assert backend.limiter._key_func is backend.client_address, (
-        "the /chat limiter is not keyed on client_address()"
+    request = _request(GFE_PEER, f"203.0.113.5,{LB_IP}")
+    assert backend.caller_key(request) == "address:203.0.113.5", (
+        "a phone without a token is not keyed on client_address()"
     )
 
 
@@ -99,7 +109,7 @@ def _refused_port() -> int:
 def test_each_phone_behind_the_load_balancer_has_its_own_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Eleven prompts from one phone hit 429; the phone beside it is still served."""
+    """Eleven tokenless prompts from one phone hit 429; the phone beside it is still served."""
     monkeypatch.setenv("BURRITBOT_UNGUARDED_URL", f"http://127.0.0.1:{_refused_port()}")
     # The module's own app: the limiter is module-level, and a second
     # create_app() would register the /chat limit twice.

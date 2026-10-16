@@ -22,13 +22,14 @@ MANIFESTS = load_manifests(PROJECT_ROOT)
 ARGOCD_VALUES = PROJECT_ROOT / "gitops" / "argocd" / "values.yaml"
 
 # The wrapper Applications and the path each one builds: deploy/<x>, or the
-# active delivery's overlay of it where the delivery slug is written in (#82).
+# active delivery's overlay of it where the delivery slug (#82) or the
+# audience limits (question 157) are written in.
 WRAPPERS = {
     "monitoring": "deploy/monitoring",
     "security": "deploy/security",
     "ai-gateway": "presentations/kubecon-na-2026/deploy/ai-gateway",
     "burritbot": "presentations/kubecon-na-2026/deploy/burritbot",
-    "audience": "deploy/audience",
+    "audience": "presentations/kubecon-na-2026/deploy/audience",
 }
 
 
