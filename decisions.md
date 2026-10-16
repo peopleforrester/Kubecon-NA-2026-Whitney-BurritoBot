@@ -760,3 +760,27 @@ current staging:
   The probe asserts both.
 - **No in-repo guard test** listing the banned markers, for the reason
   given under #61.
+
+## 2026-10-16T17:04:13Z · decision · #72 is already satisfied by #68; no new install (issue #72)
+
+#72 asks for a pinned chart Application for Envoy Gateway and the Envoy
+AI Gateway CRDs and controller (AI Gateway v0.6.0 or later with its
+matching Envoy Gateway; v1.2.0 needs Envoy Gateway 1.9.2 or later),
+plus the `envoy-ai-gateway` GatewayClass. #68 (`39fd024`, merged to
+staging in `db4e9ca`) already does all of it:
+
+- `gitops/apps/envoy-gateway.yaml`: `gateway-helm` v1.9.2 (wave -1).
+- `gitops/apps/ai-gateway-crds.yaml`: `ai-gateway-crds-helm` v1.2.0
+  (wave -1).
+- `gitops/apps/ai-gateway-controller.yaml`: `ai-gateway-helm` v1.2.0
+  (wave 2).
+- `ai-gateway/envoy/gatewayclass.yaml`: GatewayClass
+  `envoy-ai-gateway`, rendered by `deploy/ai-gateway/kustomization.yaml`.
+
+The app-of-apps (`gitops/bootstrap/app-of-apps.yaml`) picks all three
+up from `gitops/apps` (recursive, `*.yaml`).
+`tests/test_ai_gateway_controller_install.py` holds the pins, the
+GatewayClass and the waves (22 static cases pass). Nothing changes in
+the manifests. #68's own entry records that this deploy configuration
+waits for Michael's review before any cluster syncs it. That applies to
+#72 too.
