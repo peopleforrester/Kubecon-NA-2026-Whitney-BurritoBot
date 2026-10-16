@@ -41,8 +41,8 @@ spec:
         grafana:
           # Admin credentials are sourced from a Secret synced by ESO.
           # The matching ExternalSecret lives at
-          # security/eso/grafana-admin-external-secret.yaml and pulls
-          # from GCP Secret Manager key `burritbot-grafana-admin`.
+          # security/eso/grafana-admin/grafana-admin-external-secret.yaml
+          # and pulls from GCP Secret Manager key `burritbot-grafana-admin`.
           admin:
             existingSecret: grafana-admin-credentials
             userKey: admin-user

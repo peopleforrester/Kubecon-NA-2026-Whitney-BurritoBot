@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 472 passed, 41 deselected after the
-  #70 apiextensions fixture probe
+  (ruff check, then static suite) 495 passed, 41 deselected after the
+  #76 kustomize wrapper fix
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -321,7 +321,14 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 472 static tests green. Live tests fail loudly when
+- Kustomize sources (23), #76: no Application sets `source.directory`
+  on a path holding a kustomization; every kustomization an Application
+  renders lists files only in or below its own directory unless
+  `kustomize.buildOptions` relaxes the load restrictor; each `deploy/<x>`
+  wrapper renders cluster objects; mutation tests set `directory:` over
+  each kustomization file name and list a file outside the root, both
+  top-level and nested
+- **Total: 495 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
@@ -393,30 +400,19 @@ them up without re-discovering them.
   `observability/grafana/dashboards/` (C1) but no sync target lists
   them, and the ServiceMonitor / PodMonitor extras are still TODO in
   `deploy/monitoring/kustomization.yaml`.
-- **The `deploy/<x>/` wrapper Applications never run kustomize (#54,
-  confirmed against ArgoCD `release-3.3` source).**
-  `gitops/apps/10-monitoring.yaml`, `10-security.yaml`,
-  `20-ai-gateway.yaml`, `20-burritbot.yaml` and `30-audience.yaml` point
-  at `deploy/<x>/` (only a `kustomization.yaml`) and set
-  `spec.source.directory.recurse: true`. `GetAppSourceType`
-  (`reposerver/repository/repository.go`) uses `source.ExplicitType()`
-  before any auto-detection, and a non-nil `directory` makes the type
-  `Directory`. `docs/user-guide/tool_detection.md` says the same:
-  an explicitly configured tool wins. In directory mode ArgoCD reads
-  every yaml file with `apiVersion:` and `kind:` as a manifest. That
-  means each app's only object is a `kustomize.config.k8s.io/v1beta1`
-  `Kustomization`, which the cluster has no API for. None of the
-  referenced manifests sync. Removing `directory:` is not enough
-  on its own. Every `resources:` entry is a *file* outside the
-  kustomization root (`../../apps/...`, `../../ai-gateway/...`,
-  `../../security/...`). kustomize's default `LoadRestrictionsRootOnly`
-  rejects those files with `security; file ... is not in or below ...`,
-  and `gitops/argocd/values.yaml` sets only `--enable-helm` in
-  `kustomize.buildOptions`. The fix needs a choice between two options:
-  a global `--load-restrictor LoadRestrictionsNone`, or per-directory
-  kustomizations referenced as directories. That choice is open. Not
-  affected: `cert-manager-issuers.yaml` (`security/cert-manager/` is
-  plain yaml) and the root `app-of-apps.yaml` (`gitops/apps/`).
+- **The `deploy/<x>/` wrapper Applications build with kustomize (#76,
+  found in #54).** The five wrapper Applications no longer set
+  `spec.source.directory`, so ArgoCD detects Kustomize from
+  `deploy/<x>/kustomization.yaml`. Each wrapper now lists directories,
+  and each of those directories holds its own `kustomization.yaml`
+  (`ai-gateway/{envoy,nemo-guardrails,llm-guard}`, `apps/burritbot/k8s`,
+  `apps/audience-frontend/k8s`, `security/kyverno/policies`,
+  `security/eso/{cluster-secret-store,grafana-admin}`). That keeps
+  kustomize's default `LoadRestrictionsRootOnly`, and
+  `gitops/argocd/values.yaml` is unchanged. `security/eso/` is split so
+  monitoring and security each reference one directory. All five
+  wrappers built with kustomize v5.7.1 off-cluster; the ArgoCD sync
+  itself is checked in the live bring-up (#18).
 
 ## Next Session — Phase 1 Live Validation
 Once #17 restores a GCP identity and the real project ID is confirmed:

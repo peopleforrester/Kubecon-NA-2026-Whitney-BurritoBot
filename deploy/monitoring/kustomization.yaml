@@ -3,8 +3,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# A directory with its own kustomization.yaml: kustomize's default
+# LoadRestrictionsRootOnly refuses a file outside this directory (#76).
 resources:
-  - ../../security/eso/grafana-admin-external-secret.yaml
+  - ../../security/eso/grafana-admin
 
 # Note: kube-prometheus-stack, otel-collector, loki, tempo, promtail are not
 # referenced here — they ship as standalone ArgoCD Applications under

@@ -1,0 +1,9 @@
+# ABOUTME: Audience frontend Deployment + Service + ServiceAccount, rendered by deploy/audience.
+# ABOUTME: Lists files in this directory only, so kustomize's default load restrictor accepts it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml

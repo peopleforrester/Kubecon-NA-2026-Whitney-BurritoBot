@@ -1,9 +1,9 @@
 # ABOUTME: ArgoCD sync target for the audience-frontend deployment + service + SA.
-# ABOUTME: References real manifests under apps/audience-frontend/k8s.
+# ABOUTME: References the kustomization in apps/audience-frontend/k8s, which lists the real manifests.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# A directory with its own kustomization.yaml: kustomize's default
+# LoadRestrictionsRootOnly refuses a file outside this directory (#76).
 resources:
-  - ../../apps/audience-frontend/k8s/deployment.yaml
-  - ../../apps/audience-frontend/k8s/service.yaml
-  - ../../apps/audience-frontend/k8s/serviceaccount.yaml
+  - ../../apps/audience-frontend/k8s

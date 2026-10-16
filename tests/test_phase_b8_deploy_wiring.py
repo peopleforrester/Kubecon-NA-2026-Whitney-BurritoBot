@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.manifest_graph import kustomization_files
 
 
 DEPLOY = PROJECT_ROOT / "deploy"
@@ -25,25 +26,19 @@ def _load_kustomization(path: Path) -> dict:
 
 @pytest.mark.static
 def test_deploy_monitoring_includes_grafana_external_secret() -> None:
-    """B2 added a Grafana admin ExternalSecret; deploy/monitoring should wire it."""
-    k = _load_kustomization(DEPLOY / "monitoring" / "kustomization.yaml")
-    resources = k.get("resources", []) or []
-    has_grafana = any("grafana-admin-external-secret" in r for r in resources)
-    assert has_grafana, (
-        "deploy/monitoring must include "
-        "../../security/eso/grafana-admin-external-secret.yaml"
+    """B2 added a Grafana admin ExternalSecret; deploy/monitoring should render it."""
+    rendered = kustomization_files(PROJECT_ROOT, DEPLOY / "monitoring")
+    assert "security/eso/grafana-admin/grafana-admin-external-secret.yaml" in rendered, (
+        f"deploy/monitoring must render the Grafana admin ExternalSecret; renders {sorted(rendered)}"
     )
 
 
 @pytest.mark.static
 def test_deploy_security_includes_cluster_secret_store() -> None:
-    """B2 added a gcpsm ClusterSecretStore; deploy/security should wire it."""
-    k = _load_kustomization(DEPLOY / "security" / "kustomization.yaml")
-    resources = k.get("resources", []) or []
-    has_css = any("cluster-secret-store" in r for r in resources)
-    assert has_css, (
-        "deploy/security must include "
-        "../../security/eso/cluster-secret-store.yaml"
+    """B2 added a gcpsm ClusterSecretStore; deploy/security should render it."""
+    rendered = kustomization_files(PROJECT_ROOT, DEPLOY / "security")
+    assert "security/eso/cluster-secret-store/cluster-secret-store.yaml" in rendered, (
+        f"deploy/security must render the ClusterSecretStore; renders {sorted(rendered)}"
     )
 
 

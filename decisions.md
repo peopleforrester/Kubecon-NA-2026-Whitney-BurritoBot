@@ -952,3 +952,35 @@ before the acceptance was read: the MCP server (ruled out in
 attacks presenter-driven). They are open questions for Michael and
 Whitney; nothing here changes those rules. `tests/test_abstract_readiness.py`
 holds the record to nine rated rows and to paths that exist.
+
+## 2026-10-16T19:36:51Z · decision · The deploy/<x> wrappers reference per-directory kustomizations; the load restrictor stays at its default (issue #76)
+
+#54 found that the five `deploy/<x>` wrapper Applications set
+`spec.source.directory.recurse: true`, which makes ArgoCD treat the source
+as a plain Directory, so `kustomization.yaml` was never built. Dropping
+`directory:` alone was not enough. Every wrapper listed files outside its
+own root, and kustomize's default `LoadRestrictionsRootOnly` refuses
+those. `kustomize build` (v5.7.1) failed on all five with `security; file
+... is not in or below ...`.
+
+Issue #76 offered three options. This run took (B): a `kustomization.yaml`
+in each source directory, and the wrappers list those directories. The
+other two were turned down for these reasons:
+
+- (A), a global `--load-restrictor LoadRestrictionsNone` in
+  `kustomize.buildOptions`, lifts a kustomize safety check for every
+  Application on the ArgoCD instance. It also changes the hand-applied
+  ArgoCD bootstrap values, which needs a `helm upgrade` outside GitOps.
+- (C), dropping the wrappers, throws away the `deploy/<x>` layer that
+  the critical-fixes plan, the B8/C4 tests and the docs build on.
+
+(B) changes only the repo layout and the five Application sources. The
+`security/eso/` files moved into `cluster-secret-store/` (security) and
+`grafana-admin/` (monitoring) so that each wrapper references a whole
+directory. The rendered file set is the same as before, and all five
+wrappers now build. `tests/test_kustomize_sources.py` keeps the shape in
+place. An Application on a kustomization path may not set
+`source.directory`. A rendered kustomization may not list a file outside
+its root unless `kustomize.buildOptions` relaxes the restrictor. If (A) is
+ever chosen, that test lets the relaxation through, and it is the only
+change the test allows.

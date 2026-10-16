@@ -250,6 +250,8 @@ def test_mutation_reference_grant_for_other_service_is_caught() -> None:
 
 GRANT_PATH = "apps/burritbot/k8s/referencegrant-guarded.yaml"
 BURRITBOT_KUSTOMIZATION = "deploy/burritbot/kustomization.yaml"
+# The kustomization that lists the grant file; deploy/burritbot references its directory (#76).
+GRANT_KUSTOMIZATION = "apps/burritbot/k8s/kustomization.yaml"
 
 
 @pytest.mark.static
@@ -268,10 +270,10 @@ def _burritbot_tree(root: Path, drop: str | None = None) -> None:
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(PROJECT_ROOT / rel, root / rel)
     if drop is not None:
-        kust = root / BURRITBOT_KUSTOMIZATION
+        kust = root / GRANT_KUSTOMIZATION
         lines = kust.read_text(encoding="utf-8").splitlines(keepends=True)
         kept = [ln for ln in lines if drop not in ln]
-        assert len(kept) == len(lines) - 1, f"expected exactly one {drop!r} line in {BURRITBOT_KUSTOMIZATION}"
+        assert len(kept) == len(lines) - 1, f"expected exactly one {drop!r} line in {GRANT_KUSTOMIZATION}"
         kust.write_text("".join(kept), encoding="utf-8")
 
 

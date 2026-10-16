@@ -1,0 +1,8 @@
+# ABOUTME: LLM Guard Deployment + Service + ConfigMap, rendered by deploy/ai-gateway.
+# ABOUTME: config.yaml is the scanner config the ConfigMap carries, not a cluster object.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - configmap.yaml
