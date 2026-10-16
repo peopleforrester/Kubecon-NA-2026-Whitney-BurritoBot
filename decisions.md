@@ -1276,3 +1276,74 @@ and documentation, not observed:
 The billing service name `Vertex AI` is also unconfirmed against a real
 export. The doc says what to check if the second query comes back
 empty.
+
+## 2026-10-16T22:43:43Z · decision · The nemo-guardrails Deployment follows the 25.07 microservice: port 7331, a config store holding burritbot, /v1/health probes (issue #90)
+
+#73 found three ways the `nemo-guardrails` container, as deployed, would
+never answer the #66 adapter. This run checked each against NVIDIA's
+25.7.0 documentation (archive.docs.nvidia.com/nemo/microservices/25.7.0/):
+the Guardrails reference, the configuration-store page, the Docker
+tutorial and the published `guardrails.openapi.yaml`. NGC still refuses
+anonymous pulls (`docker manifest inspect` answers `unauthorized`), and
+no NGC key is available to a run, so the image itself was not read.
+
+- **Port.** The reference lists `GUARDRAILS_PORT`, "the port that the
+  service listens on", default 7331. The Docker tutorial publishes
+  `-p 7331:7331` and probes `http://0.0.0.0:7331/v1/health`. 8000 was the
+  open-source `nemoguardrails` server's port. The container now sets
+  `GUARDRAILS_PORT: "7331"` explicitly, so a changed default in a later
+  image cannot move it silently. Its `http` containerPort, the Service's
+  `http` port and the adapter's `SCANNER_URL` (`http://127.0.0.1:7331`)
+  follow. Keeping 8000 by setting `GUARDRAILS_PORT=8000` was possible, but
+  the image's documented default is the one NVIDIA's examples and
+  support assume.
+- **Config store.** The microservice reads `CONFIG_STORE_PATH` (default
+  `/app/services/guardrails/config-store`), one directory per config id,
+  each holding `config.yml` and `rails/`. The docs' own example mounts
+  `/config-store`. `NEMO_GUARDRAILS_CONFIG_PATH` appears nowhere in the
+  25.07 reference, so it is dropped. The ConfigMaps now mount at
+  `/config-store/burritbot/config.yml` (subPath `config.yaml`, so the
+  ConfigMap key, the overlay patch and its drift test stay as they are)
+  and `/config-store/burritbot/rails`. The directory name is the
+  adapter's `NEMO_GUARDRAILS_CONFIG_ID`, `burritbot`. `DEFAULT_CONFIG_ID`
+  (default `default`, which this store does not carry) is set to
+  `burritbot` too, so a request that names no config gets this one.
+- **Probes.** The 25.07 OpenAPI lists eight paths: `/v1/guardrail/`
+  `chat/completions`, `checks`, `completions`, `configs`,
+  `configs/{namespace}/{config_name}`, `models`, `models/{model_id}`, and
+  `/v1/health`. `/v1/rails/configs` is not one of them. Both probes now
+  ask `/v1/health` on `http`.
+- **The adapter's call holds.** `/v1/guardrail/checks` takes
+  `GuardrailCheckRequest` (required `model` and `messages`, optional
+  `guardrails.config_id`) and returns `GuardrailCheckResponse` (required
+  `status`, from `StatusEnum` `blocked`/`success`, and `rails_status`).
+  That matches `nemo_checks_payload` and `nemo_verdict`, so the adapter
+  code is unchanged.
+
+Tests: `tests/test_nemo_guardrails_microservice.py` derives the port
+from `GUARDRAILS_PORT` and requires the containerPort and `SCANNER_URL` to
+match it. It requires the two ConfigMaps under
+`CONFIG_STORE_PATH/<adapter config id>/`, `DEFAULT_CONFIG_ID` equal to that
+id, and no `NEMO_GUARDRAILS_CONFIG_PATH`. Both probes must be on
+`/v1/health`, and the adapter's path must be in the 25.07 path set.
+Twelve mutation cases restore the #66 shape or drift one value at a time,
+and each is caught. Two live tests port-forward to the Service's `http`
+port: one expects a 200 from `/v1/health`, and one makes the adapter's
+exact checks call with config id `burritbot` and expects the Act 1 salsa
+prompt to be blocked. The port-8000 assumptions in
+`test_phase_c2_nemo_guardrails.py`, `test_cross_manifest_references.py`
+and `test_guardrails_extproc.py` now use 7331 for NeMo. llm-guard-api
+stays on 8000.
+
+Not verified here: nothing has run on a cluster (#18), and the image was
+not pulled. Whether a 25.07 container comes up under this pod spec is
+also unchecked:
+- `runAsUser: 1001` with `readOnlyRootFilesystem: true`, and only `/tmp`
+  and `/home/nemo/.cache` writable. `DB_URI` defaults to the relative
+  `sqlite:///guardrails.db`; the reference ties it to database storage,
+  not the local store, but whether the image opens it anyway is unknown.
+- The image shipping the `vertexai` engine (`langchain-google-vertexai`)
+  that `config.yml` names. `DEFAULT_LLM_PROVIDER` defaults to `nim`.
+
+This is deploy configuration. As with #66 and #68, it waits for
+Michael's review before any cluster syncs it.

@@ -1,5 +1,5 @@
-# ABOUTME: ConfigMap wrapping the four Colang 1.0 rails; mounted at /config/rails/.
-# ABOUTME: NeMo Guardrails Deployment expects config.yaml + rails/ side-by-side under /config/.
+# ABOUTME: ConfigMap wrapping the four Colang 1.0 rails; mounted at /config-store/burritbot/rails/.
+# ABOUTME: The microservice reads config id burritbot from config.yml + rails/ side by side in that directory.
 ---
 apiVersion: v1
 kind: ConfigMap

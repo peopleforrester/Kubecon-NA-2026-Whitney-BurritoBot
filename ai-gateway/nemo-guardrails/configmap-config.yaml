@@ -1,4 +1,4 @@
-# ABOUTME: ConfigMap wrapping NeMo Guardrails config.yaml; mounted at /config/config.yaml.
+# ABOUTME: ConfigMap wrapping NeMo Guardrails config.yaml; mounted at /config-store/burritbot/config.yml.
 # ABOUTME: Companion to configmap-rails.yaml — both consumed by the nemo-guardrails Deployment.
 ---
 apiVersion: v1

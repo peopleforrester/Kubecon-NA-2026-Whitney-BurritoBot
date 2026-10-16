@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 545 passed, 46 deselected after the
-  #87 Grafana dashboard sync
+  (ruff check, then static suite) 560 passed, 48 deselected after the
+  #90 NeMo Guardrails microservice alignment
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -76,6 +76,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #82 unguarded Vertex AI calls carry `burritbot-io_owner` and `burritbot-io_delivery` (from `BURRITBOT_DELIVERY`; unset or invalid is a 502 naming it); the guarded path's equivalents found (AIServiceBackend `bodyMutation` after the gateway's translation, `ChatVertexAI` `labels` via NeMo model `parameters`), both needing the slug as a manifest literal; where the slug lives waits for Michael; 531 static green
 - 2026-10-16 · #82 question 152 (decided by hecaton's research under Michael's standing rules): the delivery slug lives in kustomize overlays under `presentations/kubecon-na-2026/deploy/{burritbot,ai-gateway}`, which the ArgoCD `burritbot` and `ai-gateway` Applications now sync; they set `BURRITBOT_DELIVERY`, the AIServiceBackend labels `bodyMutation` and both NeMo `vertexai` models' labels; the platform base carries a placeholder too long to be a label value; the Vertex AI Cost row query filters by `burritbot-io_delivery`; 542 static green
 - 2026-10-17 · #87 Grafana dashboards reach the cluster: `observability/grafana/dashboards/kustomization.yaml` lists the three dashboard ConfigMaps and `deploy/monitoring` references that directory (no TODO left for them); a static test holds each dashboard ConfigMap to a file an ArgoCD-synced kustomization renders; 545 static green
+- 2026-10-17 · #90 nemo-guardrails Deployment checked against NVIDIA's 25.07 microservice docs and OpenAPI (NGC refuses anonymous pulls, so not the image): it listens on `GUARDRAILS_PORT` 7331 (was 8000, the open-source server's), serves config id `burritbot` from `CONFIG_STORE_PATH=/config-store` with `config.yml` and `rails/` under `/config-store/burritbot/` (was `NEMO_GUARDRAILS_CONFIG_PATH=/config`, which it does not read), `DEFAULT_CONFIG_ID=burritbot`, probes on `/v1/health` (was `/v1/rails/configs`); the Service's http port and the adapter's `SCANNER_URL` move to 7331; `tests/test_nemo_guardrails_microservice.py` holds the contract with mutation cases and a live checks call; 560 static green
 
 ---
 
@@ -343,7 +344,13 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 545 static tests green. Live tests fail loudly when
+- NeMo Guardrails microservice 25.07 (15), #90: the container's
+  `GUARDRAILS_PORT`, http containerPort, Service http port and the
+  adapter's `SCANNER_URL` agree; the config and rails ConfigMaps sit at
+  `CONFIG_STORE_PATH/<adapter config id>/` with `DEFAULT_CONFIG_ID` the
+  same id; probes and the adapter's checks call use 25.07 API paths;
+  mutation tests restore the #66 shape and drift each value
+- **Total: 560 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

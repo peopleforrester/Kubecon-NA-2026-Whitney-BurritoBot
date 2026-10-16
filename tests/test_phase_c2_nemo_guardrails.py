@@ -123,10 +123,10 @@ def test_service_exposes_named_port() -> None:
     service = next(d for d in _all_docs(DEPLOYMENT) if d["kind"] == "Service")
     ports = service["spec"]["ports"]
     assert ports, "Service must expose at least one port"
-    # NeMo Guardrails microservice default REST port is 8000.
+    # The NeMo Guardrails microservice listens on GUARDRAILS_PORT, 7331 by default (#90).
     expected_ports = {p["port"] for p in ports}
-    assert 8000 in expected_ports, (
-        f"Service must expose port 8000 (NeMo default); got {expected_ports}"
+    assert 7331 in expected_ports, (
+        f"Service must expose port 7331 (NeMo microservice default); got {expected_ports}"
     )
 
 
