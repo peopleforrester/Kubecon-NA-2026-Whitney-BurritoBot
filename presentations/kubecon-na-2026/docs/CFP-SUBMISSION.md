@@ -5,6 +5,11 @@
 travel live in `peopleforrester/conference-knowledge`
 (`events/registry.yaml`, `events/cfp_pipeline.yaml`). Read them there;
 this repo keeps no copy.
+**Status:** an earlier draft, not the accepted text. The accepted text
+is Sessionize session 1249553, transcribed in
+`peopleforrester/talks-knowledge`
+(`abstracts/recovered/sessionize-public-profile.md`, section 5). See
+`ABSTRACT-READINESS.md` for the platform checked against it.
 **Speakers:** Whitney Lee and Michael Forrester
 **Demo Repo:** github.com/peopleforrester/burritobot
 
