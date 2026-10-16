@@ -31,7 +31,7 @@ it is named as workshop-only rather than forced into a 30-minute session.
 | **Step zero, then step N equals challenge N.** | Workshop numbering, and this talk has no challenges. The lesson underneath it is that the document's structure should match what is happening in the room. The runbook headings match the on-stage segments one to one (Night Before, Pre-flight, Act 1, Cast the Net, Act 2), so a cold reader can always find their place. | `RUNBOOK.md` structure. |
 | **Real policy YAML, not a `guards-on` toggle.** | Carries over directly. The two-namespace A/B split and `cast-net.sh` stay, because that architecture is non-negotiable. But the switch is not the argument. Act 2 now puts on screen the rule that fired: the Colang rail, the LLM Guard scanner, the Kyverno policy or the Falco rule. | `RUNBOOK.md` Act 2 step 3. `tests/test_portland_carry_forward.py` checks that every file it names exists. |
 | **Provision the night before.** | Carries over, at a smaller scale: one cluster, not a workshop fleet. Bring-up, ArgoCD sync and the full pre-flight run the evening before, which leaves T-60 for read-only checks. Teardown finishes within three hours of the session closing. | `RUNBOOK.md` Night Before and Teardown. |
-| **A Feedback button inside the lab.** | Carries over as a requirement for the audience phone page: a feedback link on the page people already have open. That page does not exist yet (see Mobile below). Until it does, the conference session survey is the only feedback channel, which was Portland's zero-feedback baseline. | Requirement on the phone-page follow-up. |
+| **A Feedback button inside the lab.** | Carries over as a requirement for the audience phone page: a feedback link on the page people already have open. The page now has a Feedback button in its header (#56). It links to whatever `FEEDBACK_URL` names, and that destination is not chosen yet. Until it is, the conference session survey is the only feedback channel, which was Portland's zero-feedback baseline. | `apps/audience-frontend/static/index.html`. |
 
 Portland's result (NPS 62, mean 9.0, zero detractors, 8 of 8 respondents
 rating pacing and difficulty "just right", attendance growing from 21 to
@@ -48,13 +48,13 @@ the `RUNBOOK.md` **Measurements** record. Blank cells mean unmeasured.
    segment, filled at each rehearsal and on the day. Only two budgets are
    known today: Act 1 at most 5 minutes (the runbook's hard rule) and Q&A
    about 5 minutes (`PLAN.md`). The first timed rehearsal sets the rest.
-2. **Mobile.** The gap is worse here than at Portland: there is no phone
-   page at all. `apps/audience-frontend/backend/main.py` is a JSON API
-   (`/healthz`, `/config`, `/chat`). The `index.html`, `app.js`,
-   `styles.css` and QR landing page in `BUILD-INSTRUCTIONS.md` were never
-   built, and the Phase 7 static tests pass against the backend alone. The
-   Real devices row requires one iOS Safari and one Android Chrome phone,
-   each on venue Wi-Fi and on cellular.
+2. **Mobile.** When this note was written there was no phone page at
+   all: `apps/audience-frontend/backend/main.py` was a JSON API
+   (`/healthz`, `/config`, `/chat`). #56 built the page (`/`), its
+   `app.js` and `styles.css`, and the projector QR landing (`/qr`).
+   Headless Chromium has rendered it at phone widths, but no real phone
+   has loaded it. The Real devices row still requires one iOS Safari and
+   one Android Chrome phone, each on venue Wi-Fi and on cellular.
 3. **Room network.** The Room network row records whether venue Wi-Fi
    held. Reading the code turned up a second risk. The frontend's
    `10/minute` limit is keyed on the connecting address, uvicorn runs

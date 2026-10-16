@@ -95,6 +95,12 @@ Run this checklist T-60 minutes before the talk. Everything here is
 8. **Audience URL reachable from phones:**
    Hit the audience frontend URL from the venue Wi-Fi before the lights
    come down. The venue NAT often breaks things that passed in rehearsal.
+   The page needs two settings on the Deployment, `FEEDBACK_URL` (the
+   page's Feedback button) and `AUDIENCE_PUBLIC_URL` (what the QR code
+   encodes). Either one missing returns a `503` that names it. Expect
+   `200` from `/` with the Feedback button in the header, and open `/qr`
+   on the projector laptop: the URL printed under the code is the one
+   phones will open.
    The frontend's `10/minute` limit is keyed on the connecting address,
    and uvicorn runs without proxy headers, so a room of phones behind one
    NAT or one load balancer shares a single budget. Watch for `429`s in

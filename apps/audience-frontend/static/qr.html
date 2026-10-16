@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- ABOUTME: QR landing for the projector — one large code that opens the audience phone page. -->
+<!-- ABOUTME: main.py fills the code and the printed URL from AUDIENCE_PUBLIC_URL per request. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scan to talk to BurritBot</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="projector">
+  <main class="landing">
+    <h1>Talk to BurritBot</h1>
+    <div class="qr">{{qr_svg}}</div>
+    <p class="url">{{public_url}}</p>
+    <p class="hint">Scan with your phone camera. The Feedback button is at the top of the page.</p>
+  </main>
+</body>
+</html>

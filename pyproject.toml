@@ -41,6 +41,7 @@ dev = [
     "google-cloud-secret-manager>=2.20.0",
     "google-cloud-storage>=2.18.0",
     "google-genai==1.71.0",
+    "httpx==0.28.1",
     "kubernetes>=35.0.0",
     "nemoguardrails>=0.22.0",
     "opentelemetry-api==1.41.0",
@@ -54,4 +55,5 @@ dev = [
     "qrcode>=8.2",
     "requests>=2.32.5",
     "ruff==0.17.1",
+    "slowapi==0.1.9",
 ]
