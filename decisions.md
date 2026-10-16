@@ -483,3 +483,19 @@ What it changes:
   fails the test with the rail's name rather than swallowing.
 - The audience backend's `logger.exception` drops the redundant
   exception argument (TRY401); the traceback already carries it.
+
+## 2026-10-16T15:40:00Z · decision · The repo banner is a Pillow composite, not a Gemini-generated repo-showcase render (issue #32)
+
+- `assets/hero.png` (1376x768, the Unleash banner's size) is the first
+  image in `README.md`, directly under the H1, so the MRF-website
+  banner sync picks it up.
+- It is drawn with Pillow: the BurritoBot burrito
+  (`Unleash_an_Agent_Watch_It_Burn` `assets/burrito.png`) caught in a
+  glowing cyan orb-web net on the dark ember-and-violet palette of
+  `watch-it-burn-hero.png`. The two headshot circles and their
+  positions are lifted 1:1 from that already-public banner.
+- The repo-showcase path (Gemini background, Drive portraits) had no
+  key or Drive access from the run. The earlier run's question offered
+  this composite as the default; it is taken. A repo-showcase render
+  can replace the file at the same path later without a README change.
+- The GitHub social preview card is a repo setting and stays manual.

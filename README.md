@@ -1,5 +1,7 @@
 # burritbot — A Reusable Kubernetes Platform for Agentic Covenants
 
+![burritbot: the net cast over BurritoBot, with Michael Forrester and Whitney Lee](assets/hero.png)
+
 burritbot is a self-contained Kubernetes platform that runs the *same*
 chatbot two ways at once — completely unguarded in one namespace, and
 locked behind a layered guardrails stack in another — so the difference
