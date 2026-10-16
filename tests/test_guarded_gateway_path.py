@@ -94,6 +94,13 @@ def _load(path: Path, name: str) -> ModuleType:
     return module
 
 
+def _load_frontend(monkeypatch: pytest.MonkeyPatch, name: str) -> ModuleType:
+    """Import main.py with the delivery overlay's /chat limits, which it needs to start (question 157)."""
+    monkeypatch.setenv("AUDIENCE_TOKEN_LIMIT", "10/minute")
+    monkeypatch.setenv("AUDIENCE_ADDRESS_LIMIT", "300/minute")
+    return _load(FRONTEND_MAIN, name)
+
+
 def _closed_port_url() -> str:
     """An http URL on a loopback port nothing listens on."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -129,7 +136,7 @@ def test_frontend_guarded_url_is_the_proxy_service() -> None:
 @pytest.mark.static
 def test_frontend_guarded_url_default_is_the_proxy_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BURRITBOT_GUARDED_URL", raising=False)
-    frontend = _load(FRONTEND_MAIN, "audience_frontend_main_guarded_url")
+    frontend = _load_frontend(monkeypatch, "audience_frontend_main_guarded_url")
     assert frontend.BURRITBOT_GUARDED_URL == _proxy_service_url()
 
 
@@ -153,7 +160,7 @@ def test_frontend_sends_the_audience_host_on_the_guarded_target(
     """The guarded request names the audience hostname; the Service name would fall through."""
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-guarded")
     monkeypatch.delenv("BURRITBOT_GUARDED_HOST", raising=False)
-    frontend = _load(FRONTEND_MAIN, "audience_frontend_main_guarded_host")
+    frontend = _load_frontend(monkeypatch, "audience_frontend_main_guarded_host")
     url, headers, _ = frontend._resolve_target()
     assert url == frontend.BURRITBOT_GUARDED_URL
     assert headers.get("Host") in _audience_hostnames(), (
@@ -165,7 +172,7 @@ def test_frontend_sends_the_audience_host_on_the_guarded_target(
 @pytest.mark.static
 def test_frontend_unguarded_target_keeps_its_own_host(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-unguarded")
-    frontend = _load(FRONTEND_MAIN, "audience_frontend_main_unguarded_host")
+    frontend = _load_frontend(monkeypatch, "audience_frontend_main_unguarded_host")
     url, headers, _ = frontend._resolve_target()
     assert url == frontend.BURRITBOT_UNGUARDED_URL
     assert "Host" not in headers

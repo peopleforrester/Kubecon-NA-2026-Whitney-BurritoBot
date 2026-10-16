@@ -1510,3 +1510,95 @@ timeout. Raised as a follow-up.
 
 This is deploy configuration, and it waits for Michael's review before
 any cluster syncs it, as with #66, #90 and #91.
+## 2026-10-16T23:38:00Z · decision · question 157: the audience limit is 10/minute per browser token under a 300/minute per-address ceiling, set in the delivery overlay (issue #88)
+
+Question 157 asked how the audience `/chat` limit should treat a shared
+venue NAT for the November 2026 delivery (2026-11-09 to 11-12).
+Phones on one venue Wi-Fi leave through one public NAT address. Under
+#57's per-address key they shared a single 10/minute budget, and only
+phones on cellular got one each.
+
+Answer: (b), a per-browser token. The page sets a random ID in
+localStorage and sends it with `/chat`. The limit is 10 per minute per
+token, as the spec intends per person. A per-address ceiling of 300 per
+minute (a room of about 30 active phones at the full rate) stops a
+phone from getting around the limit by clearing its token. Both numbers
+are settings in the delivery's kustomize overlay under
+`presentations/kubecon-na-2026/deploy/`, so they can be tuned at the
+venue without a code change. Option (a) still lets one phone use up the
+room's budget, and (c) fails the demo on venue Wi-Fi.
+
+Decided by the coordinator under Michael's standing rules, not by
+Michael.
+
+What it changes:
+
+- `apps/audience-frontend/static/app.js` keeps 16 random bytes from
+  `crypto.getRandomValues` as 32 hex characters in `localStorage`
+  (`burritbot-audience-token`) and sends them as `X-Audience-Token`.
+  Where storage throws (some private modes), it sends no token. A `429`
+  whose `limit` is `network` tells the phone to wait or switch to
+  cellular. A `phone` 429 tells it to wait.
+- `apps/audience-frontend/backend/main.py` reads `AUDIENCE_TOKEN_LIMIT`
+  and `AUDIENCE_ADDRESS_LIMIT` once at startup. If either is unset or
+  `limits` cannot parse it, the app refuses to start, naming the
+  variable. There is no default in code. `/chat` carries two slowapi
+  limits:
+  - The per-phone limit (`AUDIENCE_TOKEN_LIMIT`) is keyed on
+    `caller_key()`: `token:<token>`, or `address:<client_address()>`
+    when no header is sent. It is checked first, so a prompt it refuses
+    does not count against the ceiling.
+  - The ceiling (`AUDIENCE_ADDRESS_LIMIT`) is keyed on
+    `client_address()` whatever token the phone sends.
+  A token that is not 32 lowercase hex characters gets a `400`. Without
+  this check the key would be any string a client sends. The limiter is
+  built inside `create_app()`, one per app. A `429` body is
+  `{"detail", "limit"}`, and `limit` is `phone` or `network`. `/config`
+  reports `token_limit` and `address_limit` in place of `rate_limit`.
+- `presentations/kubecon-na-2026/deploy/audience/` wraps
+  `deploy/audience`. A strategic-merge patch sets
+  `AUDIENCE_TOKEN_LIMIT=10/minute` and
+  `AUDIENCE_ADDRESS_LIMIT=300/minute` on the `audience-frontend`
+  container. The ArgoCD `audience` Application now syncs this overlay.
+  The base Deployment sets neither, so a sync without the overlay
+  crash-loops instead of running with numbers nobody chose.
+- `limits==5.8.0` (already locked as slowapi's dependency, current
+  release on 2026-10-16) is now a direct entry in the
+  `image-audience-frontend` group, because `main.py` imports
+  `limits.parse_many` to validate the settings. slowapi only logs an
+  unparseable limit and leaves the route unlimited. The hashed
+  requirements export is unchanged.
+- Phase 7 spec: the per-IP rule becomes a per-browser limit under a
+  per-address ceiling, both set from the overlay. The literal
+  `10/minute`-in-`main.py` criterion becomes a check that `main.py`
+  reads both settings and the token header.
+  `tests/test_phase_07_browser_token.py` (20 static, 1 live) covers:
+  - per-token budgets behind one NAT
+  - the ceiling against fresh tokens
+  - a missing token falling back to the per-address limit
+  - malformed tokens
+  - startup refusing missing or unparseable settings
+  - the page's token handling
+  - the overlay's numbers, Application path and patch target
+  - the base leaving the numbers unset
+  The live test renders the overlay with `kubectl kustomize`.
+- RUNBOOK Pre-flight step 8 explains the limits and how to retune them
+  through the overlay. The Room network row now counts `phone` and
+  `network` 429s. The Phase 7 rows in both scorecards and the
+  PORTLAND-CARRY-FORWARD room-network note say the same.
+- #92's `tests/test_guarded_timeout_budget.py` imports `main.py`, which
+  now needs both settings to start. Its loader sets the overlay's
+  numbers, as `tests/test_guarded_gateway_path.py` does. `/chat` keeps
+  #92's per-target timeout from `_resolve_target()`.
+
+Verified here: mutation runs fail the new tests. The runs were: the
+ceiling decorator removed, the tokenless key collapsed to one room key,
+the overlay ceiling changed to 30/minute, and the Application path
+reverted to `deploy/audience`. kustomize v5.7.1 (release checksum
+checked, used only on this host) built the overlay. It differs from the
+`deploy/audience` build only by the two env entries. With
+`kubectl kustomize` routed to that binary, the live render test passed.
+
+Not verified here: no cluster and no browser engine. app.js was not run
+in a browser (no node or Chromium on this host), and no real phone has
+sent a token.

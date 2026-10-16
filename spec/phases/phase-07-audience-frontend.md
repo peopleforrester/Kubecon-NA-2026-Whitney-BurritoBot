@@ -1,7 +1,8 @@
 # Phase 7: Audience Frontend + Cast-Net Toggle
 
 **Goal:** FastAPI frontend for the audience in the room, fronted by a
-QR code, rate-limited to 10 requests per minute per source IP, with
+QR code, rate-limited to 10 requests per minute per browser (a token
+the page sets) under a per-address ceiling, with
 `scripts/cast-net.sh` wiring the live demo toggle between unguarded
 and guarded BurritBot paths.
 
@@ -11,9 +12,10 @@ and guarded BurritBot paths.
 **Outputs:**
 
 - `apps/audience-frontend/backend/main.py` — FastAPI app, imports
-  FastAPI, enforces a 10/minute per-IP rate limit (slowapi or a small
-  hand-rolled dependency), references both `burritbot-unguarded` and
-  `burritbot-guarded` upstream targets
+  FastAPI, limits `/chat` per browser token (`X-Audience-Token`) under a
+  per-address ceiling, read from `AUDIENCE_TOKEN_LIMIT` and
+  `AUDIENCE_ADDRESS_LIMIT` (slowapi), references both
+  `burritbot-unguarded` and `burritbot-guarded` upstream targets
 - `apps/audience-frontend/backend/requirements.txt` — `uv export` of
   the `image-audience-frontend` group in uv.lock, pinned with hashes
 - `apps/audience-frontend/backend/Dockerfile`
@@ -23,7 +25,9 @@ and guarded BurritBot paths.
 - `apps/audience-frontend/k8s/service.yaml`
 - `scripts/cast-net.sh` — executable, two ABOUTME lines, references
   both `burritbot-unguarded` and `burritbot-guarded`
-- `gitops/apps/audience-frontend.yaml` — sync-wave `2`
+- `gitops/apps/30-audience.yaml` — sync-wave `2`, syncing the active
+  delivery's overlay `presentations/<event>/deploy/audience`, which sets
+  both limits (10/minute and 300/minute)
 
 **Test Criteria (tests/test_phase_07_frontend.py):**
 
@@ -31,8 +35,11 @@ Static:
 
 - `test_audience_frontend_tree_exists`
 - `test_backend_uses_fastapi`
-- `test_backend_enforces_rate_limit` — `10/minute` or equivalent
-  appears in `main.py`
+- `test_backend_enforces_rate_limit` — `main.py` reads both limit
+  settings and the token header and limits a route
+  (`tests/test_phase_07_browser_token.py` drives the limits: per-token
+  budgets, the per-address ceiling, a missing token falling back to the
+  per-address limit, the overlay's numbers)
 - `test_backend_declares_burritbot_targets` — both unguarded and
   guarded string references
 - `test_cast_net_script_exists_and_is_executable` — file exists, has
@@ -47,9 +54,16 @@ Live:
 **Key Technology Decisions:**
 
 - FastAPI backend (matches the rest of the Python stack)
-- slowapi for rate limiting, or a custom middleware — either works,
-  but the rate limit must be a literal `10/minute` or
-  `RATE_LIMIT = 10`
+- slowapi for rate limiting. The limit is 10 per minute per browser:
+  the page keeps a random token in `localStorage` and sends it as
+  `X-Audience-Token`. A request without one is held to the same number
+  on its source address. A per-address ceiling (300/minute, about 30
+  phones on one venue Wi-Fi at the full rate) caps one address however
+  many tokens it sends, so clearing the token cannot get around it.
+  Both numbers are settings in the delivery's kustomize overlay, tuned
+  at the venue without a code change; the app refuses to start without
+  them (question 157, `decisions.md`). A per-IP limit alone gave every
+  phone behind one venue NAT a single shared budget.
 - `cast-net.sh` uses `kubectl patch --type=json` on an HTTPRoute in
   `burritbot-net`, not `kubectl apply` — the runbook rehearsal target
   is under 500ms

@@ -1,0 +1,12 @@
+# ABOUTME: This delivery's overlay of deploy/audience: sets the audience /chat limits (question 157).
+# ABOUTME: Tune the two numbers here at the venue; ArgoCD rolls the pod, no code change.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# A directory with its own kustomization.yaml, so the default load
+# restrictor accepts it from here (#76).
+resources:
+  - ../../../../deploy/audience
+
+patches:
+  - path: delivery-audience.yaml

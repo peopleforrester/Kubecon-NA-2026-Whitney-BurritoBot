@@ -81,7 +81,7 @@ that lie.
 
 | CNCF Project | Layer | Version | Status | Notes |
 |--------------|-------|---------|--------|-------|
-| FastAPI audience frontend | Audience | 0.1.0 | RED | 10/minute per-IP rate limit |
+| FastAPI audience frontend | Audience | 0.1.0 | RED | 10/minute per-browser rate limit, 300/minute per-address ceiling |
 | cast-net.sh | Audience | 0.1.0 | RED | Live traffic toggle |
 
 ### Phase 8 — Hardening

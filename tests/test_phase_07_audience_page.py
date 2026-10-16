@@ -36,6 +36,13 @@ CANONICAL_PROMPTS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The delivery overlay's /chat limits (question 157); the app refuses to start without them."""
+    monkeypatch.setenv("AUDIENCE_TOKEN_LIMIT", "10/minute")
+    monkeypatch.setenv("AUDIENCE_ADDRESS_LIMIT", "300/minute")
+
+
 def _load_backend() -> ModuleType:
     """Import apps/audience-frontend/backend/main.py under a private name."""
     spec = importlib.util.spec_from_file_location("audience_frontend_main", BACKEND_FILE)

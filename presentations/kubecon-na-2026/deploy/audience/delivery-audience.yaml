@@ -1,0 +1,20 @@
+# ABOUTME: Strategic-merge patch: the audience frontend's per-browser /chat limit and its per-address ceiling.
+# ABOUTME: tests/test_phase_07_browser_token.py holds these to question 157's 10/minute and 300/minute.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audience-frontend
+  namespace: audience
+spec:
+  template:
+    spec:
+      containers:
+        - name: audience-frontend
+          env:
+            # Each browser's token (or, without one, the phone's address).
+            - name: AUDIENCE_TOKEN_LIMIT
+              value: 10/minute
+            # One address, however many tokens: about 30 phones on the
+            # venue Wi-Fi at the full rate.
+            - name: AUDIENCE_ADDRESS_LIMIT
+              value: 300/minute

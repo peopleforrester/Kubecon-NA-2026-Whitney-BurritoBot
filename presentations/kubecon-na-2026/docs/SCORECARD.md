@@ -84,7 +84,7 @@ the skeleton at `spec/SCORECARD.md` is the build-time template.
 
 | CNCF Project | Layer | Version | Status | Notes |
 |--------------|-------|---------|--------|-------|
-| FastAPI audience frontend | Audience | 0.1.0 | YELLOW | slowapi `10/minute` per-IP; CORS locked to demo origins |
+| FastAPI audience frontend | Audience | 0.1.0 | YELLOW | slowapi `10/minute` per browser token under a `300/minute` per-address ceiling, both set by the delivery overlay; CORS locked to demo origins |
 | cast-net.sh | Audience | 0.1.0 | YELLOW | `kubectl patch --type=json`; cast / recall / status |
 | Deployment in `audience` ns | Audience | — | YELLOW | Non-root, readOnlyRootFilesystem, probes |
 

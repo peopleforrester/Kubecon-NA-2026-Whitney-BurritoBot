@@ -1,4 +1,4 @@
-# ABOUTME: Audience frontend — the phone page, its QR landing, and a 10/minute per-phone /chat proxy.
+# ABOUTME: Audience frontend — the phone page, its QR landing, and a /chat proxy limited per browser token.
 # ABOUTME: Routes to burritbot-unguarded (Act 1) or burritbot-guarded via the gateway (Act 2).
 
 from __future__ import annotations
@@ -7,6 +7,7 @@ import html
 import ipaddress
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -15,9 +16,16 @@ import httpx
 import qrcode
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    Response,
+)
+from limits import parse_many
 from pydantic import BaseModel, Field
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
 
@@ -54,7 +62,17 @@ BURRITBOT_GUARDED_HOST: str = os.environ.get(
 UNGUARDED_TIMEOUT_SECONDS = 10.0
 GUARDED_TIMEOUT_SECONDS = 125.0
 
-RATE_LIMIT = "10/minute"
+# /chat limits, read once at startup from the delivery overlay
+# (presentations/<event>/deploy/audience). Each browser keeps a random token
+# in localStorage and sends it in TOKEN_HEADER; the token gets TOKEN_LIMIT_ENV
+# (the spec's per-person budget, 10/minute). A phone with no token is held
+# to the same number on its address. ADDRESS_LIMIT_ENV caps one address
+# however many tokens it sends, so clearing the token cannot mint budget
+# (question 157). Unset or unparseable, the app refuses to start.
+TOKEN_LIMIT_ENV = "AUDIENCE_TOKEN_LIMIT"
+ADDRESS_LIMIT_ENV = "AUDIENCE_ADDRESS_LIMIT"
+TOKEN_HEADER = "X-Audience-Token"
+TOKEN_PATTERN = re.compile(r"[0-9a-f]{32}")  # app.js: 16 random bytes as hex
 
 # Phones reach the pod through a GKE Gateway (global external Application
 # Load Balancer, NEG backends), so every request arrives from a Google Front
@@ -144,6 +162,21 @@ class ChatResponse(BaseModel):
     target: str
 
 
+def _limit_setting(env_name: str) -> str:
+    """Return the rate limit in env_name (e.g. "10/minute"), or raise RuntimeError."""
+    value = os.environ.get(env_name, "").strip()
+    if not value:
+        raise RuntimeError(
+            f"{env_name} is not set on the audience-frontend Deployment; "
+            "the delivery overlay under presentations/<event>/deploy/audience sets it"
+        )
+    try:
+        parse_many(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{env_name} is not a rate limit like '10/minute': {value!r}") from exc
+    return value
+
+
 def client_address(request: Request) -> str:
     """Return the phone's address: the load balancer's client entry, or the direct peer.
 
@@ -178,7 +211,17 @@ def client_address(request: Request) -> str:
         ) from exc
 
 
-limiter = Limiter(key_func=client_address, default_limits=[RATE_LIMIT])
+def caller_key(request: Request) -> str:
+    """Return the per-phone budget key: the browser's token, or its address when it sends none."""
+    token = request.headers.get(TOKEN_HEADER)
+    if token is None:
+        return f"address:{client_address(request)}"
+    if not TOKEN_PATTERN.fullmatch(token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{TOKEN_HEADER} must be 32 lowercase hex characters",
+        )
+    return f"token:{token}"
 
 
 def create_app() -> FastAPI:
@@ -188,8 +231,21 @@ def create_app() -> FastAPI:
         description="Lightweight front-end that proxies audience prompts to BurritBot.",
         version="0.1.0",
     )
+    token_limit = _limit_setting(TOKEN_LIMIT_ENV)
+    address_limit = _limit_setting(ADDRESS_LIMIT_ENV)
+    # One limiter per app: its storage is the budget, and the /chat limits
+    # below register on it.
+    limiter = Limiter(key_func=caller_key)
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limited(_: Request, exc: RateLimitExceeded) -> JSONResponse:
+        # exc.detail is the error_message of the limit that was hit; the page
+        # words a "network" 429 differently from a "phone" one.
+        return JSONResponse(
+            {"detail": f"{exc.detail} limit exceeded: {exc.limit.limit}", "limit": exc.detail},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
     # Read the templates once; a missing file stops the app at startup.
     index_template = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
@@ -223,7 +279,8 @@ def create_app() -> FastAPI:
             "unguarded_url": BURRITBOT_UNGUARDED_URL,
             "guarded_url": BURRITBOT_GUARDED_URL,
             "guarded_host": BURRITBOT_GUARDED_HOST,
-            "rate_limit": RATE_LIMIT,
+            "token_limit": token_limit,
+            "address_limit": address_limit,
             "feedback_url": os.environ.get(FEEDBACK_URL_ENV),
             "public_url": os.environ.get(PUBLIC_URL_ENV),
         }
@@ -260,7 +317,10 @@ def create_app() -> FastAPI:
         return FileResponse(STATIC_DIR / asset)
 
     @app.post("/chat", response_model=ChatResponse)
-    @limiter.limit(RATE_LIMIT)
+    # The inner limit registers, and is checked, first: a prompt the phone's
+    # own budget refuses never counts against its address's ceiling.
+    @limiter.limit(address_limit, key_func=client_address, error_message="network")
+    @limiter.limit(token_limit, error_message="phone")
     async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
         target_url, headers, timeout = _resolve_target()
         async with httpx.AsyncClient(timeout=timeout) as client:

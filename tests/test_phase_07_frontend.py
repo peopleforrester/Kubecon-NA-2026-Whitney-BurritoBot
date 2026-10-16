@@ -40,14 +40,15 @@ def test_backend_uses_fastapi() -> None:
 
 @pytest.mark.static
 def test_backend_enforces_rate_limit() -> None:
-    """Audience backend declares a 10 requests-per-minute per-IP rate limit."""
+    """Audience backend limits /chat per browser token, under a per-address ceiling (question 157).
+
+    The numbers are settings; tests/test_phase_07_browser_token.py holds the
+    delivery overlay to 10/minute per token and 300/minute per address.
+    """
     text = BACKEND_FILE.read_text(encoding="utf-8")
-    # Accept either slowapi-style decorator strings or an explicit constant.
-    assert (
-        "10/minute" in text
-        or "10 per minute" in text
-        or "RATE_LIMIT = 10" in text
-    ), "audience backend does not enforce a 10/minute rate limit"
+    for setting in ("AUDIENCE_TOKEN_LIMIT", "AUDIENCE_ADDRESS_LIMIT", "X-Audience-Token"):
+        assert setting in text, f"audience backend does not read {setting}"
+    assert "@limiter.limit(" in text, "audience backend never limits a route"
 
 
 @pytest.mark.static

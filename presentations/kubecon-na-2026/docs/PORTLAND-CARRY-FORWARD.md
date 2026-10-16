@@ -61,9 +61,11 @@ the `RUNBOOK.md` **Measurements** record. Blank cells mean unmeasured.
    in front of the pod put the room in one budget. #57 chose the exposure
    path, a GKE Gateway (global external Application Load Balancer), and
    keyed the limit on the client entry that load balancer writes into
-   `X-Forwarded-For`. The venue NAT is still a shared address: phones on
-   one venue Wi-Fi share its 10 prompts a minute, and the Room network
-   row's `429` count shows how much that cost.
+   `X-Forwarded-For`. That still left phones on one venue Wi-Fi sharing
+   its NAT address's 10 prompts a minute. #88 (question 157) keys the
+   limit on a per-browser token instead, with a 300/minute ceiling per
+   address, both set in this delivery's overlay. The Room network row's
+   `429` count shows whether those numbers held.
 4. **Cost.** This talk has never been costed either. It can be costed
    by label now (#59, the GCP counterpart of
    `Unleash_an_Agent_Watch_It_Burn#392`): the GKE cluster and the Secret
