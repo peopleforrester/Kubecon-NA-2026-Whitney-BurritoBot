@@ -21,6 +21,11 @@ RUNBOOK = PRESENTATION_DOCS / "RUNBOOK.md"
 # 72 hours by luck; the scheduled one must sit well clear of that.
 EVENT_START = dt.date(2026, 11, 9)
 COLD_READ_MIN_LEAD_DAYS = 7
+# Confirmed by Michael on issue #60 (question 130, decisions.md): Whitney
+# reads on 2026-10-26; if #18 has not landed by 2026-10-23 it is a paper read.
+COLD_READ_DATE = dt.date(2026, 10, 26)
+COLD_READ_READER = "Whitney"
+PAPER_READ_CHECK = dt.date(2026, 10, 23)
 
 PROVEN_ITEMS = (
     "Hands-on format",
@@ -72,17 +77,41 @@ def test_carry_forward_doc_maps_every_portland_result() -> None:
 @pytest.mark.static
 def test_cold_read_is_scheduled_clear_of_the_last_week() -> None:
     """The cold read has a date at least a week before the event opens."""
+    latest_allowed = EVENT_START - dt.timedelta(days=COLD_READ_MIN_LEAD_DAYS)
+    assert COLD_READ_DATE <= latest_allowed, (
+        f"cold read {COLD_READ_DATE} is later than {latest_allowed}; Portland "
+        "only caught its unwinnable challenges by luck inside 72 hours"
+    )
+    assert PAPER_READ_CHECK < COLD_READ_DATE, "paper-read check must precede the read"
+
+
+@pytest.mark.static
+def test_cold_read_section_states_the_confirmed_schedule() -> None:
+    """The doc carries the confirmed date, reader and paper-read check, and nothing stale."""
     text = CARRY_FORWARD.read_text(encoding="utf-8")
-    cold_read = _section(text, "Cold read")
-    dates = [
+    cold_read = " ".join(_section(text, "Cold read").split())
+    dates = {
         dt.date.fromisoformat(d)
         for d in re.findall(r"\b(2026-\d{2}-\d{2})\b", cold_read)
-    ]
-    assert dates, "cold read section names no date"
-    latest_allowed = EVENT_START - dt.timedelta(days=COLD_READ_MIN_LEAD_DAYS)
-    assert min(dates) <= latest_allowed, (
-        f"cold read {min(dates)} is later than {latest_allowed}; Portland "
-        "only caught its unwinnable challenges by luck inside 72 hours"
+    }
+    expected = {COLD_READ_DATE, PAPER_READ_CHECK, EVENT_START}
+    assert dates == expected, (
+        f"cold read section names {sorted(dates)}, expected {sorted(expected)}"
+    )
+    assert f"{COLD_READ_READER} reads" in cold_read, "cold read names no reader"
+    assert "proposed" not in cold_read.lower(), "cold read is confirmed, not proposed"
+
+
+@pytest.mark.static
+def test_every_paper_read_mention_names_the_confirmed_check() -> None:
+    """Any presentation doc that restates the paper-read fallback uses its confirmed date."""
+    stale = []
+    for doc in sorted(PRESENTATION_DOCS.glob("*.md")):
+        text = " ".join(doc.read_text(encoding="utf-8").split())
+        if "paper read" in text and PAPER_READ_CHECK.isoformat() not in text:
+            stale.append(doc.name)
+    assert not stale, (
+        f"{stale} mention the paper read without its {PAPER_READ_CHECK} check"
     )
 
 

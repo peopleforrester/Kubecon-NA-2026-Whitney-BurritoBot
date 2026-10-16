@@ -99,6 +99,13 @@ once tests are green.
 **Total wall-clock budget:** ~11 hours of AI build time. Realistic real-world
 spread: several working sessions plus full rehearsals in Phase 8.
 
+**Cold read (confirmed):** Whitney reads `RUNBOOK.md` cold, Night Before
+through Teardown, against a live cluster on Monday 2026-10-26, 10:00 to
+16:00 Central, in Austin. That leaves 14 days for fixes before the event
+opens on 2026-11-09. If #18 (live bring-up) has not landed by
+2026-10-23, it becomes a paper read and the first live run becomes the
+risk to plan around. See `PORTLAND-CARRY-FORWARD.md` § Cold read.
+
 ## 4. Reuse Strategy
 
 The kubeauto-ai-day tree lives on disk at

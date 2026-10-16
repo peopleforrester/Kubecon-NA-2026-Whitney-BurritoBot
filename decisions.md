@@ -952,3 +952,40 @@ before the acceptance was read: the MCP server (ruled out in
 attacks presenter-driven). They are open questions for Michael and
 Whitney; nothing here changes those rules. `tests/test_abstract_readiness.py`
 holds the record to nine rated rows and to paths that exist.
+
+## 2026-10-16T17:52:00Z · decision · question 130: the cold read is Monday 2026-10-26 and Whitney reads (issue #60)
+
+Question 130 asked Michael and Whitney to confirm the proposed cold read
+of `RUNBOOK.md` (Night Before through Teardown, against a live cluster,
+Measurements record open, one issue for every stop or guess) on
+2026-10-30, with Whitney as the reader, and a paper-read fallback if #18
+had not landed by 2026-10-27.
+
+Answer: Monday 2026-10-26, Whitney reads. Michael and Whitney are both
+back in Austin on 2026-10-25, and the 26th leaves 14 days for fixes
+before 2026-11-09. It is on Michael's calendar, 10:00 to 16:00 Central.
+The paper-read fallback check moves to 2026-10-23: if #18 (live
+bring-up) has not landed by then, the read becomes a paper read.
+
+Decided by Michael. Verdict: overridden (the proposed date was
+replaced).
+
+What it changes:
+
+- `PORTLAND-CARRY-FORWARD.md` § Cold read states the confirmed date,
+  time, place and reader instead of a proposal, and the gate's
+  fallback date moves to 2026-10-23.
+- `PLAN.md` §3 carries the confirmed cold read and the 2026-10-23
+  paper-read check under the Phase 8 rehearsals.
+- `PROJECT_STATE.md` dates the `#17 → #18 → #20` critical path against
+  the 2026-10-23 check and the 2026-10-26 read.
+- `tests/test_portland_carry_forward.py` pins `COLD_READ_DATE`
+  (2026-10-26), `COLD_READ_READER` (Whitney) and `PAPER_READ_CHECK`
+  (2026-10-23). The lead-time test checks the pinned date, not the
+  earliest date in the section, and a new test holds the section to
+  exactly those dates plus the event start, names the reader and
+  rejects "proposed".
+- `ABSTRACT-READINESS.md` (added under #75 while this was in flight)
+  restates the fallback with the 2026-10-23 date, and a static test
+  holds every presentation doc that mentions the paper read to that
+  date.
