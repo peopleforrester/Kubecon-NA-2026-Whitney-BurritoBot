@@ -1,5 +1,5 @@
 # ABOUTME: LLM Guard scanner service — Deployment + Service in burritbot-net, with the burritbot-extproc sidecar.
-# ABOUTME: ProtectAI llm-guard-api consumes /config/config.yaml; ships 4Gi+ of scanner models.
+# ABOUTME: ProtectAI llm-guard-api 0.3.16 loads /config/config.yaml via CONFIG_FILE; downloads ~4.3 GiB of scanner models.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,37 +33,49 @@ spec:
           type: RuntimeDefault
       containers:
         - name: llm-guard
-          # Pinned tag; bump deliberately, never use :latest.
-          image: laiyer/llm-guard-api:0.3.9
+          # Pinned tag; bump deliberately, never use :latest. 0.3.16 is the
+          # last release: protectai/llm-guard was archived on 2026-07-08.
+          # The image runs as uid 1000 (HOME /home/user); every file in it is
+          # world-readable, so it also runs as 1001 when its writes land on
+          # the emptyDirs below.
+          image: laiyer/llm-guard-api:0.3.16
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
+              # entrypoint.sh hardcodes uvicorn --port=8000.
               containerPort: 8000
           env:
-            - name: LLM_GUARD_CONFIG
+            # create_app() reads its config path from CONFIG_FILE (default
+            # ./config/scanners.yml, the image's built-in config).
+            - name: CONFIG_FILE
               value: /config/config.yaml
             - name: APP_WORKERS
               value: "1"
-            - name: LOG_LEVEL
-              value: INFO
+            # Where transformers and optimum download the scanner models. The
+            # image's HOME stays /home/user: its packages live in /home/user/.local.
+            - name: HF_HOME
+              value: /home/user/.cache/huggingface
+            # OTLP/HTTP; config.yaml's otel_http exporters append /v1/traces and /v1/metrics.
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: http://otel-collector.monitoring.svc.cluster.local:4317
-            - name: OTEL_SERVICE_NAME
-              value: llm-guard
-          # First request may take 30-60s while scanner models lazy-load.
-          # readinessProbe waits up to ~3 min before reporting Ready.
-          readinessProbe:
+              value: http://otel-collector.monitoring.svc.cluster.local:4318
+          # lazy_load is false, so uvicorn listens only after every scanner
+          # model is downloaded (about 4.3 GiB on a fresh pod) and loaded.
+          # The startupProbe allows 15 minutes for that before liveness counts.
+          startupProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 18
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 60
             periodSeconds: 30
           resources:
             requests:
@@ -83,10 +95,11 @@ spec:
               subPath: config.yaml
               readOnly: true
             - name: tmp
+              # tiktoken (TokenLimit) caches its encodings under /tmp.
               mountPath: /tmp
             - name: hf-cache
-              # transformers / sentence-transformers writes model weights here.
-              mountPath: /home/llm-guard/.cache/huggingface
+              # HF_HOME: the scanner models download here on first start.
+              mountPath: /home/user/.cache/huggingface
         # ext_proc adapter: Envoy speaks gRPC ext_proc, the scanner speaks REST.
         # It turns each buffered body into a call to the scanner on localhost.
         - name: burritbot-extproc
@@ -136,7 +149,8 @@ spec:
           emptyDir: {}
         - name: hf-cache
           emptyDir:
-            sizeLimit: 4Gi
+            # The configured scanners download about 4.3 GiB of ONNX models.
+            sizeLimit: 6Gi
 ---
 apiVersion: v1
 kind: Service

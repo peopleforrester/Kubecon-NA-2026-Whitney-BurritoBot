@@ -155,7 +155,7 @@ Current GA versions pinned as of 2026-04-09:
 - OTel Weaver: 0.22+ (registry check, emit, live-check)
 - OTel Python (`opentelemetry-api`/`sdk`): 1.41.0 (`-instrumentation-*`: 0.62b0)
 - NeMo Guardrails: 0.11+
-- LLM Guard: 0.3.17+
+- LLM Guard: 0.3.16 (`laiyer/llm-guard-api:0.3.16`, the last release; upstream archived 2026-07-08)
 - Grafana: 11+
 - spinybacked-orbweaver: latest (Whitney's agent)
 - **Gemini model:** `gemini-3-pro` (GA) via `google-genai` 1.71.0 with

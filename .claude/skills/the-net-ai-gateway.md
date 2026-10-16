@@ -3,7 +3,8 @@
 ## Version Pins
 
 - NeMo Guardrails: **0.11+** (Colang 2.0, `dialog.rails` block)
-- LLM Guard: **0.3.17+** (both input and output scanner APIs)
+- LLM Guard: **0.3.16** (`laiyer/llm-guard-api:0.3.16`, the last release;
+  upstream archived 2026-07-08; both input and output scanner APIs)
 - Envoy AI Gateway: **0.6+** (Gateway API based; first release serving
   the v1beta1 AIGatewayRoute)
 - Gateway API: **v1.4+** (first release serving BackendTLSPolicy v1,
@@ -84,31 +85,46 @@ rails:
 and `output_scanners` (non-empty). Phase 5 tests fail if either list is
 empty.
 
+The API reads the file named by `CONFIG_FILE` (not `LLM_GUARD_CONFIG`).
+Each scanner is a `type` plus `params`, and `params` go straight to the
+llm_guard 0.3.16 constructor as keyword arguments: an unknown key (such as
+`enabled` or `max_tokens`) stops the API at startup, and a key at the
+scanner's top level is dropped unread. `tests/test_llm_guard_api_image.py`
+holds the schema, the constructor arguments and the Deployment's paths.
+
 ```yaml
 # ABOUTME: LLM Guard config — prompt/response scanner pipeline.
 # ABOUTME: Runs alongside NeMo Guardrails on the guarded path.
+app:
+  lazy_load: false
 input_scanners:
-  - name: PromptInjection
-    threshold: 0.9
-  - name: TokenLimit
-    limit: 2048
-  - name: BanSubstrings
-    substrings:
-      - kubectl
-      - exec
-      - eval
-      - os.system
-      - sudo
+  - type: PromptInjection
+    params:
+      threshold: 0.9
+  - type: TokenLimit
+    params:
+      limit: 2048
+  - type: BanSubstrings
+    params:
+      substrings:
+        - kubectl
+        - exec
+        - eval
+        - os.system
+        - sudo
 
 output_scanners:
-  - name: NoRefusal
-    threshold: 0.85
-  - name: Regex
-    patterns:
-      - "kubectl\\s+\\w+"
-      - "rm\\s+-rf"
-  - name: Sensitive
-    entity_types: [CREDIT_CARD, US_SSN, EMAIL_ADDRESS]
+  - type: NoRefusal
+    params:
+      threshold: 0.85
+  - type: Regex
+    params:
+      patterns:
+        - "kubectl\\s+\\w+"
+        - "rm\\s+-rf"
+  - type: Sensitive
+    params:
+      entity_types: [CREDIT_CARD, US_SSN, EMAIL_ADDRESS]
 ```
 
 **Never** run only the input scanners. The whole point is that a

@@ -49,7 +49,7 @@ Live:
 **Key Technology Decisions:**
 
 - NeMo Guardrails 0.11+ with Colang 2.0
-- LLM Guard 0.3.17+ — always run both input and output scanners
+- LLM Guard 0.3.16 (the last release; upstream archived 2026-07-08) — always run both input and output scanners
 - Envoy AI Gateway 0.6+ (the first release serving the v1beta1
   AIGatewayRoute; 0.2-0.5 serve only v1alpha1)
 - Gateway API v1.4+ (the first release serving BackendTLSPolicy

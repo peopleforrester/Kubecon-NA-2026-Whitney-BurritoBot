@@ -116,7 +116,7 @@ for the per-file copy/adapt/extend/ignore map.
 - OTel Python (`opentelemetry-api`/`sdk`): 1.41.0 (`-instrumentation-*`: 0.62b0)
 - spinybacked-orbweaver: latest (Whitney's auto-instrumentation agent)
 - NeMo Guardrails: 0.11+
-- LLM Guard: 0.3.17+
+- LLM Guard: 0.3.16 (`laiyer/llm-guard-api:0.3.16`, the last release; upstream archived 2026-07-08)
 - Grafana: 11+
 - Vertex AI model: `gemini-3-pro` via `google-genai` 1.71.0
   (`google-cloud-aiplatform.vertexai.generative_models` is removed

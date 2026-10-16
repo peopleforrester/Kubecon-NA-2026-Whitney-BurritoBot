@@ -1347,3 +1347,97 @@ also unchecked:
 
 This is deploy configuration. As with #66 and #68, it waits for
 Michael's review before any cluster syncs it.
+
+## 2026-10-16T23:02:12Z · decision · The llm-guard Deployment follows llm-guard-api 0.3.16: CONFIG_FILE, the type + params schema, HF_HOME under /home/user (issue #91)
+
+#91 asked whether the `llm-guard` Deployment matches the image it runs:
+version, config path and schema, and uid. This run read the image itself
+from Docker Hub: the registry config of each tag, the file listings and
+modes of the 0.3.16 amd64 layers, and the app layer's files. It also
+read the `llm_guard_api` and `llm_guard` source at tag `v0.3.16`
+(github.com/protectai/llm-guard). The image's `app/`, `config/scanners.yml`
+and `entrypoint.sh` are byte-identical to that tag.
+
+- **Version.** 0.3.16 (Docker Hub, 2025-05-19; PyPI `llm-guard` 0.3.16) is
+  the last release. The upstream repository was archived on 2026-07-08
+  ("Archiving Project (#355)"), and no 0.3.17 exists anywhere, so the
+  "0.3.17+" pins in AGENTS.md, the phase-05 spec, the skill and the
+  delivery docs named a version that will never ship. The Deployment ran
+  0.3.9 (2024-02-14), whose image starts with `CMD ["llm_guard_api",
+  "/home/user/app/config/scanners.yml"]` and takes the config path only
+  as that argument. The Deployment moves to 0.3.16, and every pin now
+  says 0.3.16. Staying on 0.3.9 would have meant a different config
+  interface for no gain.
+- **Config path.** In 0.3.16, `create_app()` reads
+  `os.getenv("CONFIG_FILE", "./config/scanners.yml")`. Nothing in the
+  image reads `LLM_GUARD_CONFIG`, so the mounted `/config/config.yaml` was
+  never loaded: the API ran the image's built-in `scanners.yml`. That file
+  turns on `auth: http_bearer` with an empty `${AUTH_TOKEN:}`, so every
+  adapter call would have been refused. The container now sets
+  `CONFIG_FILE=/config/config.yaml`, the existing ConfigMap mount.
+- **Schema.** `Config` takes `app`, `input_scanners`, `output_scanners`,
+  `rate_limit`, `auth`, `tracing` and `metrics`. Each scanner is `type`
+  plus `params`, and the API calls `Scanner(**params)`. Run through
+  upstream's own `get_config`, the old file loaded with every scanner's
+  `params` empty: the flat keys, `enabled`, `cache`, `telemetry` and
+  `app.namespace` were dropped unread. BanTopics, BanSubstrings, Language
+  and Regex then lack a required argument, and the API would not start.
+  The file keeps the same scanners and values, rewritten as `params`, with
+  the names fixed (`TokenLimit` `limit`/`encoding_name`, not
+  `max_tokens`/`encoding`). PromptInjection's `model` is dropped because
+  the API always sets that model itself. The new file passes `get_config`,
+  and every param is a constructor argument of its 0.3.16 scanner.
+  Other choices in the file:
+  - `lazy_load: false`. Under lazy loading the first request builds every
+    scanner, which takes longer than the adapter's 8 s timeout, and
+    concurrent requests each build their own set. Loaded eagerly, uvicorn
+    listens only once the scanners are ready, so Ready means a pod that
+    can scan.
+  - No `auth`, because the adapter calls 127.0.0.1 without credentials.
+  - `tracing` and `metrics` use the `otel_http` exporter with no endpoint,
+    so they read `OTEL_EXPORTER_OTLP_ENDPOINT`. That moves from :4317
+    (gRPC) to :4318 (OTLP/HTTP, which the collector already serves).
+  - `app.name` is `llm-guard`, because the API builds service.name from
+    it and ignores `OTEL_SERVICE_NAME`, so that variable is gone.
+- **uid.** The image runs as `user` (uid 1000) with HOME `/home/user`. Its
+  packages are in the user site `/home/user/.local`, which Python finds
+  through HOME. Every directory is mode 755 and every file 644 or 755, so
+  uid 1001 can run it, and the pod keeps 1001 (the C3 hardening test
+  requires ≥ 1001). With the root filesystem read-only, the writes must
+  land on emptyDirs. The model cache is one: `HF_HOME` is now set to
+  `/home/user/.cache/huggingface`, the emptyDir's new mount. The old mount
+  at `/home/llm-guard/.cache` was a directory nothing used. `/tmp` is the
+  other, for tiktoken's cache. HOME is left alone.
+- **Startup.** The configured scanners download seven ONNX models, about
+  4.3 GiB (Hub file listings at the revisions 0.3.16 pins). That is more
+  than the old 4Gi cache, so the limit is now 6Gi. A startupProbe on
+  `/healthz` allows 15 minutes for the first download and load. Readiness
+  asks `/readyz`, and neither probe has an initial delay any more.
+
+Tests: `tests/test_llm_guard_api_image.py` checks config.yaml against the
+API's key sets and a table of each used scanner's 0.3.16 constructor
+arguments (an unchecked scanner type fails, so adding one means reading
+its signature). It also checks that the ConfigMap carries config.yaml
+unchanged. For the Deployment it checks `CONFIG_FILE` against the mount,
+`HF_HOME` and `/tmp` against the emptyDirs, the cache size against the
+models, the probe paths, and the port against the adapter. The docs'
+LLM Guard pins must equal the image tag. Twenty-nine mutation cases
+restore the #66 shape or drift one value, and each is caught. Three live
+tests port-forward to the Service: `/readyz` must answer, and the
+adapter's `/analyze/prompt` and `/analyze/output` calls must run exactly
+the configured scanners, with the Act 1 salsa prompt blocked. The NeMo
+test's port-forward fixture moves to `tests/helpers/kubectl_helpers.py`
+so both share it.
+
+Not fixed here, and not verified: the image was not run. The docker
+daemon is not open to a run, and rootless podman cannot map the image's
+uid 1000. In 0.3.16, Anonymize and Sensitive build their analyzer for
+`["en", "zh"]` (fixed upstream after the release, in ba489b0, never
+published). spaCy then downloads `zh_core_web_sm`, which the image lacks
+(only `en_core_web_sm` is installed), with pip at startup. On the
+read-only root as uid 1001 that install cannot write, so spaCy exits and
+the API stops. The fix needs a choice (a derived image with the model
+baked in, an init-time install, or dropping the two PII scanners), so it
+is raised as a follow-up. Live confirmation of all of this rides on #18.
+This is deploy configuration, and as with #66 and #90 it waits for
+Michael's review before any cluster syncs it.

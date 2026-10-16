@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 560 passed, 48 deselected after the
-  #90 NeMo Guardrails microservice alignment
+  (ruff check, then static suite) 595 passed, 51 deselected after the
+  #91 llm-guard-api 0.3.16 alignment
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -77,6 +77,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #82 question 152 (decided by hecaton's research under Michael's standing rules): the delivery slug lives in kustomize overlays under `presentations/kubecon-na-2026/deploy/{burritbot,ai-gateway}`, which the ArgoCD `burritbot` and `ai-gateway` Applications now sync; they set `BURRITBOT_DELIVERY`, the AIServiceBackend labels `bodyMutation` and both NeMo `vertexai` models' labels; the platform base carries a placeholder too long to be a label value; the Vertex AI Cost row query filters by `burritbot-io_delivery`; 542 static green
 - 2026-10-17 · #87 Grafana dashboards reach the cluster: `observability/grafana/dashboards/kustomization.yaml` lists the three dashboard ConfigMaps and `deploy/monitoring` references that directory (no TODO left for them); a static test holds each dashboard ConfigMap to a file an ArgoCD-synced kustomization renders; 545 static green
 - 2026-10-17 · #90 nemo-guardrails Deployment checked against NVIDIA's 25.07 microservice docs and OpenAPI (NGC refuses anonymous pulls, so not the image): it listens on `GUARDRAILS_PORT` 7331 (was 8000, the open-source server's), serves config id `burritbot` from `CONFIG_STORE_PATH=/config-store` with `config.yml` and `rails/` under `/config-store/burritbot/` (was `NEMO_GUARDRAILS_CONFIG_PATH=/config`, which it does not read), `DEFAULT_CONFIG_ID=burritbot`, probes on `/v1/health` (was `/v1/rails/configs`); the Service's http port and the adapter's `SCANNER_URL` move to 7331; `tests/test_nemo_guardrails_microservice.py` holds the contract with mutation cases and a live checks call; 560 static green
+- 2026-10-17 · #91 llm-guard Deployment checked against the `laiyer/llm-guard-api` image (registry config, app layers, v0.3.16 source): image 0.3.9 → 0.3.16, the last release (upstream archived 2026-07-08; no 0.3.17 exists, docs said 0.3.17+); the API reads `CONFIG_FILE` (was `LLM_GUARD_CONFIG`, read by nothing); config.yaml rewritten to the API schema (`type` + `params`, constructor arguments only; the flat keys, `enabled`, `cache` and `telemetry` were dropped unread), `lazy_load: false`, no auth, OTLP/HTTP tracing and metrics to :4318; uid 1001 kept (image files world-readable), `HF_HOME` on the emptyDir under the image's HOME `/home/user` (was `/home/llm-guard`), cache 4Gi → 6Gi for ~4.3 GiB of models, startupProbe, readiness on `/readyz`; `tests/test_llm_guard_api_image.py` holds it with mutation cases, a docs version pin and live analyze calls; Anonymize/Sensitive still need spaCy `zh_core_web_sm`, which the image lacks (follow-up); 595 static green
 
 ---
 
@@ -350,7 +351,15 @@ commit.
   `CONFIG_STORE_PATH/<adapter config id>/` with `DEFAULT_CONFIG_ID` the
   same id; probes and the adapter's checks call use 25.07 API paths;
   mutation tests restore the #66 shape and drift each value
-- **Total: 560 static tests green. Live tests fail loudly when
+- llm-guard-api 0.3.16 (35), #91: config.yaml keeps to the API's Config
+  schema and each scanner's llm_guard 0.3.16 constructor arguments, with
+  lazy loading off and no auth; the ConfigMap carries it unchanged; the
+  Deployment runs 0.3.16 with `CONFIG_FILE` on the mounted key, `HF_HOME`
+  and `/tmp` on emptyDirs under the image's HOME, a cache big enough for
+  the configured models, and startup/readiness/liveness on the API's
+  health paths; the docs pin the deployed version; mutation tests
+  restore the #66 shape and drift each value
+- **Total: 595 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
