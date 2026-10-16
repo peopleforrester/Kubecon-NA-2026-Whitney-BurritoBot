@@ -30,8 +30,9 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 ## Branch & Tests
 - Branch: `staging` (default working branch)
 - Working tree: clean
-- Last CI: n/a (no CI workflows in this repo); local static suite
-  261 passed, 16 deselected after the #40 talk-identity checks
+- Last CI: n/a (no CI workflows in this repo); local Test command
+  (ruff check, then static suite) 264 passed, 16 deselected after the
+  #44 lint gate
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -41,6 +42,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #36 conference-knowledge owns event state: CFP header becomes a pointer, AGENTS.md gains "Where things live"; 255 static green
 - 2026-10-16 · #37 Europe 2027 tutorial is workshop-lineage, not built here: decisions.md entry + README Ancestry disclaims the workshop bot; 256 static green
 - 2026-10-16 · #40 identity check: README gains "The Talk" (title, speakers, argument, event, status, Europe 2027 slate, sources) and "Where things live"; AGENTS.md names talks-knowledge for the register and abstracts; 261 static green
+- 2026-10-16 · #44 lint gate: ruff 0.17.1 pinned in the dev group with an explicit rule set; Test command runs `ruff check .` before the static suite; first-run findings fixed; 264 static green
 
 ---
 
@@ -218,7 +220,10 @@ commit.
   the Europe 2027 slate) and its sources, README and AGENTS.md name
   talks-knowledge and conference-knowledge, CLAUDE.md links AGENTS.md,
   and PROJECT_STATE.md and decisions.md exist
-- **Total: 261 static tests green. Live tests skip cleanly when
+- Lint gate (3), #44: ruff is pinned exactly in the dev group with an
+  explicit rule set, and the Test command runs `ruff check .` before
+  the static suite
+- **Total: 264 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

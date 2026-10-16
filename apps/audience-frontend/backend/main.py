@@ -15,6 +15,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+
 logger = logging.getLogger("audience-frontend")
 logging.basicConfig(level=logging.INFO)
 

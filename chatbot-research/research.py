@@ -30,10 +30,11 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
+
 
 logger = logging.getLogger("chatbot-research")
 
@@ -249,7 +250,7 @@ async def test_chatbot(
 
     Returns a result dict written to RESULTS_DIR.
     """
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
     result: dict = {
         "company": name,
         "url": url,
@@ -503,7 +504,7 @@ def generate_summary() -> str:
 
     lines = [
         "# Chatbot Dance Moves Research — Results\n",
-        f"*Generated {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n",
+        f"*Generated {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M UTC')}*\n",
         "",
         "## Played Along (off-topic response given)\n",
         "| Company | Prompt Used | Response Summary | Screenshot |",
