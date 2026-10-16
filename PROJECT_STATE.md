@@ -327,6 +327,30 @@ them up without re-discovering them.
   `observability/grafana/dashboards/` (C1) but no sync target lists
   them, and the ServiceMonitor / PodMonitor extras are still TODO in
   `deploy/monitoring/kustomization.yaml`.
+- **The `deploy/<x>/` wrapper Applications never run kustomize (#54,
+  confirmed against ArgoCD `release-3.3` source).**
+  `gitops/apps/10-monitoring.yaml`, `10-security.yaml`,
+  `20-ai-gateway.yaml`, `20-burritbot.yaml` and `30-audience.yaml` point
+  at `deploy/<x>/` (only a `kustomization.yaml`) and set
+  `spec.source.directory.recurse: true`. `GetAppSourceType`
+  (`reposerver/repository/repository.go`) uses `source.ExplicitType()`
+  before any auto-detection, and a non-nil `directory` makes the type
+  `Directory`. `docs/user-guide/tool_detection.md` says the same:
+  an explicitly configured tool wins. In directory mode ArgoCD reads
+  every yaml file with `apiVersion:` and `kind:` as a manifest. That
+  means each app's only object is a `kustomize.config.k8s.io/v1beta1`
+  `Kustomization`, which the cluster has no API for. None of the
+  referenced manifests sync. Removing `directory:` is not enough
+  on its own. Every `resources:` entry is a *file* outside the
+  kustomization root (`../../apps/...`, `../../ai-gateway/...`,
+  `../../security/...`). kustomize's default `LoadRestrictionsRootOnly`
+  rejects those files with `security; file ... is not in or below ...`,
+  and `gitops/argocd/values.yaml` sets only `--enable-helm` in
+  `kustomize.buildOptions`. The fix needs a choice between two options:
+  a global `--load-restrictor LoadRestrictionsNone`, or per-directory
+  kustomizations referenced as directories. That choice is open. Not
+  affected: `cert-manager-issuers.yaml` (`security/cert-manager/` is
+  plain yaml) and the root `app-of-apps.yaml` (`gitops/apps/`).
 
 ## Next Session — Phase 1 Live Validation
 Once #17 restores a GCP identity and the real project ID is confirmed:
