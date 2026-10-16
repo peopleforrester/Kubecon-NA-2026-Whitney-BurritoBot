@@ -64,6 +64,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #63 live fixtures proven loud: a subprocess probe requests each kubeconfig and GCP client fixture with no kubeconfig and no ADC and sees a setup error, a non-zero exit and the command that fixes it (`gcloud container clusters get-credentials` or `gcloud auth application-default login`); 416 static green
 - 2026-10-16 · #72 duplicate of #68: Envoy Gateway v1.9.2, AI Gateway CRDs and controller v1.2.0 and GatewayClass `envoy-ai-gateway` are already installed by ArgoCD; recorded in decisions.md, no manifest change; 416 static green
 - 2026-10-16 · #66 the guardrails ExtProc reaches a gRPC ext_proc server: a `burritbot-extproc` sidecar (ai-gateway/extproc/adapter.py) in each scanner pod turns buffered bodies into NeMo `/v1/guardrail/checks` and LLM Guard `/analyze/*` calls, blocks with a 403, applies LLM Guard sanitization, and fails closed (503 scanner down, 400 unreadable body); the policy names port 50051 with a 10s messageTimeout; 456 static green
+- 2026-10-16 · #73 duplicate of #66: the burritbot-extproc gRPC adapter already sits in front of both scanners; llm-guard-api 0.3.9 confirmed REST (FastAPI/uvicorn, no gRPC) from its image, NeMo Guardrails microservice 25.07 REST from NVIDIA's docs; scanner config defects found on the way are raised as follow-ups; recorded in decisions.md, no manifest change; 456 static green
 
 ---
 
