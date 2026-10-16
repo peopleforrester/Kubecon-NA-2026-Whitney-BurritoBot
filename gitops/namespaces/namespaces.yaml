@@ -1,5 +1,5 @@
 # ABOUTME: Namespace manifest for the burritbot platform; owned by the root app-of-apps.
-# ABOUTME: Creates the seven namespaces that every other manifest assumes exists.
+# ABOUTME: Creates the namespaces that every other manifest assumes exists.
 ---
 apiVersion: v1
 kind: Namespace
@@ -73,4 +73,22 @@ metadata:
   name: external-secrets
   labels:
     burritbot.io/layer: the-web
+    app.kubernetes.io/part-of: burritbot
+---
+# Envoy Gateway's controller and every proxy it runs, the burritbot-ai-gateway
+# proxy included (the Terraform WIF binding names this namespace).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: envoy-gateway-system
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: envoy-ai-gateway-system
+  labels:
+    burritbot.io/layer: the-net
     app.kubernetes.io/part-of: burritbot

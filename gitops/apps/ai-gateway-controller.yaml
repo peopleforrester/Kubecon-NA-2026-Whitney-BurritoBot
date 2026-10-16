@@ -1,0 +1,78 @@
+# ABOUTME: ArgoCD Application for the AI Gateway controller — Envoy Gateway's extension server and the webhook
+# ABOUTME: that injects the AI ext_proc into the burritbot-ai-gateway proxy pod.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway-controller
+  namespace: argocd
+  annotations:
+    # After cert-manager (wave 1), which issues the webhook certificate, and
+    # before the ai-gateway Application creates the Gateway.
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # oci://docker.io/envoyproxy/ai-gateway-helm. Moves with ai-gateway-crds.
+    repoURL: docker.io/envoyproxy
+    chart: ai-gateway-helm
+    targetRevision: v1.2.0
+    helm:
+      valuesObject:
+        controller:
+          # The Service name the envoy-gateway Application's extensionManager calls.
+          fullnameOverride: ai-gateway-controller
+          mutatingWebhook:
+            # The GKE control plane reaches private nodes on 443 and 10250 only
+            # (the auto-created "-master" firewall rule); the default 9443 times
+            # out and, with failurePolicy Fail, blocks the proxy pod.
+            port: 10250
+            # ArgoCD renders with helm template, where lookup finds nothing: the
+            # chart's own genCA keypair would be reminted on every render.
+            certManager:
+              enable: true
+          service:
+            ports:
+              - name: mutating-webhook
+                protocol: TCP
+                port: 10250
+                appProtocol: http
+                targetPort: 10250
+              - name: grpc
+                protocol: TCP
+                port: 1063
+                appProtocol: grpc
+                targetPort: 1063
+        # Where Envoy Gateway runs the proxies (the envoy-gateway Application).
+        envoyGateway:
+          namespace: envoy-gateway-system
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-ai-gateway-system
+  # The chart draws a random MCP session seed when it cannot look up the
+  # previous one, which is every ArgoCD render. The live Secret keeps the seed
+  # minted at first sync; none is written into Git. BurritBot uses no MCPRoute.
+  ignoreDifferences:
+    - kind: Secret
+      name: ai-gateway-controller-mcp-session-encryption
+      namespace: envoy-ai-gateway-system
+      jsonPointers:
+        - /data/seed
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

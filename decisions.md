@@ -629,3 +629,86 @@ the EnvoyProxy, WIF namespace and listener port; the audience Host
 against the route hostnames; and the model in the gateway body against
 the route's `x-ai-eg-model` match. A guarded `/chat` with no Vertex
 project fails on the gateway hop, not on Vertex.
+
+## 2026-10-16T16:26:14Z · decision · Envoy Gateway v1.9.2 and Agent Router (Envoy AI Gateway) v1.2.0 are installed by ArgoCD; GatewayClass envoy-ai-gateway (issue #68)
+
+`ai-gateway/envoy/gateway.yaml` named GatewayClass `envoy-ai-gateway`
+and used CRDs that nothing in `gitops/apps` installed. Three Helm
+Applications and a GatewayClass now do, following the upstream install
+(Agent Router v1.2.0 `site/docs/getting-started/prerequisites.md` and
+`installation.md`). Envoy AI Gateway was renamed Agent Router in v1.2.0
+(released 2026-10-07); the charts, images and API groups kept their
+names.
+
+- **Versions.** `gateway-helm` v1.9.2, `ai-gateway-crds-helm` v1.2.0
+  and `ai-gateway-helm` v1.2.0, all from `docker.io/envoyproxy` (OCI).
+  These are the current releases (checked 2026-10-16), and v1.2.0 builds
+  against Envoy Gateway v1.9.2. The #53 entry already checked
+  gateway.yaml against both, and the #67 entry checked the EnvoyProxy
+  against v1.9.2. The 0.6+ floor stays as the floor.
+- **`envoy-gateway`** (wave -1, `envoy-gateway-system`) takes the
+  upstream `manifests/envoy-gateway-values.yaml` at v1.2.0 inline:
+  the extension manager hooks, `enableBackend` (the Vertex `Backend`)
+  and `enableEnvoyPatchPolicy`, pointed at
+  `ai-gateway-controller.envoy-ai-gateway-system:1063`. Its crds
+  subchart installs the Gateway API CRDs and the Envoy Gateway CRDs.
+  ServerSideApply, because the EnvoyProxy and Gateway API CRDs are
+  larger than the client-side last-applied annotation allows. The
+  topology-injector webhook is off: it listens on 9443 (see below) and
+  zone-aware routing is not used.
+- **`ai-gateway-crds`** (wave -1, `envoy-ai-gateway-system`), with
+  ServerSideApply.
+- **`ai-gateway-controller`** (wave 2, `envoy-ai-gateway-system`),
+  after cert-manager (wave 1). Two chart defaults do not survive
+  ArgoCD's `helm template` render, where `lookup` finds nothing:
+  - The webhook keypair would be reminted by `genCA` on every render.
+    `controller.mutatingWebhook.certManager.enable` has cert-manager
+    issue it and inject the CA bundle.
+  - The MCP session seed would be redrawn by `randAlphaNum` on every
+    render. The v1.2.0 notes say to set `seed` or `existingSecret` for
+    GitOps. A `seed` value in Git is a committed secret. An
+    `existingSecret` would mean a new Secret Manager entry and
+    ExternalSecret for a feature BurritBot does not use (no MCPRoute).
+    Instead the Application ignores `/data/seed` on the
+    `ai-gateway-controller-mcp-session-encryption` Secret with
+    `RespectIgnoreDifferences=true`, so the seed minted at first sync
+    stays and never reaches Git. If an MCPRoute is ever added, move to
+    `existingSecret` from Secret Manager.
+- **Webhook port 10250.** The cluster has private nodes and a
+  `master_ipv4_cidr_block` (VPC peering). GKE's auto-created `-master`
+  firewall rule lets the control plane reach nodes on TCP 443 and 10250
+  only. The controller's pod-mutating webhook (failurePolicy Fail, on the
+  Envoy proxy pods) defaults to 9443, which would time out and block the
+  burritbot-ai-gateway proxy pod. It moves to 10250, the port
+  cert-manager's webhook already uses. Kyverno's webhook on 9443 has the
+  same exposure; that is raised separately.
+- **`ai-gateway`** moves from wave 1 to wave 3, after the CRDs and the
+  controller. BurritBot (wave 1) and the audience frontend (wave 2) call
+  the gateway only at request time, so they do not need to wait.
+- **GatewayClass `envoy-ai-gateway`** lives in
+  `ai-gateway/envoy/gatewayclass.yaml` and is synced by the `ai-gateway`
+  kustomization, with `controllerName:
+  gateway.envoyproxy.io/gatewayclass-controller`, the same name as the
+  Envoy Gateway config. The AI Gateway controller extends Envoy Gateway
+  and owns no GatewayClass of its own.
+- **Namespaces.** `envoy-gateway-system` and `envoy-ai-gateway-system`
+  join `gitops/namespaces/namespaces.yaml`, so every app keeps
+  `CreateNamespace=false`.
+- **GKE-managed Gateway API.** gateway-helm brings its own Gateway API
+  CRDs. Turning on `gateway_api_config` in Terraform (which the #57 GKE
+  Gateway for the audience frontend would need) would give the cluster
+  two owners of those CRDs. `tests/test_incompatible_settings.py` now
+  reports that pair and names the way out: install only the Envoy
+  Gateway CRDs from `gateway-crds-helm`, once GKE's Gateway API serves
+  BackendTLSPolicy v1.
+
+`tests/test_ai_gateway_controller_install.py` holds the pins, the
+extension-manager target, the GatewayClass, the webhook port and cert,
+the MCP seed handling and the waves. Its live tests check the CRDs, the
+GatewayClass's Accepted condition, the Gateway's Programmed condition
+and the controller Deployment. The phase-05 live check now looks for
+the proxy pod in `envoy-gateway-system` by its owning-gateway labels,
+not in `burritbot-net`.
+
+This is deploy configuration. It lands for Michael's review before any
+cluster syncs it; nothing has been applied.
