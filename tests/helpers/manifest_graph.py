@@ -22,6 +22,10 @@ AI_GATEWAY = "aigateway.envoyproxy.io"
 # Gateway API route kinds: a listener's allowedRoutes governs their parentRefs.
 ROUTE_KINDS = {"HTTPRoute", "GRPCRoute", "TLSRoute", "TCPRoute", "UDPRoute"}
 
+# Kinds whose controller generates a route of another kind, with the same
+# name, namespace and parentRefs. The listener admits the generated route.
+GENERATED_ROUTE_KINDS = {(AI_GATEWAY, "AIGatewayRoute"): "HTTPRoute"}
+
 # Kinds whose spec.template is a pod template a Service selector can match.
 POD_TEMPLATE_KINDS = {
     ("apps", "Deployment"),
@@ -300,10 +304,17 @@ def _default_route_kinds(protocol: str) -> set[str]:
     }.get(protocol, set())
 
 
+def _attaching_kind(route: Manifest) -> str | None:
+    """The route kind a listener sees for this manifest, or None if it is no route."""
+    if route.kind in ROUTE_KINDS:
+        return route.kind
+    return GENERATED_ROUTE_KINDS.get((route.group, route.kind))
+
+
 def _listener_admits(listener: dict, gateway: Manifest, route: Manifest, namespaces: dict[str, dict]) -> bool:
     allowed = listener.get("allowedRoutes") or {}
     kinds = {k["kind"] for k in allowed.get("kinds") or []} or _default_route_kinds(listener["protocol"])
-    if route.kind not in kinds:
+    if _attaching_kind(route) not in kinds:
         return False
     ns_rule = allowed.get("namespaces") or {}
     origin = ns_rule.get("from", "Same")
@@ -323,13 +334,14 @@ def unattachable_routes(manifests: list[Manifest]) -> dict[str, str]:
     """Route parentRefs that no listener on the named Gateway admits.
 
     A listener's allowedRoutes (namespace origin + route kinds) decides which
-    routes may attach. A route it refuses is never programmed into Envoy.
+    routes may attach. A route it refuses is never programmed into Envoy. An
+    AIGatewayRoute is judged as the HTTPRoute its controller generates.
     """
     index = _index(manifests)
     namespaces = {m.name: m.doc for m in manifests if m.group == "" and m.kind == "Namespace"}
     out: dict[str, str] = {}
     for ref in collect_refs(manifests):
-        if ref.field != "parentRef" or ref.source.kind not in ROUTE_KINDS or ref.kind != "Gateway":
+        if ref.field != "parentRef" or _attaching_kind(ref.source) is None or ref.kind != "Gateway":
             continue
         gw = index.get((GATEWAY_API, "Gateway", ref.namespace, ref.name))
         if gw is None:

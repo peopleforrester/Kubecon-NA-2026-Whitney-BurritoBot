@@ -237,3 +237,34 @@ stray entry at the next Test command run.
 ## 2026-10-15T12:00:00Z · 3.3 · Main fast-forwarded with known test failures
 
 On Michael's instruction, main was fast-forwarded to staging to ship the Dependabot fix with these failures, all present on main before the fix, accepted: test_terraform_plan and test_gke_cluster_is_standard_with_wif_and_nap need live GCP; the credential has expired (invalid_grant).
+
+## 2026-10-16T13:13:37Z · decision · The AIGatewayRoute takes the upstream CRD shape; ExtProc moves to an EnvoyExtensionPolicy on the Gateway (issue #49)
+
+`burritbot-gemini-route` set `spec.targetRefs` (an HTTPRoute),
+`spec.schema` and `spec.filters[].extProc`. The upstream
+AIGatewayRoute (`aigateway.envoyproxy.io`, v1alpha1 and v1beta1)
+defines none of them, so ArgoCD's ServerSideApply rejects or strips
+them. The route is now v1beta1 (matching the AIServiceBackend from
+#24) with `parentRefs: burritbot-ai-gateway`, and matches on
+`x-ai-eg-model`, the header the gateway sets from the request body,
+instead of `x-ai-model`, which nothing sets.
+
+The NeMo Guardrails and LLM Guard ExtProc entries move to the
+`burritbot-guardrails` EnvoyExtensionPolicy, unchanged in order,
+port and buffered bodies. It targets the Gateway, not one route.
+The old filters guarded the route they were attached to, the audience
+HTTPRoute. The phase-05 spec has every guarded call traverse both
+scanners, and the gateway is the single choke point. A Gateway target
+covers the audience route and the HTTPRoute generated from the
+AIGatewayRoute alike.
+
+The #26 entry above holds the route in `burritbot-net` because the old
+`targetRefs` was local. That reason is gone, but the listener stays
+`from: Same`: the generated HTTPRoute takes the AIGatewayRoute's
+namespace, so both routes on the gateway still live in `burritbot-net`.
+The cross-manifest listener check now judges an AIGatewayRoute as
+the HTTPRoute it generates.
+
+`tests/test_ai_gateway_route_schema.py` holds both objects to the
+fields their CRDs define, and its mutation tests catch each pre-#49
+shape.
