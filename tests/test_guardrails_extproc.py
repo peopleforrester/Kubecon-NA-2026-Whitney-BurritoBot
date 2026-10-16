@@ -36,8 +36,9 @@ PYPROJECT = PROJECT_ROOT / "pyproject.toml"
 
 SIDECAR = "burritbot-extproc"
 NAMESPACE = "burritbot-net"
-# What the scanners themselves serve: REST on 8000. Envoy's ext_proc there fails every request.
-SCANNER_REST_PORT = 8000
+# What the scanners themselves serve: REST, the NeMo microservice on 7331 (#90), llm-guard-api on 8000.
+# Envoy's ext_proc there fails every request.
+SCANNER_REST_PORTS = {"nemo-guardrails": 7331, "llm-guard": 8000}
 ADAPTER_PINS = ("envoy-data-plane", "betterproto2", "grpclib", "httpx")
 
 
@@ -149,7 +150,7 @@ def extproc_timeout_violations(policy: dict, docs: list[dict]) -> list[str]:
 
 @pytest.mark.static
 def test_extproc_backends_reach_the_adapter_not_the_rest_scanner() -> None:
-    """#66: nemo-guardrails:8000 and llm-guard:8000 serve REST; Envoy needs envoy.service.ext_proc.v3."""
+    """#66: nemo-guardrails:7331 and llm-guard:8000 serve REST; Envoy needs envoy.service.ext_proc.v3."""
     violations = extproc_wiring_violations(_policy(_docs(GATEWAY)), _scanner_docs())
     assert not violations, "guardrails ExtProc wired to something that is not an ext_proc server:\n  " + "\n  ".join(violations)
 
@@ -159,7 +160,8 @@ def test_extproc_backends_reach_the_adapter_not_the_rest_scanner() -> None:
 def test_mutation_extproc_on_the_scanner_rest_port_is_caught(index: int) -> None:
     """The pre-#66 wiring: the ExtProc backend is the scanner's own REST port."""
     policy = copy.deepcopy(_policy(_docs(GATEWAY)))
-    policy["spec"]["extProc"][index]["backendRefs"][0]["port"] = SCANNER_REST_PORT
+    ref = policy["spec"]["extProc"][index]["backendRefs"][0]
+    ref["port"] = SCANNER_REST_PORTS[ref["name"]]
     violations = extproc_wiring_violations(policy, _scanner_docs())
     assert any(f"spec.extProc[{index}]" in v and "not the burritbot-extproc gRPC adapter" in v for v in violations), violations
 
@@ -362,7 +364,7 @@ def test_nemo_reply_out_of_contract_is_a_scanner_error(reply: object) -> None:
 def test_config_fails_without_each_variable(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
     env = {
         "SCANNER": "nemo-guardrails",
-        "SCANNER_URL": "http://127.0.0.1:8000",
+        "SCANNER_URL": "http://127.0.0.1:7331",
         "SCANNER_TIMEOUT_SECONDS": "8",
         "EXTPROC_PORT": "50051",
         "NEMO_GUARDRAILS_MODEL": "gemini-3-pro",

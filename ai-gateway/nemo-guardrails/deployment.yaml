@@ -1,5 +1,5 @@
 # ABOUTME: NeMo Guardrails microservice — Deployment + Service in burritbot-net, with the burritbot-extproc sidecar.
-# ABOUTME: Consumes config.yaml + rails/ via two ConfigMaps mounted under /config/.
+# ABOUTME: Serves the burritbot config from a config store at /config-store/burritbot/ built from two ConfigMaps.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -41,12 +41,24 @@ spec:
         - name: nemo-guardrails
           image: nvcr.io/nvidia/nemo-microservices/guardrails:25.07
           imagePullPolicy: IfNotPresent
+          # The 25.07 microservice's own contract (NVIDIA 25.7.0 guardrails
+          # reference and configuration-store docs): it listens on
+          # GUARDRAILS_PORT (default 7331) and serves each config id from a
+          # directory of that name under CONFIG_STORE_PATH. The adapter's
+          # SCANNER_URL and NEMO_GUARDRAILS_CONFIG_ID must match these, and
+          # tests/test_nemo_guardrails_microservice.py checks that they do.
           ports:
             - name: http
-              containerPort: 8000
+              containerPort: 7331
           env:
-            - name: NEMO_GUARDRAILS_CONFIG_PATH
-              value: /config
+            - name: GUARDRAILS_PORT
+              value: "7331"
+            - name: CONFIG_STORE_PATH
+              value: /config-store
+            # Requests that name no config id get burritbot, not the image's
+            # "default", which this store does not have.
+            - name: DEFAULT_CONFIG_ID
+              value: burritbot
             - name: GOOGLE_CLOUD_PROJECT
               value: kk-community-projects
             - name: GOOGLE_CLOUD_LOCATION
@@ -57,13 +69,13 @@ spec:
               value: nemo-guardrails
           readinessProbe:
             httpGet:
-              path: /v1/rails/configs
+              path: /v1/health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /v1/rails/configs
+              path: /v1/health
               port: http
             initialDelaySeconds: 30
             periodSeconds: 30
@@ -80,12 +92,13 @@ spec:
             capabilities:
               drop: ["ALL"]
           volumeMounts:
+            # The store's documented layout: <id>/config.yml beside <id>/rails/.
             - name: nemo-config
-              mountPath: /config/config.yaml
+              mountPath: /config-store/burritbot/config.yml
               subPath: config.yaml
               readOnly: true
             - name: nemo-rails
-              mountPath: /config/rails
+              mountPath: /config-store/burritbot/rails
               readOnly: true
             - name: tmp
               mountPath: /tmp
@@ -103,7 +116,7 @@ spec:
             - name: SCANNER
               value: nemo-guardrails
             - name: SCANNER_URL
-              value: http://127.0.0.1:8000
+              value: http://127.0.0.1:7331
             # Under the policy's messageTimeout (10s), so a slow scanner gets
             # this adapter's explicit 503, not Envoy's 500.
             - name: SCANNER_TIMEOUT_SECONDS
@@ -163,7 +176,7 @@ spec:
     app.kubernetes.io/name: nemo-guardrails
   ports:
     - name: http
-      port: 8000
+      port: 7331
       targetPort: http
       protocol: TCP
     - name: extproc

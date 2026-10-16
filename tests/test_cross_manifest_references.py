@@ -191,14 +191,14 @@ def test_mutation_container_port_drift_is_caught() -> None:
     """Service port and backendRef agree, but the container listens elsewhere."""
     def mutate(ms: list[Manifest]) -> None:
         svc = _find(ms, "Service", "burritbot-net", "nemo-guardrails")
-        svc["spec"]["ports"][0]["targetPort"] = 8000
+        svc["spec"]["ports"][0]["targetPort"] = 7331
         deploy = _find(ms, "Deployment", "burritbot-net", "nemo-guardrails")
         deploy["spec"]["template"]["spec"]["containers"][0]["ports"][0]["containerPort"] = 9000
 
     manifests = _mutated(mutate)
     assert port_mismatches(manifests) == {}, "the Service-side port still agrees"
     found = service_backend_mismatches(manifests)
-    assert "Service burritbot-net/nemo-guardrails:8000" in found, found
+    assert "Service burritbot-net/nemo-guardrails:7331" in found, found
 
 
 @pytest.mark.static
