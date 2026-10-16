@@ -31,7 +31,7 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  261 passed, 16 deselected after the #40 talk-identity checks
+  272 passed, 17 deselected after the #45 BurritBot behavioural tests
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -41,6 +41,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #36 conference-knowledge owns event state: CFP header becomes a pointer, AGENTS.md gains "Where things live"; 255 static green
 - 2026-10-16 · #37 Europe 2027 tutorial is workshop-lineage, not built here: decisions.md entry + README Ancestry disclaims the workshop bot; 256 static green
 - 2026-10-16 · #40 identity check: README gains "The Talk" (title, speakers, argument, event, status, Europe 2027 slate, sources) and "Where things live"; AGENTS.md names talks-knowledge for the register and abstracts; 261 static green
+- 2026-10-16 · #45 BurritBot behavioural tests: /healthz and /chat called in-process (guarded flag, payload validation, explicit 502 without a project) + one live Vertex round-trip; audience backend held, it needs slowapi (new package); 272 static green
 
 ---
 
@@ -64,7 +65,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 261 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36; +1 for #37; +5 for #40). Zero open Dependabot alerts, zero open PRs.
+- 272 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36; +1 for #37; +5 for #40; +11 for #45). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -218,7 +219,12 @@ commit.
   the Europe 2027 slate) and its sources, README and AGENTS.md name
   talks-knowledge and conference-knowledge, CLAUDE.md links AGENTS.md,
   and PROJECT_STATE.md and decisions.md exist
-- **Total: 261 static tests green. Live tests skip cleanly when
+- BurritBot behaviour (11), #45: /healthz reports the model pin and the
+  case-insensitive guarded flag, /chat rejects bad payloads with 422
+  and fails with an explicit 502 when GOOGLE_CLOUD_PROJECT is unset,
+  all in-process via TestClient (one live test sends a real prompt to
+  Vertex AI)
+- **Total: 272 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
