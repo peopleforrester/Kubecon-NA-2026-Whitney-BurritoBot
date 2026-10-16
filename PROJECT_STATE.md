@@ -1,3 +1,47 @@
+Phase: 3.3 Promote
+Approved: pending
+
+# Project State: burritbot
+
+Phase: 3.3 Promote
+Approved: pending
+
+## Lifecycle
+- [x] 1.1 Research
+- [x] 1.2 Plan
+- [x] 1.3 Approve
+- [x] 2.1 Test
+- [x] 2.2 Implement
+- [x] 2.3 Verify
+- [x] 3.1 Stage
+- [x] 3.2 Confirm CI
+- [x] 3.3 Promote  ← you are here
+
+## Contracts
+_(none sealed under the lifecycle schema yet. Work before 2026-10-16
+was approved ad hoc and is recorded in the pre-lifecycle body below.
+Approved plans land here with ts + sha256.)_
+
+## Current Plan
+Nothing in flight. The last cycle (Dependabot bumps, promoted
+2026-10-15) is complete. When work resumes, the path is the critical
+path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
+
+## Branch & Tests
+- Branch: `staging` (default working branch)
+- Working tree: clean
+- Last CI: n/a (no CI workflows in this repo); local static suite
+  203 passed, 16 deselected on `4b435be`
+
+## Phase History
+_(append-only. Each phase transition adds one line, oldest first.)_
+- 2026-10-16T11:01:07Z · init-state migrated pre-lifecycle file → Phase 3.3
+
+---
+
+_Everything below this line is the pre-lifecycle body, preserved
+verbatim by the migration._
+
 # Project State — burritbot (Can Your Chatbot Run kubectl?)
 
 ## PAUSED — 2026-08-26
