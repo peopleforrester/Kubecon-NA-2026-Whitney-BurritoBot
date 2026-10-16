@@ -91,7 +91,10 @@ resource "google_container_cluster" "burritbot" {
   initial_node_count       = 1
   remove_default_node_pool = true
 
-  # Minimal dataplane and addons tuned for the demo.
+  # Dataplane V2 (Cilium-based) enforces NetworkPolicy natively. Do not add
+  # a network_policy {} block or addons_config.network_policy_config: the
+  # legacy Calico path is mutually exclusive with ADVANCED_DATAPATH and the
+  # GKE API rejects the combination at apply time (plan stays green).
   datapath_provider = "ADVANCED_DATAPATH"
 
   addons_config {
@@ -101,14 +104,6 @@ resource "google_container_cluster" "burritbot" {
     horizontal_pod_autoscaling {
       disabled = false
     }
-    network_policy_config {
-      disabled = false
-    }
-  }
-
-  network_policy {
-    enabled  = true
-    provider = "CALICO"
   }
 
   logging_config {
