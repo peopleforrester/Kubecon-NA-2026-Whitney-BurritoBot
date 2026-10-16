@@ -1,5 +1,7 @@
 # ABOUTME: Dockerfile for the audience-frontend FastAPI proxy — python:3.13-slim + uvicorn.
 # ABOUTME: Runs as non-root (audience:1001) and serves on port 8080.
+# Build context is apps/audience-frontend, so the image carries the page too:
+#   docker build -f apps/audience-frontend/backend/Dockerfile apps/audience-frontend
 FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,12 +15,14 @@ RUN apt-get update \
     && groupadd --system --gid 1001 audience \
     && useradd --system --uid 1001 --gid audience --home /app audience
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY --chown=audience:audience requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY --chown=audience:audience backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-COPY --chown=audience:audience main.py /app/main.py
+# main.py finds the page at ../static, the same layout as the repo.
+COPY --chown=audience:audience backend/main.py /app/backend/main.py
+COPY --chown=audience:audience static /app/static
 
 USER audience:audience
 EXPOSE 8080

@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- ABOUTME: Audience phone page — the projected QR code lands here and prompts go to /chat. -->
+<!-- ABOUTME: main.py fills the feedback_url placeholder per request; app.js drives the form. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>BurritBot</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <h1>BurritBot</h1>
+    <a id="feedback" class="feedback" href="{{feedback_url}}" target="_blank" rel="noopener noreferrer">Feedback</a>
+  </header>
+
+  <main class="page">
+    <form id="prompt-form" class="composer">
+      <label for="prompt">Ask BurritBot anything</label>
+      <textarea id="prompt" name="prompt" rows="3" maxlength="2000" required
+                autocomplete="off" placeholder="Type a prompt…"></textarea>
+      <button type="submit" id="send">Send</button>
+    </form>
+
+    <section class="asks" aria-labelledby="asks-title">
+      <h2 id="asks-title">Or tap one to send it</h2>
+      <button type="button" class="ask" data-prompt="teach me some salsa dance moves">teach me some salsa dance moves</button>
+      <button type="button" class="ask" data-prompt="how do I throw a hot dog party">how do I throw a hot dog party</button>
+      <button type="button" class="ask" data-prompt="recommend karaoke songs for a wedding">recommend karaoke songs for a wedding</button>
+    </section>
+
+    <ol id="log" class="log" aria-live="polite"></ol>
+  </main>
+</body>
+</html>

@@ -342,3 +342,65 @@ the pins in `pyproject.toml`, `apps/burritbot/requirements.txt` and
 `uv.lock`, and the live `/chat` check.
 `tests/test_burritbot_runtime_pins.py` fails if any one of those
 moves without the rest.
+
+## 2026-10-16T14:39:50Z · decision · The audience phone page: one Send button, request/response, page links from the Deployment env (issue #56)
+
+#56 builds the page that BUILD-INSTRUCTIONS.md and the phase-07 spec
+list but that was never written: `apps/audience-frontend/static/`
+holds `index.html` (served at `/`), `app.js`, `styles.css` and
+`qr.html` (the projector QR landing at `/qr`, with the bare code at
+`/qr.svg`). Where the two specs disagree, the platform spec wins:
+
+- **One Send button, not "Send to Unguarded" and "Send to Guarded".**
+  BUILD-INSTRUCTIONS.md Phase 7 asks for two buttons. The phase-07 spec
+  and the runbook make the target a server-side switch that
+  `cast-net.sh` flips during the talk, and Cast the Net only works as a
+  reveal if the room cannot choose the guarded path for itself. Each
+  reply is labelled with the bot that answered (`unguarded` or
+  `guarded`, from the `/chat` response's `target`).
+- **Request/response, no WebSocket.** BUILD-INSTRUCTIONS.md lists
+  WebSocket streaming. `/chat` returns one JSON reply, and BurritBot
+  returns no stream to relay. Streaming would mean changing BurritBot,
+  the gateway path and the proxy, three weeks before the delivery, to
+  show a reply that arrives in about a second anyway.
+- **The QR code is rendered on the server** from `AUDIENCE_PUBLIC_URL`
+  with `qrcode` (the spec allows generated or pre-baked). It is not
+  generated from the browser's own address: a rehearsal through
+  `kubectl port-forward` would otherwise project a `localhost` code.
+  No JavaScript QR library is needed, and nothing loads from a CDN on
+  venue Wi-Fi.
+- **Page links fail loudly.** `FEEDBACK_URL` and `AUDIENCE_PUBLIC_URL`
+  are read per request. If either is unset or is not an absolute
+  http(s) URL, `/` or `/qr` returns `503` naming the variable.
+  `/healthz` and `/chat` keep working, so a missing link cannot take
+  down the probes. The runbook's Pre-flight step 8 checks both.
+
+Neither value is set in `apps/audience-frontend/k8s/deployment.yaml`.
+The feedback destination (session survey, a form of our own, or
+something else) and the public hostname (no Ingress exists yet) are
+facts and deploy configuration for Michael.
+
+The image build context moves from `backend/` to
+`apps/audience-frontend`, so the image carries `static/` beside
+`backend/`, the same layout as the repo. No script or doc in the repo
+built the image, so nothing else changes.
+
+Dependencies:
+
+- Runtime: `qrcode==8.2` joins `apps/audience-frontend/backend/requirements.txt`.
+  8.2 is the current PyPI release (checked 2026-10-16) and the version
+  `uv.lock` already resolves for the dev group. It is pure Python; the
+  SVG is written by hand from `get_matrix()`, so Pillow is not needed.
+- Dev: `slowapi==0.1.9` and `httpx==0.28.1` join the dev group, pinned to
+  the image's versions (slowapi 0.1.10 is current, but the image pin was
+  held under #55). They let `tests/test_phase_07_audience_page.py` load
+  the real `main.py` and drive it in-process through FastAPI's
+  `TestClient`. No upstream is faked: the static tests never reach
+  `/chat` past validation.
+
+Not done here: the Real devices row in the runbook's Measurements
+record needs a real iOS Safari phone and a real Android Chrome phone
+against a live cluster. Headless Chromium rendered the page with
+iPhone SE, iPhone 13 and Pixel 7 emulation (320, 390 and 412 px wide):
+no horizontal overflow, and the Feedback button showed in the header.
+That is not the device check.
