@@ -64,7 +64,10 @@ Live:
 **Known Risk:** The Vertex SDK's `usage_metadata` field name differs
 between SDK versions. Pin the SDK and test with a live Vertex call
 during Phase 6 rehearsal — the OTel gen_ai.* emission depends on
-this exact field shape.
+this exact field shape. The fastapi, google-genai and OpenTelemetry
+pins hold through the November 2026 delivery; the google-genai 2.x bump waits
+until after the talk unless an advisory lands against a pin (see
+`decisions.md`, issue #55).
 
 **Completion Promise:** `<promise>PHASE6_DONE</promise>`
 

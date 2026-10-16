@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 301 passed, 19 deselected after the
-  #53 AI Gateway floor checks
+  (ruff check, then static suite) 315 passed, 19 deselected after the
+  #55 runtime pin checks
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -51,6 +51,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #49 AIGatewayRoute takes the upstream v1beta1 shape (parentRefs to the Gateway, x-ai-eg-model match); NeMo/LLM Guard ExtProc moves to the burritbot-guardrails EnvoyExtensionPolicy on the Gateway; 287 static green
 - 2026-10-16 · #52 listener fix (`from: Same`) already landed under #26; probes now prove application namespaces cannot attach routes to the gateway; 291 static green
 - 2026-10-16 · #53 gateway.yaml verified against upstream AI Gateway CRDs v0.2.0-v1.2.0 and Envoy Gateway v1.7.0/v1.9.2: valid from AI Gateway v0.6.0 (first v1beta1 release); static field sets narrowed to that floor, docs floor 0.2+ → 0.6+, live tests check the installed CRDs; 301 static green
+- 2026-10-16 · #55 fastapi / google-genai / OpenTelemetry pins held at 0.135.3 / 1.71.0 / 1.41.0 + 0.62b0 through the November 2026 delivery (decisions.md); static test keeps the pins equal across both requirements files, pyproject.toml, uv.lock, AGENTS.md and the phase-06 spec; 315 static green
 
 ---
 
@@ -256,7 +257,13 @@ commit.
   serves; mutation tests add hostnames, rule name, streamIdleTimeout,
   excludeFromModelsEndpoint, shadowMode, statusOnError and a
   ListenerSet target; the phase-05 spec and both scorecards state 0.6+
-- **Total: 301 static tests green. Live tests skip cleanly when
+- BurritBot runtime pins (14), #55: fastapi, google-genai,
+  opentelemetry-api/sdk and -instrumentation-fastapi are pinned to the
+  same release in apps/burritbot/requirements.txt, pyproject.toml and
+  uv.lock; the OTLP exporter tracks opentelemetry-api; the audience
+  backend ships the same fastapi; AGENTS.md and the phase-06 spec name
+  the pinned versions
+- **Total: 315 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

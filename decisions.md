@@ -301,3 +301,44 @@ every release from the floor up serves, and live tests check
 gateway.yaml against the CRDs actually installed on the cluster.
 `.claude/skills/the-net-ai-gateway.md` still says 0.2+: this run could
 not write under `.claude/`.
+
+## 2026-10-16T13:50:09Z · decision · The fastapi, google-genai and OpenTelemetry pins hold through the November 2026 delivery (issue #55)
+
+Issue #55 (split from #28) asked whether to bump the exact pins
+`fastapi==0.135.3`, `google-genai==1.71.0`,
+`opentelemetry-api`/`-sdk`/`-exporter-otlp==1.41.0` and
+`opentelemetry-instrumentation-fastapi==0.62b0` to the current
+releases (fastapi 0.143.2, google-genai 2.31.0, OpenTelemetry 1.45.1 /
+0.66b1). Decision: hold them. The spec settles it:
+
+- The phase-06 spec and AGENTS.md Critical Versions pin these releases.
+  The phase-06 Known Risk says to pin the SDK and prove it with a live
+  Vertex call during rehearsal, because the `usage_metadata` shape that
+  the gen_ai.* telemetry reads differs between SDK versions. No rule
+  asks the pins to track the latest release, so a bump needs a reason.
+- No reason exists today. OSV (queried 2026-10-16) lists no advisory
+  for any of the exact pins: fastapi 0.135.3, google-genai 1.71.0,
+  OpenTelemetry 1.41.0 / 0.62b0, uvicorn 0.44.0, pydantic 2.12.5,
+  httpx 0.28.1, slowapi 0.1.9, or the locked starlette 1.8.0. PyPI has
+  not yanked google-genai 1.71.0.
+- A bump is not finished until a live `/chat` call against Vertex
+  `gemini-3-pro` confirms the 2.x `response.text` and `usage_metadata`
+  path. Nothing has run on a cluster yet and the GCP credential has
+  expired, so a bump now would put an unproven major SDK change on the
+  live critical path (`#17 → #18 → #20`) about three weeks before demo
+  day.
+
+What is accepted: google-genai 1.x has had no release since 1.75.0
+(2026-05-04). 2.0.0 shipped on 2026-05-07, so a future 1.x security
+fix will not come. The issue's isolated probe already shows that
+2.31.0 imports `apps/burritbot/app.py` and builds the app, so the
+bump is cheap once there is a reason.
+
+When to revisit: after the delivery (2026-11-12). Bump earlier if an
+advisory lands against any of these pins, or if the Phase 6 rehearsal
+call fails on 1.71.0. A bump carries the spec and AGENTS.md amendment,
+the pins in `pyproject.toml`, `apps/burritbot/requirements.txt` and
+`apps/audience-frontend/backend/requirements.txt`, a refreshed
+`uv.lock`, and the live `/chat` check.
+`tests/test_burritbot_runtime_pins.py` fails if any one of those
+moves without the rest.
