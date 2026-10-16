@@ -268,3 +268,36 @@ the HTTPRoute it generates.
 `tests/test_ai_gateway_route_schema.py` holds both objects to the
 fields their CRDs define, and its mutation tests catch each pre-#49
 shape.
+
+## 2026-10-16T13:41:30Z · decision · gateway.yaml needs Envoy AI Gateway v0.6.0 or later; the 0.2+ floor is raised to 0.6+ (issue #53)
+
+No chart in this repo pins Envoy AI Gateway or Envoy Gateway, so the
+pinned version is the documented floor, 0.2+. gateway.yaml was checked
+against the upstream CRDs of every floor-relevant release
+(`ai-gateway-crds-helm` at v0.2.0, v0.5.0, v0.6.0, v0.7.0, v1.0.0,
+v1.1.0, v1.2.0; Envoy Gateway `gateway-crds-helm` at v1.7.0 and v1.9.2).
+
+- The recollection in #53 was right about v1alpha1: in v0.2.0
+  `spec.targetRefs` (required) names Gateways and `spec.schema` is
+  required. v0.3.0 deprecates targetRefs for parentRefs. No release
+  ever defined `spec.filters`, so the pre-#49 ExtProc was always
+  pruned.
+- The post-#49 AIGatewayRoute (v1beta1, parentRefs to the Gateway,
+  `x-ai-eg-model` header match) is valid in v0.6.0 through v1.2.0 and
+  unservable in v0.2.0 through v0.5.0, which serve only v1alpha1.
+  The AIServiceBackend and BackendSecurityPolicy in
+  vertex-ai-backend.yaml are v1beta1 too, so v0.6.0 is the floor for
+  the whole guarded path.
+- The `burritbot-guardrails` EnvoyExtensionPolicy is valid in Envoy
+  Gateway v1.7.0 (what AI Gateway v0.6.0 builds against) and v1.9.2
+  (AI Gateway v1.2.0). The AI Gateway controller creates no
+  EnvoyExtensionPolicy of its own; it inserts its ext_proc through the
+  extension server ahead of user ext_proc filters, so a Gateway-level
+  policy also covers the generated HTTPRoute.
+
+The phase-05 spec and both scorecards now say 0.6+. The static field
+sets in `tests/test_ai_gateway_route_schema.py` are narrowed to what
+every release from the floor up serves, and live tests check
+gateway.yaml against the CRDs actually installed on the cluster.
+`.claude/skills/the-net-ai-gateway.md` still says 0.2+: this run could
+not write under `.claude/`.

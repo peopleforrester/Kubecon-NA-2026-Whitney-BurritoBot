@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 291 passed, 16 deselected after the
-  #52 listener probes
+  (ruff check, then static suite) 301 passed, 19 deselected after the
+  #53 AI Gateway floor checks
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -50,6 +50,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #39 advisory guard: static test holds uv.lock at or above the patched anyio, urllib3, oauthlib, fsspec and multidict releases; 273 static green
 - 2026-10-16 · #49 AIGatewayRoute takes the upstream v1beta1 shape (parentRefs to the Gateway, x-ai-eg-model match); NeMo/LLM Guard ExtProc moves to the burritbot-guardrails EnvoyExtensionPolicy on the Gateway; 287 static green
 - 2026-10-16 · #52 listener fix (`from: Same`) already landed under #26; probes now prove application namespaces cannot attach routes to the gateway; 291 static green
+- 2026-10-16 · #53 gateway.yaml verified against upstream AI Gateway CRDs v0.2.0-v1.2.0 and Envoy Gateway v1.7.0/v1.9.2: valid from AI Gateway v0.6.0 (first v1beta1 release); static field sets narrowed to that floor, docs floor 0.2+ → 0.6+, live tests check the installed CRDs; 301 static green
 
 ---
 
@@ -250,7 +251,12 @@ commit.
   HTTPRoute from each `burritbot.io/layer: application` namespace is
   refused; mutation tests widen the listener to `from: All`, the old
   application selector and a part-of selector
-- **Total: 291 static tests green. Live tests skip cleanly when
+- AI Gateway floor (10), #53: the route and ExtProc field sets are the
+  ones every release from AI Gateway v0.6.0 / Envoy Gateway v1.7.0 up
+  serves; mutation tests add hostnames, rule name, streamIdleTimeout,
+  excludeFromModelsEndpoint, shadowMode, statusOnError and a
+  ListenerSet target; the phase-05 spec and both scorecards state 0.6+
+- **Total: 301 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
