@@ -42,11 +42,14 @@ lines-after-imports = 2
 
 [dependency-groups]
 dev = [
+    "betterproto2==0.9.1",
+    "envoy-data-plane==2.2.0",
     "fastapi==0.135.3",
     "google-cloud-container>=2.50.0",
     "google-cloud-secret-manager>=2.20.0",
     "google-cloud-storage>=2.18.0",
     "google-genai==1.71.0",
+    "grpclib==0.4.9",
     "httpx==0.28.1",
     "kubernetes>=35.0.0",
     "nemoguardrails>=0.22.0",

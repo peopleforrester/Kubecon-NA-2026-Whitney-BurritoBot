@@ -183,7 +183,7 @@ def test_mutation_ai_route_parent_to_undefined_gateway_is_caught() -> None:
 def test_mutation_extproc_to_undefined_service_is_caught() -> None:
     manifests = _mutated(lambda ms: _extproc(ms, "llm-guard").update(name="llm-gaurd"))
     found = unresolved_refs(manifests)
-    assert any("Service burritbot-net/llm-gaurd:8000" in k for k in found), found
+    assert any("Service burritbot-net/llm-gaurd:50051" in k for k in found), found
 
 
 @pytest.mark.static
