@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from conftest import PROJECT_ROOT
 
 
 GITOPS_APPS_DIR = PROJECT_ROOT / "gitops" / "apps"
+PINNED_CHART_VERSION = re.compile(r"^v?\d+\.\d+\.\d+$")
 
 
 def _load_applications() -> list[tuple[Path, dict]]:
@@ -27,19 +29,39 @@ def _load_applications() -> list[tuple[Path, dict]]:
     return apps
 
 
+def _app_id(x: Path | dict) -> str:
+    return x.name if isinstance(x, Path) else x.get("metadata", {}).get("name", "?")
+
+
+APPLICATIONS = _load_applications()
+PATH_APPS = [(f, a) for f, a in APPLICATIONS if "chart" not in a["spec"]["source"]]
+CHART_APPS = [(f, a) for f, a in APPLICATIONS if "chart" in a["spec"]["source"]]
+
+
 @pytest.mark.static
-@pytest.mark.parametrize(
-    "yaml_file,app",
-    _load_applications(),
-    ids=lambda x: x.name if isinstance(x, Path) else x.get("metadata", {}).get("name", "?"),
-)
+def test_applications_load() -> None:
+    """At least one ArgoCD Application loads, so the parametrized checks run."""
+    assert APPLICATIONS, f"no ArgoCD Applications found under {GITOPS_APPS_DIR}"
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("yaml_file,app", CHART_APPS, ids=_app_id)
+def test_argocd_helm_application_pins_chart(yaml_file: Path, app: dict) -> None:
+    """Every Helm-source Application names a chart repo and an exact chart version."""
+    source = app["spec"]["source"]
+    assert source.get("repoURL"), f"{yaml_file.name}: spec.source.repoURL is missing"
+    revision = str(source.get("targetRevision", ""))
+    assert PINNED_CHART_VERSION.match(revision), (
+        f"{yaml_file.name}: chart {source['chart']!r} targetRevision {revision!r} "
+        "is not an exact version"
+    )
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("yaml_file,app", PATH_APPS, ids=_app_id)
 def test_argocd_application_path_resolves(yaml_file: Path, app: dict) -> None:
     """Every Git-source Application must point to an existing populated dir."""
     source = app["spec"]["source"]
-
-    if "chart" in source:
-        # Helm-source apps (e.g. kyverno) target a chart, not a repo path.
-        return
 
     path = source.get("path")
     assert path, f"{yaml_file.name}: spec.source.path is missing"
