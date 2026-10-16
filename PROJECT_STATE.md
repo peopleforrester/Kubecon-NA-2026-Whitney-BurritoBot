@@ -31,12 +31,13 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  242 passed, 16 deselected after the #26 cross-manifest reference
-  and incompatible-settings checks
+  248 passed, 16 deselected after the #27 Portland carry-forward
+  checks
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16T11:01:07Z · init-state migrated pre-lifecycle file → Phase 3.3
+- 2026-10-16 · #27 Portland carry-forward: PORTLAND-CARRY-FORWARD.md + runbook Night Before / rule-on-screen / Measurements; 248 static green
 
 ---
 
@@ -60,7 +61,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 242 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26). Zero open Dependabot alerts, zero open PRs.
+- 248 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -198,7 +199,12 @@ commit.
   own namespace (`from: Same`, see decisions.md)
 - Incompatible settings registry (9), #26: Dataplane V2 vs Calico
   policy / addon, Autopilot vs Falco, each with its reason and mutations
-- **Total: 242 static tests green. Live tests skip cleanly when
+- Portland carry-forward (6), #27: the carry-forward map covers every
+  proven and unmeasured result, the cold read sits a week clear of the
+  event, and the runbook provisions the night before, puts existing rule
+  files on screen in Act 2, keeps Act 1 to the canonical prompts, and
+  has a Measurements record
+- **Total: 248 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
