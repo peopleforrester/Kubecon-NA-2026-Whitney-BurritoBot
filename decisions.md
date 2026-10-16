@@ -741,3 +741,22 @@ The static Test command never requests the live fixtures, so it still
 passes everywhere (409 passed). The E2E command exits non-zero with 0
 skipped on a host without a cluster, ADC or terraform, each test naming
 what is missing.
+
+## 2026-10-16T16:41:38Z · amendment · Live fixtures are proven loud by a probe, and name the fix (issue #63)
+
+#62 already made the `tests/conftest.py` live fixtures fail the test
+when the cluster or ADC is missing. This change keeps that conftest
+and adds what #63's approved design carried on top of it, re-landed on
+current staging:
+
+- **Probe test.** `tests/test_live_fixtures_fail_loudly.py` (static,
+  7 cases) runs a one-test pytest subprocess per live fixture with
+  `KUBECONFIG` and `GOOGLE_APPLICATION_CREDENTIALS` pointing at missing
+  files. Each run must exit non-zero with a setup error. Against the
+  pre-#62 conftest all seven fail, so the probe is not vacuous.
+- **The message names the fix.** The kubeconfig failure now says to run
+  `gcloud container clusters get-credentials` for the demo cluster, as
+  the GCP fixtures already say `gcloud auth application-default login`.
+  The probe asserts both.
+- **No in-repo guard test** listing the banned markers, for the reason
+  given under #61.
