@@ -1,10 +1,12 @@
 # ABOUTME: Cross-manifest reference contract — every backendRef/parentRef/targetRef resolves to a
-# ABOUTME: defined object, on a port it exposes and a container serves; mutation tests prove each check bites.
+# ABOUTME: defined object ArgoCD syncs, on a port it exposes and a container serves; mutation tests prove each bites.
 
 from __future__ import annotations
 
 import copy
+import shutil
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
@@ -13,12 +15,14 @@ from helpers.manifest_graph import (
     GATEWAY_API,
     Manifest,
     collect_refs,
+    kustomized_paths,
     load_manifests,
     missing_reference_grants,
     port_mismatches,
     service_backend_mismatches,
     unattachable_routes,
     unresolved_refs,
+    unsynced_reference_grants,
 )
 
 
@@ -242,6 +246,57 @@ def test_mutation_reference_grant_for_wrong_namespace_is_caught() -> None:
 def test_mutation_reference_grant_for_other_service_is_caught() -> None:
     manifests = _mutated(lambda ms: _grant(ms)["spec"]["to"][0].update(name="burritbot-unguarded"))
     assert missing_reference_grants(manifests).keys() == {AUDIENCE_BACKEND_KEY}
+
+
+GRANT_PATH = "apps/burritbot/k8s/referencegrant-guarded.yaml"
+BURRITBOT_KUSTOMIZATION = "deploy/burritbot/kustomization.yaml"
+
+
+@pytest.mark.static
+def test_reference_grants_are_synced_by_argocd() -> None:
+    """The grant must be rendered by an Application's Kustomization, not merely exist in the repo."""
+    synced = kustomized_paths(PROJECT_ROOT, MANIFESTS)
+    assert GRANT_PATH in synced, f"{GRANT_PATH} not rendered by any synced Kustomization: {sorted(synced)}"
+    assert unsynced_reference_grants(MANIFESTS, synced) == {}
+
+
+def _burritbot_tree(root: Path, drop: str | None = None) -> None:
+    """Copy deploy/burritbot and its resources into root, optionally dropping one resource line."""
+    for rel in [BURRITBOT_KUSTOMIZATION, *(
+        str(p.relative_to(PROJECT_ROOT)) for p in (PROJECT_ROOT / "apps/burritbot/k8s").glob("*.yaml")
+    )]:
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PROJECT_ROOT / rel, root / rel)
+    if drop is not None:
+        kust = root / BURRITBOT_KUSTOMIZATION
+        lines = kust.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = [ln for ln in lines if drop not in ln]
+        assert len(kept) == len(lines) - 1, f"expected exactly one {drop!r} line in {BURRITBOT_KUSTOMIZATION}"
+        kust.write_text("".join(kept), encoding="utf-8")
+
+
+@pytest.mark.static
+def test_copied_kustomization_still_syncs_grant(tmp_path: Path) -> None:
+    """Positive control for the mutation below: the copied tree renders the grant."""
+    _burritbot_tree(tmp_path)
+    assert GRANT_PATH in kustomized_paths(tmp_path, MANIFESTS)
+
+
+@pytest.mark.static
+def test_mutation_grant_dropped_from_kustomization_is_caught(tmp_path: Path) -> None:
+    """The grant file stays in the repo, so missing_reference_grants passes; ArgoCD never applies it."""
+    _burritbot_tree(tmp_path, drop="referencegrant-guarded.yaml")
+    assert missing_reference_grants(MANIFESTS) == {}
+    found = unsynced_reference_grants(MANIFESTS, kustomized_paths(tmp_path, MANIFESTS))
+    assert found.keys() == {"ReferenceGrant burritbot-guarded/burritbot-net-to-guarded"}
+
+
+@pytest.mark.static
+def test_kustomization_resource_naming_nothing_raises(tmp_path: Path) -> None:
+    _burritbot_tree(tmp_path)
+    (tmp_path / GRANT_PATH).unlink()
+    with pytest.raises(FileNotFoundError, match="referencegrant-guarded.yaml"):
+        kustomized_paths(tmp_path, MANIFESTS)
 
 
 @pytest.mark.static

@@ -294,6 +294,61 @@ def missing_reference_grants(manifests: list[Manifest]) -> dict[str, str]:
     return out
 
 
+def _kustomization_files(root: Path, directory: Path) -> set[str]:
+    """Repo-relative files a Kustomization in directory renders, following nested ones.
+
+    A resource that is a directory must hold its own kustomization.yaml, as
+    kustomize requires. A resource that names nothing raises: kustomize build
+    would fail the same way, and the sync with it.
+    """
+    with (directory / "kustomization.yaml").open(encoding="utf-8") as fh:
+        kustomization = yaml.safe_load(fh)
+    files: set[str] = set()
+    for resource in kustomization.get("resources") or []:
+        target = (directory / resource).resolve()
+        if target.is_dir():
+            files |= _kustomization_files(root, target)
+        elif target.is_file():
+            files.add(str(target.relative_to(root)))
+        else:
+            raise FileNotFoundError(f"{directory / 'kustomization.yaml'}: resource {resource!r} does not exist")
+    return files
+
+
+def kustomized_paths(root: Path, manifests: list[Manifest]) -> set[str]:
+    """Repo-relative files that an ArgoCD Application syncs through a Kustomization.
+
+    Applications whose source path holds a kustomization.yaml render exactly
+    its resources; any other file in the repo is never applied by them.
+    Helm-chart Applications (no path) contribute nothing.
+    """
+    resolved = root.resolve()
+    files: set[str] = set()
+    for app in manifests:
+        if app.group != "argoproj.io" or app.kind != "Application":
+            continue
+        path = app.doc["spec"].get("source", {}).get("path")
+        if path and (resolved / path / "kustomization.yaml").is_file():
+            files |= _kustomization_files(resolved, resolved / path)
+    return files
+
+
+def unsynced_reference_grants(manifests: list[Manifest], synced: set[str]) -> dict[str, str]:
+    """ReferenceGrants defined in the repo but rendered by no synced Kustomization.
+
+    missing_reference_grants reads every YAML file, so a grant dropped from
+    its kustomization still satisfies it while ArgoCD never applies the
+    grant, and the route reports RefNotPermitted on the cluster.
+    """
+    return {
+        f"ReferenceGrant {m.namespace}/{m.name}": (
+            f"{m.label}: no ArgoCD-synced kustomization.yaml lists {m.path}, so the grant never reaches the cluster"
+        )
+        for m in manifests
+        if m.group == GATEWAY_API and m.kind == "ReferenceGrant" and m.path not in synced
+    }
+
+
 def _default_route_kinds(protocol: str) -> set[str]:
     return {
         "HTTP": {"HTTPRoute"},
