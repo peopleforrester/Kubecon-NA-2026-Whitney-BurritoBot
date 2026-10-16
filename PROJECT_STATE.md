@@ -33,7 +33,7 @@ fixed statically).
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
   (ruff check, then static suite) 409 passed, 32 deselected after the
-  #68 gateway controller install
+  #61 skip-path removal
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -60,6 +60,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #65 question 133: ship skill and state-persistence rule (llm-coding-workflow 0c68e17) already send promote-time decision entries to decisions.md; the 2026-10-15 stray predates this repo's decisions.md; closed as satisfied, no writer change; 365 static green
 - 2026-10-16 · #67 guarded traffic takes its gateway routes: EnvoyProxy pins the proxy Service (`burritbot-ai-gateway.envoy-gateway-system`, ClusterIP); the frontend sends Host `burritbot.burritbot.local` so `burritbot-audience` matches; guarded BurritBot posts OpenAI chat completions to the gateway (AIGatewayRoute → vertex-ai-gemini) instead of calling Vertex; the guarded egress lock admits the proxy pods; 379 static green
 - 2026-10-16 · #68 gateway controllers installed by ArgoCD: `envoy-gateway` (gateway-helm v1.9.2, Gateway API + EG CRDs, AI Gateway extension manager), `ai-gateway-crds` and `ai-gateway-controller` (v1.2.0, webhook on 10250 with a cert-manager cert, MCP seed kept out of Git), GatewayClass `envoy-ai-gateway`, namespaces `envoy-gateway-system` / `envoy-ai-gateway-system`; `ai-gateway` moves to wave 3; GKE-managed Gateway API is now an incompatible pair; 409 static green
+- 2026-10-16 · #61 no skip paths: the last exit-as-skip (Prometheus rules-map early return) now asserts; the Phase C5 plan no longer lets the Colang test skip; live fixtures and Terraform checks already fail naming what is missing (#62); the E2E command exits non-zero with 0 skipped on a bare host; 409 static green
 
 ---
 
