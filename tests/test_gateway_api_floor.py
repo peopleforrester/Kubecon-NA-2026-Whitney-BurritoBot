@@ -143,8 +143,8 @@ def test_mutation_old_doc_floor_is_caught(text: str) -> None:
 
 @pytest.mark.live
 @pytest.mark.parametrize("manifest", _gateway_api_objects(load_manifests(PROJECT_ROOT)), ids=lambda m: m.label)
-def test_installed_gateway_api_crd_accepts_manifest(manifest: Manifest) -> None:
+def test_installed_gateway_api_crd_accepts_manifest(k8s_apiextensions_v1, manifest: Manifest) -> None:
     version = manifest.doc["apiVersion"].split("/", 1)[1]
-    schema = installed_schema(f"{CRD_PLURALS[manifest.kind]}.{GATEWAY_API}", version)
+    schema = installed_schema(k8s_apiextensions_v1, f"{CRD_PLURALS[manifest.kind]}.{GATEWAY_API}", version)
     violations = openapi_violations(manifest.doc, schema)
     assert not violations, f"installed {manifest.kind} {version} CRD would refuse or strip {manifest.label}: {violations}"

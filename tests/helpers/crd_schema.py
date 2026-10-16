@@ -30,12 +30,13 @@ def openapi_violations(obj: object, schema: dict, path: str = "") -> list[str]:
     return out
 
 
-def installed_schema(crd_name: str, version: str) -> dict:
-    """The served openAPIV3Schema of an installed CRD. Needs a kubeconfig and the cluster."""
-    from kubernetes import client, config  # type: ignore
+def installed_schema(apiext, crd_name: str, version: str) -> dict:
+    """The served openAPIV3Schema of an installed CRD, read through the live cluster client.
 
-    config.load_kube_config()
-    resp = client.ApiextensionsV1Api().read_custom_resource_definition(crd_name, _preload_content=False)
+    `apiext` is the k8s_apiextensions_v1 fixture, which fails the test naming
+    the missing kubeconfig before this runs.
+    """
+    resp = apiext.read_custom_resource_definition(crd_name, _preload_content=False)
     crd = json.loads(resp.data)
     served = {v["name"]: v for v in crd["spec"]["versions"] if v.get("served")}
     assert version in served, f"installed CRD {crd_name} serves {sorted(served)}, not {version}"
