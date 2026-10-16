@@ -121,6 +121,21 @@ def test_billing_export_playbook_keeps_the_dataset_out_of_teardown() -> None:
 
 
 @pytest.mark.static
+def test_vertex_ai_query_filters_by_the_delivery_label() -> None:
+    """Model calls carry the label (#82), so other Vertex AI users of the project drop out."""
+    text = BILLING_DOC.read_text(encoding="utf-8")
+    queries = [q for q in text.split("```sql", 1)[1].split("```", 1)[0].split(";") if "SELECT" in q]
+    vertex = [q for q in queries if "service.description = 'Vertex AI'" in q]
+    assert len(vertex) == 1, "the playbook needs one query reading the Vertex AI service"
+    assert re.search(rf"key = '{DELIVERY_LABEL}' AND value = 'DELIVERY_SLUG'", vertex[0]), (
+        "the Vertex AI query must filter on the delivery label, not the project and window"
+    )
+    assert "project.id" not in vertex[0]
+    gke = [q for q in queries if "service.description != 'Vertex AI'" in q]
+    assert len(gke) == 1, "the GKE query must leave the labelled model calls to the Vertex AI query"
+
+
+@pytest.mark.static
 def test_runbook_applies_with_a_delivery_label_and_reads_cost_from_export() -> None:
     text = RUNBOOK.read_text(encoding="utf-8")
     night = _section(text, "Night Before")

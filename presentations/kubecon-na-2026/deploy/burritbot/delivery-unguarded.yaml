@@ -1,0 +1,15 @@
+# ABOUTME: Strategic-merge patch: unguarded BurritBot labels its Vertex AI calls with this delivery's slug.
+# ABOUTME: Must equal the runbook's `-var delivery=`; tests/test_delivery_overlay.py holds the two together.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: burritbot
+  namespace: burritbot-unguarded
+spec:
+  template:
+    spec:
+      containers:
+        - name: burritbot
+          env:
+            - name: BURRITBOT_DELIVERY
+              value: kubecon-na-2026

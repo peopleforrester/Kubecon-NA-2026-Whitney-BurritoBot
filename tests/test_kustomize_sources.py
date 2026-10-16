@@ -21,12 +21,13 @@ from helpers.manifest_graph import (
 MANIFESTS = load_manifests(PROJECT_ROOT)
 ARGOCD_VALUES = PROJECT_ROOT / "gitops" / "argocd" / "values.yaml"
 
-# The wrapper Applications and the deploy/<x> path each one builds.
+# The wrapper Applications and the path each one builds: deploy/<x>, or the
+# active delivery's overlay of it where the delivery slug is written in (#82).
 WRAPPERS = {
     "monitoring": "deploy/monitoring",
     "security": "deploy/security",
-    "ai-gateway": "deploy/ai-gateway",
-    "burritbot": "deploy/burritbot",
+    "ai-gateway": "presentations/kubecon-na-2026/deploy/ai-gateway",
+    "burritbot": "presentations/kubecon-na-2026/deploy/burritbot",
     "audience": "deploy/audience",
 }
 
@@ -70,7 +71,7 @@ CONFIGMAP = {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "x", 
 @pytest.mark.static
 @pytest.mark.parametrize("name", sorted(WRAPPERS))
 def test_wrapper_application_is_kustomize_sourced(name: str) -> None:
-    """Each wrapper points at its deploy/<x> kustomization, so ArgoCD detects Kustomize."""
+    """Each wrapper points at its kustomization (deploy/<x> or its overlay), so ArgoCD detects Kustomize."""
     apps = [m for m in MANIFESTS if m.kind == "Application" and m.name == name]
     assert len(apps) == 1, f"expected one Application {name}, found {[a.path for a in apps]}"
     path = apps[0].doc["spec"]["source"]["path"]

@@ -21,7 +21,9 @@ spec:
   source:
     repoURL: https://github.com/peopleforrester/burritobot.git
     targetRevision: main
-    path: deploy/ai-gateway
+    # The active delivery's overlay of deploy/ai-gateway: it writes the delivery
+    # slug into the Vertex AI cost labels (docs/BILLING-EXPORT.md).
+    path: presentations/kubecon-na-2026/deploy/ai-gateway
   destination:
     server: https://kubernetes.default.svc
     namespace: burritbot-net

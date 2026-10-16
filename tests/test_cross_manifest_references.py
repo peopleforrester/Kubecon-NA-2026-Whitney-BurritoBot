@@ -250,6 +250,8 @@ def test_mutation_reference_grant_for_other_service_is_caught() -> None:
 
 GRANT_PATH = "apps/burritbot/k8s/referencegrant-guarded.yaml"
 BURRITBOT_KUSTOMIZATION = "deploy/burritbot/kustomization.yaml"
+# The delivery overlay of deploy/burritbot that the burritbot Application syncs (#82).
+BURRITBOT_OVERLAY = "presentations/kubecon-na-2026/deploy/burritbot"
 # The kustomization that lists the grant file; deploy/burritbot references its directory (#76).
 GRANT_KUSTOMIZATION = "apps/burritbot/k8s/kustomization.yaml"
 
@@ -263,9 +265,11 @@ def test_reference_grants_are_synced_by_argocd() -> None:
 
 
 def _burritbot_tree(root: Path, drop: str | None = None) -> None:
-    """Copy deploy/burritbot and its resources into root, optionally dropping one resource line."""
+    """Copy the overlay, deploy/burritbot and its resources into root, optionally dropping one resource line."""
     for rel in [BURRITBOT_KUSTOMIZATION, *(
-        str(p.relative_to(PROJECT_ROOT)) for p in (PROJECT_ROOT / "apps/burritbot/k8s").glob("*.yaml")
+        str(p.relative_to(PROJECT_ROOT))
+        for d in ("apps/burritbot/k8s", BURRITBOT_OVERLAY)
+        for p in (PROJECT_ROOT / d).glob("*.yaml")
     )]:
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(PROJECT_ROOT / rel, root / rel)

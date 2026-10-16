@@ -1141,3 +1141,138 @@ Evidence for #59, from this host (no GCP credentials):
   `test_terraform_plan` reaches that plan only on a host with ADC and
   the state bucket. Here it fails at the GCS init ("could not find
   default credentials"), and #17 is what restores that identity.
+
+## 2026-10-16T20:17:57Z · decision · Unguarded Vertex AI calls carry the delivery's cost labels; the guarded path waits on where the slug lives (issue #82)
+
+Issue #82 asked for labels on every Vertex AI call so the second Cost row
+query can filter by `burritbot-io_delivery` instead of the project and
+the time window.
+
+Done for the unguarded path:
+
+- `apps/burritbot/app.py` builds the unguarded `GenerateContentConfig`
+  with `labels` set to `burritbot-io_owner: burritbot` and
+  `burritbot-io_delivery: $BURRITBOT_DELIVERY`. These are the same keys
+  as `local.cost_labels`, and the value is checked against the same rule
+  as `var.delivery`. google-genai 1.71.0 copies `config.labels` to the
+  top level of the Vertex `generateContent` request.
+- An unset or invalid `BURRITBOT_DELIVERY` fails the `/chat` request
+  with a `502` that names the variable, before any Vertex client is
+  built. This is a per-request failure, the same as a missing
+  `GOOGLE_CLOUD_PROJECT` and the #56 page links, so the probes keep
+  passing.
+- `tests/test_vertex_request_labels.py` covers these checks: the keys
+  match `labels.tf`, bad values are refused, the SDK's own Vertex
+  converter puts the labels on the request, and an unset delivery is a
+  `502`. Guarded BurritBot does not read the variable, because it never
+  calls Vertex itself.
+
+What each guarded call needs, checked against the source:
+
+- **AI gateway** (Envoy AI Gateway v1.2.0): the OpenAI → GCP Vertex AI
+  translator builds `gcp.GenerateContentRequest`
+  (`internal/apischema/gcp/gcp.go`). That struct has no labels, so
+  labels in the client body are dropped. `AIServiceBackend.spec.bodyMutation.set`
+  is present at the v0.6.0 floor and later. It is applied after
+  translation (`internal/extproc/processor_impl.go`, `applyBodyMutation`
+  on the translated body). So `{path: labels, value: '{"burritbot-io_owner":
+  "burritbot", "burritbot-io_delivery": "<slug>"}'}` on
+  `vertex-ai-gemini` sets them on the upstream request. A mutation
+  error is logged and the request goes on unlabelled. It does not fail.
+- **NeMo Guardrails**: each model's `parameters` are passed as kwargs
+  to the LangChain provider (`init_llm_model`). For `engine: vertexai`
+  the provider is `ChatVertexAI`, which has a `labels: dict[str, str]`
+  field that it sends on each request. `config.yaml` is read with
+  `yaml.safe_load` and no environment expansion, so the slug has to be
+  written in as a literal.
+
+Not done, and why: both guarded call sites take only a literal in a
+manifest. The unguarded Deployment needs the value in its env too.
+No mechanism carries a per-delivery value into the GitOps tree. The
+platform is event-neutral, and the event-name guard test rejects this
+delivery's slug (the runbook's Night Before `-var delivery=`) anywhere
+outside `presentations/`. Deploy
+configuration waits for Michael. So the slug's location is raised as a
+question in the run report, and no manifest sets `BURRITBOT_DELIVERY`
+yet. Until a manifest sets it, unguarded `/chat` returns `502`, and
+nothing is deployed yet. `docs/BILLING-EXPORT.md` describes what is
+labelled. The second query still reads Vertex AI spend by window.
+
+## 2026-10-16T20:46:36Z · decision · question 152: the delivery slug lives in a per-delivery kustomize overlay under presentations/<event>/deploy/ (issue #82)
+
+Question 152 asked where the per-delivery slug (`burritbot-io_delivery`)
+should live in the GitOps tree. Three places need it as a literal: the
+unguarded Deployment's `BURRITBOT_DELIVERY` env, a `bodyMutation` on
+the `vertex-ai-gemini` AIServiceBackend, and `parameters.labels` on both
+`vertexai` models in the NeMo config. The event-name guard test rejects
+the slug outside `presentations/`.
+
+Answer: a per-delivery kustomize overlay under
+`presentations/<event>/deploy/` patches the slug into all three places.
+The ArgoCD `burritbot` and `ai-gateway` Applications point at the active
+delivery's overlay, and the platform tree stays event-neutral.
+
+Decided by hecaton's research under Michael's standing rules, not by
+Michael.
+
+What it changes:
+
+- `presentations/kubecon-na-2026/deploy/burritbot/` wraps
+  `deploy/burritbot`. A strategic-merge patch adds
+  `BURRITBOT_DELIVERY` (the runbook's slug) to the unguarded
+  Deployment's `burritbot` container.
+- `presentations/kubecon-na-2026/deploy/ai-gateway/` wraps
+  `deploy/ai-gateway`. It has two patches. One sets the AIServiceBackend
+  `bodyMutation` labels to the slug. The other replaces the NeMo
+  ConfigMap's `config.yaml` with the base file carrying the slug. A
+  kustomize patch cannot reach into a YAML string, so the patch holds
+  the whole file. `tests/test_delivery_overlay.py` fails if it differs
+  from `ai-gateway/nemo-guardrails/config.yaml` by anything other than
+  the slug.
+- `gitops/apps/20-burritbot.yaml` and `20-ai-gateway.yaml` now sync
+  those overlay paths, not `deploy/burritbot` and `deploy/ai-gateway`.
+- The platform base carries
+  `unset-the-delivery-overlay-under-presentations-sets-burritbot-io-delivery`
+  in the gateway mutation and the NeMo labels. That is 73 characters,
+  over the 63-character limit for a label value. The bare platform
+  therefore fails instead of billing under a wrong label:
+  - The app's check refuses it.
+  - `ChatVertexAI`'s label validator refuses values over 63 characters
+    (langchain-google-vertexai main).
+  - Vertex AI's label rules refuse it on the gateway's call.
+  - The unguarded base Deployment sets no `BURRITBOT_DELIVERY`, so
+    `/chat` returns a `502`.
+- Tests: `tests/test_delivery_overlay.py` has 10 static tests and 2 live
+  ones. The static tests check that each Application syncs an overlay
+  that wraps exactly its base, and that every patch targets an object
+  the base renders. They check that each of the three call sites carries
+  the runbook's `-var delivery=` slug and equals the Terraform cost
+  labels, that the base carries the placeholder, and that the platform
+  tree names no slug. Mutation runs prove these checks bite: reverting
+  the Application path, drifting the NeMo config, using a wrong slug and
+  using a wrong patch namespace each fail. The live tests render each
+  overlay with `kubectl kustomize`.
+  `tests/test_cost_labels.py` checks that the Vertex AI query filters by
+  the delivery label. `test_kustomize_sources.py` and
+  `test_cross_manifest_references.py` follow the new Application paths.
+- `docs/BILLING-EXPORT.md`: the Vertex AI Cost row query now filters by
+  `burritbot-io_delivery` and the `Vertex AI` service. The GKE query
+  excludes that service. The doc keeps the project-and-window form for
+  spend from before the labels landed. `RUNBOOK.md`'s Night Before says
+  the overlay carries the same slug as the Terraform apply.
+
+Verified here: kustomize v5.7.1, release checksum checked and used only
+on this host, built both overlays. Each differs from its base build
+only in the three slug lines (ai-gateway) and the one env entry
+(burritbot). With `kubectl kustomize` routed to that binary, the live
+test passed. Without kubectl, it fails, naming it.
+
+Not verified here: no cluster. Three behaviours are taken from source
+and documentation, not observed:
+- Vertex AI rejecting an over-long label value.
+- The labels reaching the billing export.
+- The NeMo microservice 25.07 image shipping a `ChatVertexAI` with the
+  same label validator.
+The billing service name `Vertex AI` is also unconfirmed against a real
+export. The doc says what to check if the second query comes back
+empty.
