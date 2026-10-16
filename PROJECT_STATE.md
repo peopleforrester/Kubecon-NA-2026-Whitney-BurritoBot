@@ -24,15 +24,17 @@ Approved plans land here with ts + sha256.)_
 
 ## Current Plan
 Nothing in flight. The last cycle (Dependabot bumps, promoted
-2026-10-15) is complete. When work resumes, the path is the critical
-path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
+2026-10-15) is complete. The live path is the critical path in the
+"Open Work" section below: `#17 → #18 → #20` (#22, #23 and #24 are
+fixed statically).
 
 ## Branch & Tests
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 264 passed, 16 deselected after the
-  #44 lint gate
+  (ruff check, then static suite) 265 passed, 16 deselected after the
+  #46 state-file refresh
+- Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -43,54 +45,57 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #37 Europe 2027 tutorial is workshop-lineage, not built here: decisions.md entry + README Ancestry disclaims the workshop bot; 256 static green
 - 2026-10-16 · #40 identity check: README gains "The Talk" (title, speakers, argument, event, status, Europe 2027 slate, sources) and "Where things live"; AGENTS.md names talks-knowledge for the register and abstracts; 261 static green
 - 2026-10-16 · #44 lint gate: ruff 0.17.1 pinned in the dev group with an explicit rule set; Test command runs `ruff check .` before the static suite; first-run findings fixed; 264 static green
+- 2026-10-16 · #46 pre-lifecycle body refreshed: pause replaced by Open Work, stale counts and duplicate Branch & Test Status removed, resolved known gaps marked; 265 static green
 
 ---
 
-_Everything below this line is the pre-lifecycle body, preserved
-verbatim by the migration._
+_Everything below this line is the pre-lifecycle body. The migration
+(#21) preserved it verbatim; #46 refreshed its stale sections (the
+2026-08-26 pause, the current status, the duplicate branch and test
+block, the known gaps since fixed). The earlier text is in git
+history._
 
 # Project State — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 
-## PAUSED — 2026-08-26
+## Open Work
 
-**This project is paused by Michael's decision until after DevOpsDays
-Portland (2026-09-08 to 09-10).** The nearer deadline owns attention:
-Portland's deliverable is the Watch It Burn workshop in
-`~/repos/talks/Unleash_an_Agent_Watch_It_Burn`, a different and far
-more mature repo. This platform's own delivery is not until
-2026-11-09 to 11-12 (see `presentations/` for the event), so the
-runway is real.
+### The 2026-08-26 pause has ended
+Michael paused this project on 2026-08-26 until after DevOpsDays
+Portland (2026-09-08 to 09-10), whose deliverable was the Watch It Burn
+workshop in `~/repos/talks/Unleash_an_Agent_Watch_It_Burn`. That end
+condition has passed. Issue work here resumed on 2026-10-16 with
+Michael approving each merge (see Phase History in the header), and the
+Portland results are carried forward in
+`presentations/kubecon-na-2026/docs/PORTLAND-CARRY-FORWARD.md` (#27).
+This platform's own delivery is 2026-11-09 to 11-12 (see
+`presentations/` for the event).
 
-Do not resume work here without Michael saying so.
-
-### State at the pause
-- Branch `staging`, working tree clean, `staging` and `main` both in
-  sync with origin. Nothing unpushed, nothing stashed.
-- 261 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36; +1 for #37; +5 for #40). Zero open Dependabot alerts, zero open PRs.
+### Ground truth
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
-- 11 open issues, every one labeled `deferred`.
+- The GCP credential had expired by 2026-10-15 (`invalid_grant`), so
+  the live tests fail until #17 restores an identity (see the
+  2026-10-15 entry at the foot of this file).
 
-### The critical path when work resumes
-`#17 → #22 / #23 / #24 → #18 → #20`
+### The critical path
+`#17 → #18 → #20`
 
 1. **#17** swap the dead `kk-community-projects` GCP identity and the
    `michael@kodekloud.com` ACME email. Michael lost access to that
    account. Blocks everything below.
-2. **#22, #23, #24** three verified defects that would break a live
-   bring-up. #22 in particular means `terraform apply` fails outright
-   (Dataplane V2 and legacy Calico both enabled), which a green
-   `terraform plan` did NOT catch — plan is client-side, the GKE API
+2. **#18** live cluster bring-up. The three verified defects that would
+   have broken it are fixed statically: #22 (Dataplane V2 and legacy
+   Calico both enabled, D4), #23 (gateway port, now covered by the #26
+   cross-manifest checks) and #24 (Vertex AI backend). Their live
+   confirmation rides on #18. #22's lesson stands: a green
+   `terraform plan` did NOT catch it — plan is client-side, the GKE API
    rejects the combination only at apply. Do not read a green plan as
    apply-ready.
-3. **#18** live cluster bring-up.
-4. **#20** the Grafana screenshot for the README needs a live rehearsal.
+3. **#20** the Grafana screenshot for the README needs a live rehearsal.
 
 ### Doable any time, needs nothing external
 - **#15** cut a dated release (`v0.1.0-static`)
-- **#21** migrate this file to the lifecycle schema (the SessionStart
-  hook nags every session until it is done)
 
 ### Related work that is NOT this repo
 `Unleash_an_Agent_Watch_It_Burn` also contains a working BurritoBot —
@@ -115,16 +120,18 @@ work tracked below.
 
 ## Current Status
 **Phases 1–8 offline build complete; six critical defects (C1, C2,
-C3, C4, C5, C9) found and repaired under TDD.** Commits land on
-`staging` and ride the autonomous staging→main flow once each phase's
-test passes. Live cluster validation (terraform apply, helm installs,
-live Kyverno + Falco + Envoy + NeMo Guardrails smoke tests) remains
-deferred to a session with GCP auth and cluster access.
+C3, C4, C5, C9) found and repaired under TDD; Phases B, G, C and the
+offline part of D complete; #22, #23 and #24 fixed statically.** Work
+lands on `staging` and is promoted to `main` once its tests pass. Live
+cluster validation (terraform apply, helm installs, live Kyverno +
+Falco + Envoy + NeMo Guardrails smoke tests) remains deferred until #17
+restores GCP auth (see "Open Work" above).
 
 **Recent rewrites (post-Phase-8):**
 - Commit F (`0bd0f34`) — hard rename Deinopis → burritbot across 78 files.
 - Commit G (`43b4db3`) — narrative shift to a lighthearted Act 1.
-- Critical-fix series (this session) — see "Critical Fixes" below.
+- Critical-fix series (2026-04-25 senior review) — see "Critical Fixes" below.
+- 2026-10-16 issue work (#21 to #46) — see Phase History in the header.
 
 ## Platform Context
 - Platform name: **burritbot** (ogre-faced spider — The Eyes + The Net)
@@ -134,7 +141,7 @@ deferred to a session with GCP auth and cluster access.
   live under `presentations/<event>/`. See `README.md` for the current
   active deliveries.
 
-## Critical Fixes (this session)
+## Critical Fixes (2026-04-25 senior review)
 Plan: `docs/CRITICAL-FIXES-PLAN.md`. Each phase landed a failing test
 first, then the minimum fix, then re-ran the full static suite before
 commit.
@@ -174,7 +181,7 @@ commit.
 | 16 | Phase 6: BurritBot application (gemini-3-pro) | completed | cdb1dda |
 | 17 | Phase 7: Audience frontend + rate limiter | completed | 542c194 |
 | 18 | Phase 8: Hardening, runbook, docs | completed | (Phase 8 commit) |
-| 19 | Critical fixes C1–C5, C9 (senior-review pass) | completed | this session |
+| 19 | Critical fixes C1–C5, C9 (senior-review pass) | completed | see Critical Fixes |
 
 ### Static Test Totals
 - Phase 1: 8 passed
@@ -223,7 +230,9 @@ commit.
 - Lint gate (3), #44: ruff is pinned exactly in the dev group with an
   explicit rule set, and the Test command runs `ruff check .` before
   the static suite
-- **Total: 264 static tests green. Live tests skip cleanly when
+- State file (1), #46: PROJECT_STATE.md has one branch and test status
+  section, and its count agrees with the Total line below
+- **Total: 265 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
@@ -245,9 +254,11 @@ commit.
 - Installed: `yamllint`, `jq`, `kyverno`, `shellcheck`, `uv`, `python3.13`,
   `terraform`, `kubectl`, `helm`, `gcloud`
 - Still missing: `kubeconform`, `docker`
-- gcloud accounts authenticated: `michael@kodekloud.com` (active, intended
-  GCP identity), `michaelrishiforrester@gmail.com` (personal, do not use)
-- ADC for the Terraform google provider: not yet set up — run
+- gcloud accounts authenticated: `michael@kodekloud.com` (Michael has
+  lost access to it; #17 replaces it), `michaelrishiforrester@gmail.com`
+  (personal, do not use)
+- ADC for the Terraform google provider: expired by 2026-10-15
+  (`invalid_grant`). Once #17 settles the identity, run
   `gcloud auth application-default login` before the first
   `terraform init`.
 
@@ -268,29 +279,33 @@ them up without re-discovering them.
   container before demo day.
 - **C7 — CORS `allow_origins=["*"]`.** Lock to known audience hostnames.
 - **C8 — per-pod rate limiter.** slowapi in-memory storage scales
-  per replica; either keep replicas: 1 or wire to Redis.
+  per replica; either keep replicas: 1 (the audience Deployment's
+  current setting) or wire to Redis.
 - **C10 — `cast-net.sh` hardcoded `containers/0`.** Switch to
   `kubectl set env deployment/...` or look up by container name.
-- **C11 — Terraform GCS backend.** No `backend "gcs"` block; first
-  `terraform apply` writes local state.
-- **C12 — Public GKE nodes.** No `private_cluster_config` despite the
-  NAT gateway suggesting private intent.
-- **C13 — `deletion_protection = false`.** Combined with
-  `teardown.sh --yes`, the cluster could be destroyed by a stray CI run.
+- **C11 — Terraform GCS backend.** Fixed statically by D1: a
+  `backend "gcs"` block in `infrastructure/terraform/main.tf`.
+- **C12 — Public GKE nodes.** Fixed statically by D2: a
+  `private_cluster_config` block in `infrastructure/terraform/gke.tf`.
+- **C13 — `deletion_protection = false`.** Mitigated by D3:
+  `teardown.sh --yes` also requires `CAST_NET_ALLOW_DESTROY=true`, so a
+  stray CI run with `--yes` alone still prompts. `deletion_protection`
+  itself is still `false`.
 - All Medium/Low items (#14–#27 in the senior review).
 
 ### Newly surfaced (deeper structural)
-- **No Deployment manifests for the AI Gateway / NeMo / LLM Guard /
-  OTel Collector / Falco DaemonSet / Grafana dashboards.** The
-  `deploy/` Kustomizations created in Phase A1 are deliberately
-  shallow — they reference what *is* deployable today (Kyverno
-  ClusterPolicies, Envoy Gateway CR, BurritBot + audience workloads)
-  and carry TODO comments for the rest. Future work needs to author
-  the missing manifests (ConfigMap-wrap configs, Deployment specs,
-  ServiceMonitor / PodMonitor, etc.).
+- **Deployment manifests, mostly closed.** The `deploy/`
+  Kustomizations created in Phase A1 were deliberately shallow. Since
+  then NeMo Guardrails (C2), LLM Guard (C3) and the Vertex AI backend
+  (#24) are wired into `deploy/ai-gateway/`, and the OTel Collector and
+  Falco ship as their own Helm Applications under `gitops/apps/` (B4,
+  B5). Still open: the Grafana dashboard ConfigMaps exist under
+  `observability/grafana/dashboards/` (C1) but no sync target lists
+  them, and the ServiceMonitor / PodMonitor extras are still TODO in
+  `deploy/monitoring/kustomization.yaml`.
 
 ## Next Session — Phase 1 Live Validation
-Once a GCP project is confirmed and Terraform is installed:
+Once #17 restores a GCP identity and the real project ID is confirmed:
 
 ```bash
 claude -p "Read CLAUDE.md, PROJECT_STATE.md, \
@@ -313,15 +328,10 @@ passes. **Do not green-wash the scorecard.**
 - `scripts/teardown.sh` — `terraform destroy` with a two-step confirmation
 - `scripts/cast-net.sh` — the single-command live traffic toggle
 
-## Branch & Test Status
-- **Branch**: `staging` (default working branch)
-- **Remote**: `origin → https://github.com/peopleforrester/burritobot`
-- **Static tests**: 80 passing, 0 failing, live tests skip when kubeconfig absent
-
 ## Key References
 - `CLAUDE.md` — project Claude Code instructions
 - `presentations/<event>/docs/BUILD-INSTRUCTIONS.md` — talk-specific burritbot spec
-- `docs/CRITICAL-FIXES-PLAN.md` — senior-review repair plan (this session)
+- `docs/CRITICAL-FIXES-PLAN.md` — senior-review repair plan (2026-04-25)
 - `presentations/<event>/docs/RUNBOOK.md` — demo-day operational runbook
 - `presentations/<event>/docs/SCORECARD.md` — per-component scorecard
 - `spec/BUILD-SPEC.md` — build-time pointer and completion protocol

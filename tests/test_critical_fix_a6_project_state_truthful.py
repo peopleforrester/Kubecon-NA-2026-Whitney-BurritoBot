@@ -46,3 +46,23 @@ def test_project_state_static_test_count_is_current() -> None:
         f"{actual}. Refresh the state file — see "
         f"~/.claude/rules/state-persistence.md (no green-washing)."
     )
+
+
+@pytest.mark.static
+def test_project_state_has_one_branch_and_tests_section() -> None:
+    """One branch/test status section, and its count agrees with the Total line (#46)."""
+    text = PROJECT_STATE.read_text()
+    headings = re.findall(r"^## Branch & Tests?\b.*$", text, re.MULTILINE)
+    assert len(headings) == 1, (
+        f"PROJECT_STATE.md has {len(headings)} branch/test status sections "
+        f"({headings}); keep only the lifecycle header's '## Branch & Tests'."
+    )
+    section = text.split(headings[0], 1)[1].split("\n## ", 1)[0]
+    passed = re.search(r"(\d+)\s+passed", section)
+    assert passed, "'## Branch & Tests' does not state an 'N passed' count"
+    total = TOTAL_PATTERN.search(text)
+    assert total, "PROJECT_STATE.md has no 'Total: N static tests' line"
+    assert passed.group(1) == total.group(1), (
+        f"'## Branch & Tests' says {passed.group(1)} passed; the Total line "
+        f"says {total.group(1)}."
+    )
