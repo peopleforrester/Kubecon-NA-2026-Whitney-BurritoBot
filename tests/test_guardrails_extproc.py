@@ -20,6 +20,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.image_requirements import requirement_pins
 from helpers.manifest_graph import kustomization_files
 
 
@@ -226,10 +227,7 @@ def test_adapter_sidecar_is_complete(scanner: str) -> None:
 @pytest.mark.static
 def test_adapter_image_pins_match_the_dev_group() -> None:
     """The image installs requirements.txt; the static tests below run on the dev group's copy."""
-    pins = {}
-    for line in (EXTPROC_DIR / "requirements.txt").read_text(encoding="utf-8").splitlines():
-        name, _, version = line.strip().partition("==")
-        pins[name.lower()] = version
+    pins = requirement_pins(EXTPROC_DIR / "requirements.txt")
     dev = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["dependency-groups"]["dev"]
     dev_pins = {}
     for line in dev:

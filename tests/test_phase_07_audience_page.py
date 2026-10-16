@@ -14,6 +14,7 @@ import qrcode
 from fastapi.testclient import TestClient
 
 from conftest import PROJECT_ROOT
+from helpers.image_requirements import requirement_pins
 from helpers.static_assets import file_has_aboutme
 
 
@@ -84,7 +85,7 @@ def test_image_ships_the_static_page() -> None:
 
 @pytest.mark.static
 def test_requirements_pin_qrcode() -> None:
-    assert re.search(r"^qrcode==\S+$", REQUIREMENTS.read_text(encoding="utf-8"), re.M), (
+    assert requirement_pins(REQUIREMENTS).get("qrcode"), (
         "requirements.txt has no exact qrcode pin (the QR landing imports it)"
     )
 

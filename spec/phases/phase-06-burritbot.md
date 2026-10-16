@@ -14,7 +14,8 @@ exist.
 
 - `apps/burritbot/app.py` — FastAPI app; pins `MODEL_NAME` to
   `gemini-3-pro`; no references to 1.5, 2.0, or 2.5 Flash/Pro
-- `apps/burritbot/requirements.txt` — pinned
+- `apps/burritbot/requirements.txt` — `uv export` of the
+  `image-burritbot` group in uv.lock, every package pinned with hashes
 - `apps/burritbot/Dockerfile` — two ABOUTME lines at top
 - `apps/burritbot/k8s/deployment-unguarded.yaml` — namespace
   `burritbot-unguarded`
