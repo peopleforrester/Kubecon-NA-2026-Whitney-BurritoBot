@@ -213,3 +213,27 @@ the earlier text stays in git history.
 - `tests/test_critical_fix_a6_project_state_truthful.py` gains a
   check that the file has one branch and test status section whose
   count agrees with the Total line.
+
+## 2026-10-16T23:45:00Z · amendment · Promote-time entries append to decisions.md (issue #47)
+
+The #21 migration left the 2026-10-15 promote entry at the foot of
+`PROJECT_STATE.md` so the body stayed unchanged; the init entry above
+says so. #46 has since stopped keeping that body verbatim, so the
+reason is gone. The entry is carried over below with its original
+heading and text, and removed from `PROJECT_STATE.md`.
+
+From now on every decision entry, the promote-time ones included
+(main fast-forwarded with known failures, a skipped gate, an accepted
+red test), is appended here and never to `PROJECT_STATE.md`. AGENTS.md
+§ "Session Discipline" states the rule.
+`tests/test_decision_entries_location.py` fails if a
+`## <timestamp> · ...` entry heading reappears in `PROJECT_STATE.md`.
+
+The writer of the 2026-10-15 entry is the promote step outside this
+repo (commit `cd5dd0f`, "Trivial: decision log entry"). Its target
+file is fixed there, not here; this repo's rule and test catch a
+stray entry at the next Test command run.
+
+## 2026-10-15T12:00:00Z · 3.3 · Main fast-forwarded with known test failures
+
+On Michael's instruction, main was fast-forwarded to staging to ship the Dependabot fix with these failures, all present on main before the fix, accepted: test_terraform_plan and test_gke_cluster_is_standard_with_wif_and_nap need live GCP; the credential has expired (invalid_grant).
