@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import copy
-import json
 import re
 
 import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.crd_schema import installed_schema, openapi_violations
 
 
 GATEWAY = PROJECT_ROOT / "ai-gateway" / "envoy" / "gateway.yaml"
@@ -77,12 +77,14 @@ EXPECTED_EXTPROC_BACKENDS = [("nemo-guardrails", 50051), ("llm-guard", 50051)]
 
 # Docs that pin the Envoy AI Gateway release this manifest needs.
 AI_GATEWAY_FLOOR = "0.6"
-# "Envoy AI Gateway 0.6+" in prose, "| Envoy AI Gateway | The Net | 0.6+ |" in scorecards.
-FLOOR_PATTERN = re.compile(r"Envoy AI Gateway[\s|]*(?:The Net[\s|]*)?(\d+\.\d+)\+")
+# "Envoy AI Gateway 0.6+" in prose, "| Envoy AI Gateway | The Net | 0.6+ |" in
+# scorecards, "Envoy AI Gateway: **0.6+**" in the skill.
+FLOOR_PATTERN = re.compile(r"Envoy AI Gateway[\s|:*]*(?:The Net[\s|]*)?(\d+\.\d+)\+")
 FLOOR_DOCS = [
     PROJECT_ROOT / "spec" / "phases" / "phase-05-the-net-ai-gateway.md",
     PROJECT_ROOT / "presentations" / "kubecon-na-2026" / "spec" / "SCORECARD.md",
     PROJECT_ROOT / "presentations" / "kubecon-na-2026" / "docs" / "SCORECARD.md",
+    PROJECT_ROOT / ".claude" / "skills" / "the-net-ai-gateway.md",
 ]
 
 
@@ -296,42 +298,6 @@ def test_doc_states_the_ai_gateway_floor(doc) -> None:
 # --- live: the CRDs actually installed accept gateway.yaml (#53) ----------
 
 
-def openapi_violations(obj: object, schema: dict, path: str = "") -> list[str]:
-    """Unknown fields, missing required fields and out-of-enum values under a CRD's openAPIV3Schema.
-
-    CEL rules (x-kubernetes-validations) are not evaluated; the static checks
-    above hold the ones gateway.yaml depends on.
-    """
-    out: list[str] = []
-    if isinstance(obj, dict):
-        props = schema.get("properties")
-        if props is not None and not schema.get("x-kubernetes-preserve-unknown-fields"):
-            out += [f"{path}.{k}" for k in sorted(obj.keys() - props.keys())]
-        out += [f"{path}.{k} (required)" for k in schema.get("required", []) if k not in obj]
-        for k, v in obj.items():
-            if props and k in props:
-                out += openapi_violations(v, props[k], f"{path}.{k}")
-    elif isinstance(obj, list):
-        if "items" in schema:
-            for i, v in enumerate(obj):
-                out += openapi_violations(v, schema["items"], f"{path}[{i}]")
-    elif "enum" in schema and obj not in schema["enum"]:
-        out.append(f"{path} {obj!r} not in {schema['enum']}")
-    return out
-
-
-def _installed_schema(crd_name: str, version: str) -> dict:
-    """The served openAPIV3Schema of an installed CRD. Needs a kubeconfig and the cluster."""
-    from kubernetes import client, config  # type: ignore
-
-    config.load_kube_config()
-    resp = client.ApiextensionsV1Api().read_custom_resource_definition(crd_name, _preload_content=False)
-    crd = json.loads(resp.data)
-    served = {v["name"]: v for v in crd["spec"]["versions"] if v.get("served")}
-    assert version in served, f"installed CRD {crd_name} serves {sorted(served)}, not {version}"
-    return served[version]["schema"]["openAPIV3Schema"]
-
-
 LIVE_OBJECTS = [
     ("aigatewayroutes.aigateway.envoyproxy.io", "v1beta1", _route),
     ("envoyextensionpolicies.gateway.envoyproxy.io", "v1alpha1", _extproc_policy),
@@ -341,7 +307,7 @@ LIVE_OBJECTS = [
 @pytest.mark.live
 @pytest.mark.parametrize("crd_name,version,pick", LIVE_OBJECTS, ids=[c for c, _, _ in LIVE_OBJECTS])
 def test_installed_crd_accepts_gateway_yaml(crd_name: str, version: str, pick) -> None:
-    schema = _installed_schema(crd_name, version)
+    schema = installed_schema(crd_name, version)
     obj = pick(_docs())
     violations = openapi_violations(obj, schema)
     assert not violations, f"installed {crd_name} {version} would refuse or strip {obj['metadata']['name']}: {violations}"
@@ -350,7 +316,7 @@ def test_installed_crd_accepts_gateway_yaml(crd_name: str, version: str, pick) -
 @pytest.mark.live
 def test_installed_route_crd_refuses_the_pre_49_shape() -> None:
     """The walker is not vacuous: the old targetRefs/schema/filters are unknown to the installed CRD."""
-    schema = _installed_schema("aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
+    schema = installed_schema("aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
     route = copy.deepcopy(_route(_docs()))
     route["spec"]["targetRefs"] = [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "burritbot-audience"}]
     route["spec"]["schema"] = {"name": "OpenAI"}

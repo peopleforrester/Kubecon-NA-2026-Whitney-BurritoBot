@@ -144,7 +144,8 @@ INCOMPATIBLE: dict[str, IncompatiblePair] = {
         "channel over the copy ArgoCD applies from gateway-helm. Set gateway-helm "
         "crds.enabled false and install only the Envoy Gateway CRDs "
         "(gateway-crds-helm, crds.gatewayAPI.enabled false), once GKE's Gateway "
-        "API serves what gateway.yaml uses (BackendTLSPolicy v1).",
+        "API serves what the ai-gateway manifests use (Gateway API v1.4+, for "
+        "BackendTLSPolicy v1 in vertex-ai-backend.yaml).",
     ),
 }
 

@@ -51,7 +51,10 @@ Live:
 - NeMo Guardrails 0.11+ with Colang 2.0
 - LLM Guard 0.3.17+ — always run both input and output scanners
 - Envoy AI Gateway 0.6+ (the first release serving the v1beta1
-  AIGatewayRoute; 0.2-0.5 serve only v1alpha1), Gateway API v1.2
+  AIGatewayRoute; 0.2-0.5 serve only v1alpha1)
+- Gateway API v1.4+ (the first release serving BackendTLSPolicy
+  `gateway.networking.k8s.io/v1`, which `vertex-ai-backend.yaml`
+  applies; v1.2 and v1.3 serve only v1alpha3, experimental channel)
 - All three live in the **`burritbot-net`** namespace. The name
   `guardrails` is from an earlier draft; a Phase 5 test greps for it
   and fails.

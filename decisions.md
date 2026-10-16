@@ -896,3 +896,33 @@ being fixed here:
   microservice, so the probes would never pass.
 
 As with #66, live confirmation rides on #18.
+
+## 2026-10-16T17:26:45Z · decision · The ai-gateway manifests need Gateway API v1.4 or later; the v1.2 floor is raised to v1.4+ (issue #74)
+
+The phase-05 spec, the spec scorecard and the AI gateway skill pinned
+Gateway API v1.2. The served versions were read from the upstream
+`standard-install.yaml` and `experimental-install.yaml` CRDs of v1.0.0,
+v1.1.0, v1.2.0, v1.2.1, v1.3.0, v1.4.0, v1.4.1, v1.5.1 and v1.6.1:
+
+- BackendTLSPolicy, which `ai-gateway/envoy/vertex-ai-backend.yaml`
+  applies at `gateway.networking.k8s.io/v1`, is served only as
+  v1alpha3 in v1.2 and v1.3, and only in the experimental channel.
+  v1 first ships in v1.4.0 (standard and experimental). So #74 is
+  right: on a v1.2 install the Vertex AI TLS policy does not apply.
+- The policy validates against the v1.4.0, v1.4.1 and v1.6.1 v1
+  schemas. The other Gateway API objects (GatewayClass, Gateway,
+  HTTPRoute v1; ReferenceGrant v1beta1) validate from v1.2.0 on.
+  Gateway `spec.infrastructure` is unknown to the v1.0 and v1.1
+  standard CRDs.
+- Envoy Gateway v1.7.0 and AI Gateway v0.6.0 (the #53 floor) build
+  against gateway-api v1.4.1 (`go.mod`). Envoy Gateway v1.9.2 and
+  AI Gateway v1.2.0 (the #68 install) build against v1.6.1. So the
+  v1.4 floor agrees with the AI Gateway 0.6 floor.
+
+The three docs now say v1.4+. `tests/test_gateway_api_floor.py` records
+the first release that serves each Gateway API apiVersion and kind in
+the manifests, derives the floor from them, and holds the docs to it.
+It fails if a Gateway API object turns up whose apiVersion and kind are
+not recorded. A live test checks each object against the CRDs installed
+on the cluster. The skill's Envoy AI Gateway line, left at 0.2+ by #53,
+now says 0.6+ and is part of the #53 doc-floor test.

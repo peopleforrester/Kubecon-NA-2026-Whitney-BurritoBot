@@ -4,8 +4,10 @@
 
 - NeMo Guardrails: **0.11+** (Colang 2.0, `dialog.rails` block)
 - LLM Guard: **0.3.17+** (both input and output scanner APIs)
-- Envoy AI Gateway: **0.2+** (Gateway API based)
-- Gateway API: **v1.2**
+- Envoy AI Gateway: **0.6+** (Gateway API based; first release serving
+  the v1beta1 AIGatewayRoute)
+- Gateway API: **v1.4+** (first release serving BackendTLSPolicy v1,
+  which `ai-gateway/envoy/vertex-ai-backend.yaml` applies)
 
 ## The Point of This Skill
 
