@@ -31,7 +31,7 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  255 passed, 16 deselected after the #36 conference-source checks
+  256 passed, 16 deselected after the #37 workshop-lineage check
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -39,6 +39,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #27 Portland carry-forward: PORTLAND-CARRY-FORWARD.md + runbook Night Before / rule-on-screen / Measurements; 248 static green
 - 2026-10-16 · #33 accepted talk title replaces the old working title repo-wide; 253 static green
 - 2026-10-16 · #36 conference-knowledge owns event state: CFP header becomes a pointer, AGENTS.md gains "Where things live"; 255 static green
+- 2026-10-16 · #37 Europe 2027 tutorial is workshop-lineage, not built here: decisions.md entry + README Ancestry disclaims the workshop bot; 256 static green
 
 ---
 
@@ -62,7 +63,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 255 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36). Zero open Dependabot alerts, zero open PRs.
+- 256 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33; +2 for #36; +1 for #37). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -210,7 +211,9 @@ commit.
 - Conference source of truth (2), #36: the CFP doc keeps no event-state
   copy and points at conference-knowledge, and AGENTS.md says where
   conference information lives
-- **Total: 255 static tests green. Live tests skip cleanly when
+- Workshop lineage (1), #37: the README's Ancestry section names the
+  workshop BurritoBot as a separate project, not an ancestor
+- **Total: 256 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

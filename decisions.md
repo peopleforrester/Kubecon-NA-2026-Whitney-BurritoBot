@@ -105,3 +105,34 @@ in `PORTLAND-CARRY-FORWARD.md` and in the pre-lifecycle body of
 `BUILD-INSTRUCTIONS.md` preamble, and the CFP's "Has This Been
 Presented Before?" answer, which is submitted text. The event name
 and city still identify the delivery in `README.md` and `PLAN.md`.
+
+## 2026-10-16T20:00:00Z · decision · The Europe 2027 tutorial is not built on this platform (issue #37)
+
+Whitney's Europe 2027 tutorial abstract (shared 2026-10-04) is a
+hands-on, attack-then-block workshop: kagent, one cluster per
+attendee, a browser terminal, and a goth burrito chain with a secret to
+protect. Every one of those is the `Unleash_an_Agent_Watch_It_Burn`
+workshop's architecture or canon. This platform's shape (the
+guarded/unguarded A/B in two namespaces, Vertex through Envoy AI
+Gateway, no terminal, no per-attendee provisioning) matches it on the
+burrito theme only.
+
+Settled by the #25 entry above, not by a new call: the workshop's
+premise and canon are not imported here, and workshop platform work
+does not transfer. A tutorial built on that platform is workshop work,
+so this repo does not carry it and stays the platform behind the NA
+2026 delivery. #25 stands as "independent on purpose", and the README's
+Ancestry section now says so (`tests/test_workshop_lineage.py`).
+
+Consequences for this repo:
+
+- KubeArmor, Istio, kagent, classifier models and tool allow-lists,
+  which the abstract names and this repo lacks, are not backlog here.
+  Their absence is the intended scope, not a gap to close.
+- The submission itself (event, track, Sessionize invite) is event
+  state and lives in conference-knowledge, per the #36 entry; nothing
+  about it is copied here.
+
+Reopen if Michael and Whitney decide the 2027 tutorial runs on this
+platform. That reopens #25 too, and amends CLAUDE.md (narrative,
+non-negotiable architecture) before any port starts.
