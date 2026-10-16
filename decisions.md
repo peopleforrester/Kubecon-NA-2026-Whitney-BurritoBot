@@ -163,3 +163,31 @@ Two calls made to fit the standard to the entries above:
 `decisions.md` already existed when this landed (created by the
 2026-10-16 lifecycle migration), so the audit's "no decisions.md"
 needed no new file.
+
+## 2026-10-16T23:00:00Z · decision · question 119: ruff joins the dev group and the light Test command (issue #44)
+
+Question 119 asked whether the repo may add a Python linter as a new
+dev dependency and run it in the Test command. Answer (coordinator,
+for Michael): approved, ruff pinned in the dev group plus a
+`ruff check` step in the Test command. A new dev package does not need
+Michael's approval; his rule (2026-10-16) is approval only at
+publication, and hecaton#125 removes the old rule.
+
+What it changes:
+
+- `pyproject.toml` pins `ruff==0.17.1` in `[dependency-groups].dev`
+  and `uv.lock` carries it.
+- `[tool.ruff.lint]` selects an explicit rule set (`E4`, `E7`, `E9`,
+  `F`, `I`, `UP`) rather than ruff's defaults, which widened in 0.17
+  to blind-except, bandit and pylint checks. An upgrade cannot change
+  the gate on its own; widening it is a deliberate edit. isort treats
+  `conftest` and `helpers` as first-party (they sit on pytest's
+  pythonpath) and keeps two blank lines after imports, the repo's
+  existing style.
+- The first run's findings (unsorted and unused imports, deprecated
+  `typing` imports, `timezone.utc`, one TypeVar generic) are fixed
+  with no behaviour change.
+- The Test command in AGENTS.md (CLAUDE.md links to it) is
+  `uv run --managed-python --frozen ruff check . && uv run --managed-python --frozen pytest -m static`.
+  `tests/test_lint_gate.py` keeps the pin, the explicit rule set and
+  the command in place.

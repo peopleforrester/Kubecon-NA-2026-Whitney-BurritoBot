@@ -14,6 +14,7 @@ from google.genai import types
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, Field
 
+
 logger = logging.getLogger("burritbot")
 logging.basicConfig(level=logging.INFO)
 

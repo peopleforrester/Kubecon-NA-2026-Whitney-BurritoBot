@@ -5,12 +5,10 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Callable, TypeVar
-
-T = TypeVar("T")
+from collections.abc import Callable
 
 
-def wait_for_condition(
+def wait_for_condition[T](
     description: str,
     check_fn: Callable[[], T],
     timeout: int = 120,
