@@ -4,6 +4,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  # GatewayClass envoy-ai-gateway (Envoy Gateway controller, gitops/apps/envoy-gateway.yaml).
+  - ../../ai-gateway/envoy/gatewayclass.yaml
   # Gateway custom resources (Phase 5).
   - ../../ai-gateway/envoy/gateway.yaml
   # Vertex AI upstream the AIGatewayRoute routes to (WIF-authenticated).

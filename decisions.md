@@ -268,3 +268,72 @@ the HTTPRoute it generates.
 `tests/test_ai_gateway_route_schema.py` holds both objects to the
 fields their CRDs define, and its mutation tests catch each pre-#49
 shape.
+
+## 2026-10-16T13:23:42Z · decision · Envoy Gateway and the AI Gateway controller install as ArgoCD Applications; ControllerNamespace mode is pinned (issue #50)
+
+The Gateway named `gatewayClassName: envoy-ai-gateway`, but nothing in
+the tree installed Envoy Gateway, the AI Gateway CRDs or controller, or
+defined the GatewayClass. Four Applications and one manifest now do:
+
+- `gitops/apps/envoy-gateway.yaml`: `gateway-helm` v1.9.2 into
+  `envoy-gateway-system`, wave -2. The values are upstream
+  `manifests/envoy-gateway-values.yaml` at AI Gateway v1.2.0
+  (extension manager hooks to
+  `ai-gateway-controller.envoy-ai-gateway-system:1063`, Backend API on),
+  plus `provider.kubernetes.deploy.type: ControllerNamespace` stated
+  explicitly.
+- `gitops/apps/ai-gateway-crds.yaml`: `ai-gateway-crds-helm` v1.2.0
+  into `envoy-ai-gateway-system`, wave -2.
+- `gitops/apps/ai-gateway-controller.yaml`: `ai-gateway-helm` v1.2.0,
+  wave 2.
+- `ai-gateway/envoy/gatewayclass.yaml`: GatewayClass `envoy-ai-gateway`
+  on `gateway.envoyproxy.io/gatewayclass-controller`, synced by the
+  `ai-gateway` Application, which moves from wave 1 to wave 3.
+- Both namespaces join `gitops/namespaces/namespaces.yaml`.
+
+Versions. Envoy AI Gateway was renamed Agent Router at v1.2.0
+(2026-10-07). The API group, CRDs, chart names and images are unchanged.
+v1.2.0 is the latest release; it is past the v0.6.0 floor for ADC in a
+v1beta1 BackendSecurityPolicy, and its v1beta1 API is stable for 1.x.
+Its documented Envoy Gateway minimum is v1.9.2, the latest Envoy
+Gateway release. Both chart tags were confirmed on Docker Hub.
+
+Deployment mode. ControllerNamespace keeps the proxy pod and the
+`burritbot-ai-gateway` KSA in `envoy-gateway-system`, which the
+Terraform WIF binding already targets. GatewayNamespace mode would put
+the pod in `burritbot-net`, where `require-burritbot-sidecar-naming`
+(Enforce) rejects the `ai-gateway-extproc` and `shutdown-manager`
+containers. Envoy Gateway v1.9.2 copies the Gateway's
+`spec.infrastructure.annotations` onto the proxy ServiceAccount, so
+the `iam.gke.io/gcp-service-account` annotation lands where WIF reads it.
+
+Waves. The controller's webhook adds the ExtProc sidecar when Envoy
+Gateway creates the proxy pod, so the Gateway syncs after the
+controller. The webhook cert comes from cert-manager
+(`certManager.enable`), so the controller follows cert-manager (wave 1).
+The chart's default self-signed cert uses `lookup`, which `helm
+template` (ArgoCD) cannot do, so ArgoCD would mint a new keypair on
+every render.
+
+MCP session seed. The v1.2.0 chart generates a random seed when it
+finds no Secret, which under `helm template` happens on every render.
+The seed is a secret, so it stays out of Git. The Application ignores
+`/data` on `ai-gateway-controller-mcp-session-encryption` with
+`RespectIgnoreDifferences=true`, so the seed from the first sync is
+kept. MCP is not used here.
+
+Not confirmed: gemini-3-pro on the us-west1 regional endpoint. The
+Vertex AI locations page (read 2026-10-16) lists no `gemini-3-pro` or
+`gemini-3-pro-preview` row in any location. It lists
+`gemini-3.1-pro-preview` for both global and us-west1. The GCP
+credential is dead (#17), so no call was possible.
+`test_vertex_backend_region_serves_model` (live) now makes the call at
+the BackendSecurityPolicy's region. It fails loudly until #17 restores
+an identity, and it fails if the model is not served there. Changing
+the model pin is a CLAUDE.md fact and is filed as a follow-up.
+
+`tests/test_envoy_gateway_install.py` holds all of the above. Its
+mutations (GatewayNamespace, Gateway wave 1, AI Gateway v0.5.0, the
+GatewayClass dropped from the kustomization) each fail it. The live
+phase-05 proxy test now looks in `envoy-gateway-system` by
+owning-gateway labels, and checks the KSA and the ExtProc sidecar.

@@ -1,0 +1,38 @@
+# ABOUTME: Wave -2: Envoy AI Gateway CRDs (AIGatewayRoute, AIServiceBackend, BackendSecurityPolicy, ...).
+# ABOUTME: Separate chart from the controller so the CRDs exist before any app applies those kinds.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # OCI chart; ArgoCD reads a scheme-less repoURL as an OCI registry.
+    # The project is now named Agent Router; the charts, images and the
+    # aigateway.envoyproxy.io API group kept their names.
+    repoURL: docker.io/envoyproxy
+    chart: ai-gateway-crds-helm
+    # Same release as ai-gateway-controller.yaml; bump the two together.
+    targetRevision: v1.2.0
+    helm:
+      releaseName: aieg-crd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-ai-gateway-system
+  syncPolicy:
+    automated:
+      # CRD deletion would cascade to every AIGatewayRoute in the cluster.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

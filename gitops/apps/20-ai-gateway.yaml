@@ -1,4 +1,4 @@
-# ABOUTME: Wave 1: Envoy AI Gateway + NeMo Guardrails + LLM Guard — the active guardrail net.
+# ABOUTME: Wave 3: Envoy AI Gateway + NeMo Guardrails + LLM Guard — the active guardrail net.
 # ABOUTME: Lives in burritbot-net so BurritBot traffic passes through a single choke point.
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -7,7 +7,9 @@ metadata:
   name: ai-gateway
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    # After the AI Gateway controller (wave 2): its webhook must exist before
+    # Envoy Gateway creates the proxy pod, or the pod lacks the ExtProc sidecar.
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     burritbot.io/layer: the-net
     app.kubernetes.io/part-of: burritbot

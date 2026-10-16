@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 287 passed, 16 deselected after the
-  #49 AIGatewayRoute schema fix
+  (ruff check, then static suite) 304 passed, 20 deselected after the
+  #50 Envoy Gateway / AI Gateway install
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -49,6 +49,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #47 the 2026-10-15 promote entry moves from the foot of this file to decisions.md; AGENTS.md sends every decision entry, promote-time ones included, to decisions.md; 268 static green
 - 2026-10-16 · #39 advisory guard: static test holds uv.lock at or above the patched anyio, urllib3, oauthlib, fsspec and multidict releases; 273 static green
 - 2026-10-16 · #49 AIGatewayRoute takes the upstream v1beta1 shape (parentRefs to the Gateway, x-ai-eg-model match); NeMo/LLM Guard ExtProc moves to the burritbot-guardrails EnvoyExtensionPolicy on the Gateway; 287 static green
+- 2026-10-16 · #50 Envoy Gateway v1.9.2, AI Gateway CRDs + controller v1.2.0 and GatewayClass envoy-ai-gateway land as ArgoCD Applications; ControllerNamespace mode pinned to match the WIF binding; gemini-3-pro in us-west1 left to a live test; 304 static green
 
 ---
 
@@ -245,7 +246,15 @@ commit.
   the EnvoyExtensionPolicy use only fields their upstream CRDs define;
   mutation tests reintroduce targetRefs, schema, filters, a singular
   backendRef and the old BUFFERED spelling
-- **Total: 287 static tests green. Live tests skip cleanly when
+- Envoy Gateway / AI Gateway install (14, plus 3 Application path checks), #50: GatewayClass
+  envoy-ai-gateway is synced and names Envoy Gateway's controller; the
+  three charts are exact pins (AI Gateway >= v0.6.0 for ADC, Envoy
+  Gateway at the AI Gateway release's minimum); the extension manager
+  dials the AI Gateway controller; ControllerNamespace mode matches the
+  Terraform WIF binding; namespaces are declared; waves put the
+  controllers before the Gateway; the webhook cert and MCP seed survive
+  ArgoCD re-renders
+- **Total: 304 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

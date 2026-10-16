@@ -110,10 +110,49 @@ def test_nemo_guardrails_pod_running(k8s_core_v1) -> None:
 
 
 @pytest.mark.live
+@pytest.mark.parametrize(
+    "namespace,deployment",
+    [
+        ("envoy-gateway-system", "envoy-gateway"),
+        ("envoy-ai-gateway-system", "ai-gateway-controller"),
+    ],
+)
+def test_gateway_controller_available(k8s_apps_v1, namespace: str, deployment: str) -> None:
+    status = k8s_apps_v1.read_namespaced_deployment(deployment, namespace).status
+    assert status.available_replicas, f"{namespace}/{deployment} has no available replicas"
+
+
+@pytest.mark.live
+def test_envoy_ai_gateway_class_accepted(k8s_custom_objects) -> None:
+    gateway_class = k8s_custom_objects.get_cluster_custom_object(
+        "gateway.networking.k8s.io", "v1", "gatewayclasses", "envoy-ai-gateway"
+    )
+    conditions = {
+        c["type"]: c["status"] for c in gateway_class.get("status", {}).get("conditions", [])
+    }
+    assert conditions.get("Accepted") == "True", (
+        f"GatewayClass envoy-ai-gateway conditions: {conditions}"
+    )
+
+
+@pytest.mark.live
 def test_envoy_ai_gateway_pod_running(k8s_core_v1) -> None:
+    """ControllerNamespace mode: the proxy runs in envoy-gateway-system on the WIF-bound KSA."""
     pods = k8s_core_v1.list_namespaced_pod(
-        namespace="burritbot-net",
-        label_selector="app.kubernetes.io/name=envoy-ai-gateway",
+        namespace="envoy-gateway-system",
+        label_selector=(
+            "app.kubernetes.io/name=envoy,"
+            "gateway.envoyproxy.io/owning-gateway-name=burritbot-ai-gateway,"
+            "gateway.envoyproxy.io/owning-gateway-namespace=burritbot-net"
+        ),
     )
     running = [p for p in pods.items if p.status and p.status.phase == "Running"]
-    assert running, "No Envoy AI Gateway pods Running in burritbot-net"
+    assert running, "No burritbot-ai-gateway Envoy proxy pods Running in envoy-gateway-system"
+    for pod in running:
+        assert pod.spec.service_account_name == "burritbot-ai-gateway", (
+            f"{pod.metadata.name} runs as {pod.spec.service_account_name}, not the WIF-bound KSA"
+        )
+        containers = [c.name for c in [*(pod.spec.init_containers or []), *pod.spec.containers]]
+        assert "ai-gateway-extproc" in containers, (
+            f"{pod.metadata.name} has no AI Gateway ExtProc sidecar: {containers}"
+        )

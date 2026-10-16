@@ -1,0 +1,12 @@
+# ABOUTME: GatewayClass envoy-ai-gateway, handled by the Envoy Gateway controller (gitops/apps/envoy-gateway.yaml).
+# ABOUTME: The burritbot-ai-gateway Gateway names it; the AI Gateway controller extends that Envoy Gateway.
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy-ai-gateway
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

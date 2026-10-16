@@ -1,0 +1,64 @@
+# ABOUTME: Wave 2: Envoy AI Gateway controller — Envoy Gateway extension server and ExtProc sidecar injector.
+# ABOUTME: Follows cert-manager (webhook cert) and precedes the Gateway so proxy pods get the sidecar.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # OCI chart; ArgoCD reads a scheme-less repoURL as an OCI registry.
+    repoURL: docker.io/envoyproxy
+    chart: ai-gateway-helm
+    # >= v0.6.0 for ADC in the v1beta1 BackendSecurityPolicy. v1.2.0 needs
+    # Envoy Gateway >= v1.9.2 (envoy-gateway.yaml); bump them together, and
+    # ai-gateway-crds.yaml with this one.
+    targetRevision: v1.2.0
+    helm:
+      releaseName: aieg
+      valuesObject:
+        controller:
+          # Envoy Gateway's extension manager dials
+          # ai-gateway-controller.envoy-ai-gateway-system:1063.
+          fullnameOverride: ai-gateway-controller
+          mutatingWebhook:
+            # ArgoCD renders with helm template, where the chart's lookup of
+            # the previous self-signed cert finds nothing and mints a new
+            # keypair on every render. cert-manager owns it instead.
+            certManager:
+              enable: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-ai-gateway-system
+  # The chart generates a random MCP session seed when no Secret exists; under
+  # helm template it would generate a new one on every render. Keep the seed
+  # created on first sync (no seed in Git; MCP is unused here).
+  ignoreDifferences:
+    - kind: Secret
+      name: ai-gateway-controller-mcp-session-encryption
+      namespace: envoy-ai-gateway-system
+      jsonPointers:
+        - /data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

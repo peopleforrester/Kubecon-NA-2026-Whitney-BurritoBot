@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import PROJECT_ROOT, TERRAFORM_DIR
+from conftest import GCP_PROJECT_ID, GEMINI_MODEL, PROJECT_ROOT, TERRAFORM_DIR
 
 
 GATEWAY = PROJECT_ROOT / "ai-gateway" / "envoy" / "gateway.yaml"
@@ -175,6 +175,17 @@ def test_vertex_backend_has_tls_policy() -> None:
     assert validation.get("wellKnownCACertificates") == "System"
 
 
+def _vertex_security_policies() -> list[dict]:
+    ai_backend = _vertex_backend()
+    return [
+        d
+        for d in _tree_docs()
+        if d.get("kind") == "BackendSecurityPolicy"
+        and d["metadata"].get("namespace") == ai_backend["metadata"]["namespace"]
+        and _targets(d, "aigateway.envoyproxy.io", "AIServiceBackend", VERTEX_BACKEND)
+    ]
+
+
 @pytest.mark.static
 def test_vertex_backend_authenticates_via_wif() -> None:
     """GCPCredentials with neither key file nor external WIF config uses ADC.
@@ -183,14 +194,7 @@ def test_vertex_backend_authenticates_via_wif() -> None:
     Envoy proxy pod's KSA. ADC is only accepted by the v1beta1 API; v1alpha1
     demands a key file or an external-OIDC WIF config.
     """
-    ai_backend = _vertex_backend()
-    policies = [
-        d
-        for d in _tree_docs()
-        if d.get("kind") == "BackendSecurityPolicy"
-        and d["metadata"].get("namespace") == ai_backend["metadata"]["namespace"]
-        and _targets(d, "aigateway.envoyproxy.io", "AIServiceBackend", VERTEX_BACKEND)
-    ]
+    policies = _vertex_security_policies()
     assert len(policies) == 1, (
         f"expected one BackendSecurityPolicy targeting AIServiceBackend {VERTEX_BACKEND}"
     )
@@ -249,3 +253,24 @@ def test_gateway_proxy_service_account_is_wif_bound() -> None:
         rf'\s*member\s*=\s*"serviceAccount:\$\{{var\.project_id\}}\.svc\.id\.goog\[[^/\]]+/{ksa}\]"',
         iam,
     ), f"no workloadIdentityUser binding from KSA {ksa} to the ai_gateway GSA"
+
+
+@pytest.mark.live
+def test_vertex_backend_region_serves_model() -> None:
+    """The gateway's regional Vertex AI endpoint serves the pinned Gemini model (#50).
+
+    The Backend, BackendSecurityPolicy, app.py and the NeMo config all use
+    one region; a model served only from the global endpoint returns 404.
+    """
+    from google import genai
+    from google.genai import types
+
+    (policy,) = _vertex_security_policies()
+    region = policy["spec"]["gcpCredentials"]["region"]
+    client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=region)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents="Name one burrito filling.",
+        config=types.GenerateContentConfig(max_output_tokens=256),
+    )
+    assert response.candidates, f"{GEMINI_MODEL} in {region} returned no candidates"

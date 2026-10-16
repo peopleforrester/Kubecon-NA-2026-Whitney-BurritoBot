@@ -1,0 +1,88 @@
+# ABOUTME: Wave -2: Envoy Gateway (with the Gateway API CRDs) — the controller behind GatewayClass envoy-ai-gateway.
+# ABOUTME: Values carry the AI Gateway extension-manager hooks and pin ControllerNamespace proxy deployment.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # OCI chart; ArgoCD reads a scheme-less repoURL as an OCI registry.
+    repoURL: docker.io/envoyproxy
+    chart: gateway-helm
+    # v1.9.2 is the minimum Envoy Gateway for AI Gateway v1.2.0
+    # (ai-gateway-controller.yaml). Bump the two together.
+    targetRevision: v1.9.2
+    helm:
+      releaseName: eg
+      # Upstream manifests/envoy-gateway-values.yaml at AI Gateway v1.2.0,
+      # plus the explicit deploy mode.
+      valuesObject:
+        config:
+          envoyGateway:
+            gateway:
+              controllerName: gateway.envoyproxy.io/gatewayclass-controller
+            logging:
+              level:
+                default: info
+            provider:
+              type: Kubernetes
+              kubernetes:
+                # Proxies (and the burritbot-ai-gateway KSA the EnvoyProxy
+                # pins) run in envoy-gateway-system. The Terraform WIF binding
+                # targets envoy-gateway-system/burritbot-ai-gateway, and
+                # GatewayNamespace mode would put the ExtProc sidecar in
+                # burritbot-net, where require-burritbot-sidecar-naming rejects it.
+                deploy:
+                  type: ControllerNamespace
+            extensionApis:
+              enableEnvoyPatchPolicy: true
+              # Required: the Vertex AI upstream is an Envoy Gateway Backend.
+              enableBackend: true
+            # Required: the AI Gateway controller rewrites the generated xDS.
+            extensionManager:
+              hooks:
+                xdsTranslator:
+                  translation:
+                    listener:
+                      includeAll: true
+                    route:
+                      includeAll: true
+                    cluster:
+                      includeAll: true
+                    secret:
+                      includeAll: true
+                  post:
+                    - Translation
+                    - Cluster
+                    - Route
+              service:
+                fqdn:
+                  hostname: ai-gateway-controller.envoy-ai-gateway-system.svc.cluster.local
+                  port: 1063
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      # The Gateway API CRDs exceed the client-side last-applied annotation limit.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
