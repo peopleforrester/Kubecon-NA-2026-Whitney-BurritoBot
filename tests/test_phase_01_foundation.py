@@ -132,14 +132,13 @@ def test_tfvars_example_has_no_real_secrets() -> None:
     assert "region" in text, "terraform.tfvars.example must declare region"
 
 
-# --- Live Terraform checks (skipped when terraform is not installed) --------
+# --- Live Terraform checks (fail when terraform is not installed) -----------
 
 
 @pytest.mark.live
 def test_terraform_validate() -> None:
     """`terraform validate` passes with no errors."""
-    if shutil.which("terraform") is None:
-        pytest.skip("terraform is not installed on this host")
+    assert shutil.which("terraform"), "terraform is not on PATH; the live Terraform checks need it"
     result = subprocess.run(
         ["terraform", "validate"],
         cwd=TERRAFORM_DIR,
@@ -153,8 +152,7 @@ def test_terraform_validate() -> None:
 @pytest.mark.live
 def test_terraform_plan() -> None:
     """`terraform plan` produces no errors (exit 0 or 2)."""
-    if shutil.which("terraform") is None:
-        pytest.skip("terraform is not installed on this host")
+    assert shutil.which("terraform"), "terraform is not on PATH; the live Terraform checks need it"
     result = subprocess.run(
         ["terraform", "plan", "-detailed-exitcode"],
         cwd=TERRAFORM_DIR,

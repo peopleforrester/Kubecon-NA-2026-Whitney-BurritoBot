@@ -69,8 +69,7 @@ def test_teardown_script_exists_and_is_executable() -> None:
 def test_all_shell_scripts_start_with_aboutme() -> None:
     """Every *.sh under scripts/ starts with two ABOUTME: comment lines."""
     scripts_dir = PROJECT_ROOT / "scripts"
-    if not scripts_dir.exists():
-        pytest.skip("scripts/ directory not yet created")
+    assert scripts_dir.is_dir(), "scripts/ directory is missing"
     offenders = []
     for path in scripts_dir.glob("*.sh"):
         head = path.read_text(encoding="utf-8").splitlines()[:4]

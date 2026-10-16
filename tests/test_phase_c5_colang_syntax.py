@@ -1,5 +1,5 @@
 # ABOUTME: Phase C5 test — each .co rail must parse with the nemoguardrails Colang 1.0 parser.
-# ABOUTME: Skips cleanly if the package is not installed; otherwise the parse failure is loud.
+# ABOUTME: nemoguardrails is a dev dependency, so a missing package fails the import loudly.
 
 from __future__ import annotations
 
@@ -12,13 +12,6 @@ from conftest import PROJECT_ROOT
 
 RAILS_DIR = PROJECT_ROOT / "ai-gateway" / "nemo-guardrails" / "rails"
 RAIL_FILES = sorted(RAILS_DIR.glob("*.co"))
-
-
-nemoguardrails = pytest.importorskip(
-    "nemoguardrails",
-    reason="nemoguardrails not installed in dev env; live container "
-    "verification remains a Phase D obligation",
-)
 
 
 @pytest.mark.static

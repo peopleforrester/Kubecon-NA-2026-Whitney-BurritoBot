@@ -441,3 +441,29 @@ this lands for Michael's review before it is applied.
 
 Not verified here: no `terraform` binary on the build host, so
 `terraform validate` / `plan` did not run against these changes.
+
+## 2026-10-16T15:40:00Z · amendment · Missing live prerequisites fail the test; nothing in tests/ skips (issue #61)
+
+Governance bans skip paths in tests, so the skips that let the live
+suite pass on a bare host are gone:
+
+- **Live fixtures fail.** `tests/conftest.py` loads kubeconfig through
+  one helper that calls `pytest.fail` naming the missing kubeconfig or
+  kubernetes library; the GCP client fixtures fail naming the missing
+  library or Application Default Credentials. The unused
+  `kubeconfig_loaded` fixture is removed.
+- **Terraform checks fail** when `terraform` is not on PATH, and the
+  phase-08 ABOUTME check asserts `scripts/` exists.
+- **The Colang parse test imports nemoguardrails directly.** It is in
+  the dev group, so the Phase C5 plan's skip-if-uninstallable branch is
+  amended in `docs/PHASE-C-GREENFIELD-PLAN.md`.
+- **The Prometheus rename check asserts** `additionalPrometheusRulesMap`
+  is present instead of returning early when it is absent.
+- **A static AST guard** (`tests/test_no_skip_paths.py`) keeps skip,
+  skipif, importorskip, xfail, exit and KNOWN_OPEN out of tests/.
+
+The static Test command never requests the live fixtures, so it still
+passes everywhere. The E2E command now exits non-zero on a host
+without a cluster, ADC or terraform, with each test naming what is
+missing.
+

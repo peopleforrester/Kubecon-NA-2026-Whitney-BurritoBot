@@ -88,8 +88,7 @@ def test_alerts_renamed_from_idp_to_burritbot() -> None:
     """The EKS reference had idp-node-alerts / idp-app-alerts — rename to burritbot-*."""
     values = _values(_all_docs(PROMETHEUS_APP)[0])
     rules_map = values.get("additionalPrometheusRulesMap", {}) or {}
-    if not rules_map:
-        return  # additionalPrometheusRulesMap is optional, skip if absent
+    assert rules_map, "prometheus values carry no additionalPrometheusRulesMap"
     burritbot_rules_key = next(
         (k for k in rules_map if "burritbot" in k.lower()), None
     )

@@ -43,82 +43,59 @@ EXPECTED_NAMESPACES = [
 GRAFANA_BASIC_AUTH = "Basic YWRtaW46YWRtaW4="
 
 
-# --- Live-cluster fixture gating ----------------------------------------
+# --- Live-cluster fixtures --------------------------------------------
 #
 # Tests decorated with @pytest.mark.live require a reachable GKE cluster and
-# a loaded kubeconfig. On a bare workstation (no kubectl, no kubeconfig) we
-# skip them at collection time so the rest of the suite (static validation,
-# policy unit tests, Python unit tests) can still run.
+# a loaded kubeconfig. They run only under the E2E command (`pytest -m
+# live`); the Test command (`pytest -m static`) never requests these
+# fixtures. A missing kubeconfig, client library or credential fails the
+# test with a message naming what is missing. Nothing skips.
 
 
-def _kubeconfig_available() -> bool:
-    """Return True if a kubeconfig is reachable and kubernetes lib imports."""
+def _kube_client():
+    """Load kubeconfig and return the kubernetes client module, or fail loudly."""
     try:
-        from kubernetes import config  # type: ignore
-
+        from kubernetes import client, config  # type: ignore
+    except ImportError as exc:
+        pytest.fail(f"live test needs the kubernetes client library: {exc}")
+    try:
         config.load_kube_config()
-        return True
-    except Exception:
-        return False
-
-
-@pytest.fixture(scope="session")
-def kubeconfig_loaded() -> bool:
-    """Session fixture that returns whether kubeconfig loaded cleanly."""
-    return _kubeconfig_available()
+    except Exception as exc:
+        pytest.fail(
+            f"live test needs a kubeconfig for the burritbot cluster "
+            f"(run `gcloud container clusters get-credentials`): {exc}"
+        )
+    return client
 
 
 @pytest.fixture(scope="session")
 def k8s_core_v1():
-    """CoreV1Api client for pod/service/namespace assertions.
-
-    Fails explicitly if kubeconfig is not loaded (no fallbacks, no mocks).
-    """
-    if not _kubeconfig_available():
-        pytest.skip("kubeconfig not loaded; live cluster fixture unavailable")
-    from kubernetes import client  # type: ignore
-
-    return client.CoreV1Api()
+    """CoreV1Api client for pod/service/namespace assertions."""
+    return _kube_client().CoreV1Api()
 
 
 @pytest.fixture(scope="session")
 def k8s_apps_v1():
     """AppsV1Api client for deployment/daemonset assertions."""
-    if not _kubeconfig_available():
-        pytest.skip("kubeconfig not loaded; live cluster fixture unavailable")
-    from kubernetes import client  # type: ignore
-
-    return client.AppsV1Api()
+    return _kube_client().AppsV1Api()
 
 
 @pytest.fixture(scope="session")
 def k8s_custom_objects():
     """CustomObjectsApi client for CRD assertions (Kyverno policies, etc.)."""
-    if not _kubeconfig_available():
-        pytest.skip("kubeconfig not loaded; live cluster fixture unavailable")
-    from kubernetes import client  # type: ignore
-
-    return client.CustomObjectsApi()
+    return _kube_client().CustomObjectsApi()
 
 
 @pytest.fixture(scope="session")
 def k8s_networking_v1():
     """NetworkingV1Api client for NetworkPolicy assertions."""
-    if not _kubeconfig_available():
-        pytest.skip("kubeconfig not loaded; live cluster fixture unavailable")
-    from kubernetes import client  # type: ignore
-
-    return client.NetworkingV1Api()
+    return _kube_client().NetworkingV1Api()
 
 
 @pytest.fixture(scope="session")
 def k8s_rbac_v1():
     """RbacAuthorizationV1Api client for RBAC assertions."""
-    if not _kubeconfig_available():
-        pytest.skip("kubeconfig not loaded; live cluster fixture unavailable")
-    from kubernetes import client  # type: ignore
-
-    return client.RbacAuthorizationV1Api()
+    return _kube_client().RbacAuthorizationV1Api()
 
 
 # --- GCP client fixtures ------------------------------------------------
@@ -153,12 +130,15 @@ def gcp_container_client():
     """google-cloud-container ClusterManagerClient for GKE assertions."""
     try:
         from google.cloud import container_v1  # type: ignore
-    except ImportError:
-        pytest.skip("google-cloud-container not installed")
+    except ImportError as exc:
+        pytest.fail(f"live test needs google-cloud-container: {exc}")
     try:
         return container_v1.ClusterManagerClient()
-    except Exception as exc:  # pragma: no cover — only hit without ADC
-        pytest.skip(f"GCP auth unavailable: {exc}")
+    except Exception as exc:
+        pytest.fail(
+            f"live test needs GCP Application Default Credentials "
+            f"(run `gcloud auth application-default login`): {exc}"
+        )
 
 
 @pytest.fixture(scope="session")
@@ -166,9 +146,12 @@ def gcp_secret_manager_client():
     """google-cloud-secret-manager SecretManagerServiceClient."""
     try:
         from google.cloud import secretmanager  # type: ignore
-    except ImportError:
-        pytest.skip("google-cloud-secret-manager not installed")
+    except ImportError as exc:
+        pytest.fail(f"live test needs google-cloud-secret-manager: {exc}")
     try:
         return secretmanager.SecretManagerServiceClient()
-    except Exception as exc:  # pragma: no cover — only hit without ADC
-        pytest.skip(f"GCP auth unavailable: {exc}")
+    except Exception as exc:
+        pytest.fail(
+            f"live test needs GCP Application Default Credentials "
+            f"(run `gcloud auth application-default login`): {exc}"
+        )
