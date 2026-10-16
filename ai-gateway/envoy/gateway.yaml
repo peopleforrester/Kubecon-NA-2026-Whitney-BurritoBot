@@ -31,6 +31,9 @@ spec:
         namespaces:
           from: Same
 ---
+# Audience traffic (Act 2): the audience frontend posts /chat to the proxy
+# Service with Host burritbot.burritbot.local, so this route wins. Any other
+# Host falls to the hostname-less route generated from the AIGatewayRoute.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -58,6 +61,9 @@ spec:
 # The route attaches to the Gateway itself; the AI Gateway controller generates
 # an HTTPRoute of the same name and inserts its own ext_proc there. The upstream
 # CRD has no targetRefs, schema or filters (the client schema is always OpenAI).
+# Guarded BurritBot's model call lands here: an OpenAI /v1/chat/completions
+# body sent to the proxy Service by name, which is not the audience hostname.
+# The route stays hostname-less (spec.hostnames needs AI Gateway v0.7.0).
 apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:

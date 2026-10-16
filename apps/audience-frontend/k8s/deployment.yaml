@@ -42,8 +42,12 @@ spec:
               value: burritbot-unguarded
             - name: BURRITBOT_UNGUARDED_URL
               value: http://burritbot-unguarded.burritbot-unguarded.svc.cluster.local:8080
+            # The gateway proxy Service (Envoy Gateway's namespace, name pinned
+            # by the EnvoyProxy) and the Host its burritbot-audience route matches.
             - name: BURRITBOT_GUARDED_URL
-              value: http://burritbot-ai-gateway.burritbot-net.svc.cluster.local:8080
+              value: http://burritbot-ai-gateway.envoy-gateway-system.svc.cluster.local:8080
+            - name: BURRITBOT_GUARDED_HOST
+              value: burritbot.burritbot.local
           readinessProbe:
             httpGet:
               path: /healthz

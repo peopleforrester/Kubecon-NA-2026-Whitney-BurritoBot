@@ -32,9 +32,19 @@ BURRITBOT_UNGUARDED_URL: str = os.environ.get(
     "BURRITBOT_UNGUARDED_URL",
     "http://burritbot-unguarded.burritbot-unguarded.svc.cluster.local:8080",
 )
+# The guarded path enters the AI gateway's proxy Service. Envoy Gateway runs
+# the proxy in its controller namespace; the burritbot-ai-gateway EnvoyProxy
+# pins the Service name (ai-gateway/envoy/vertex-ai-backend.yaml).
 BURRITBOT_GUARDED_URL: str = os.environ.get(
     "BURRITBOT_GUARDED_URL",
-    "http://burritbot-ai-gateway.burritbot-net.svc.cluster.local:8080",
+    "http://burritbot-ai-gateway.envoy-gateway-system.svc.cluster.local:8080",
+)
+# The gateway picks the route by Host. The burritbot-audience HTTPRoute
+# matches only this hostname; any other Host (the Service name included)
+# falls to the route generated from the AIGatewayRoute, which expects an
+# OpenAI-shaped body, not {"prompt": ...}.
+BURRITBOT_GUARDED_HOST: str = os.environ.get(
+    "BURRITBOT_GUARDED_HOST", "burritbot.burritbot.local"
 )
 
 RATE_LIMIT = "10/minute"
@@ -109,11 +119,11 @@ def _render(template: str, **values: str) -> str:
     return template
 
 
-def _resolve_target_url() -> str:
-    """Return the upstream URL for the currently selected target."""
+def _resolve_target() -> tuple[str, dict[str, str]]:
+    """Return the upstream URL and extra headers for the selected target."""
     if BURRITBOT_TARGET == "burritbot-guarded":
-        return BURRITBOT_GUARDED_URL
-    return BURRITBOT_UNGUARDED_URL
+        return BURRITBOT_GUARDED_URL, {"Host": BURRITBOT_GUARDED_HOST}
+    return BURRITBOT_UNGUARDED_URL, {}
 
 
 class ChatRequest(BaseModel):
@@ -205,6 +215,7 @@ def create_app() -> FastAPI:
             "target": BURRITBOT_TARGET,
             "unguarded_url": BURRITBOT_UNGUARDED_URL,
             "guarded_url": BURRITBOT_GUARDED_URL,
+            "guarded_host": BURRITBOT_GUARDED_HOST,
             "rate_limit": RATE_LIMIT,
             "feedback_url": os.environ.get(FEEDBACK_URL_ENV),
             "public_url": os.environ.get(PUBLIC_URL_ENV),
@@ -244,12 +255,13 @@ def create_app() -> FastAPI:
     @app.post("/chat", response_model=ChatResponse)
     @limiter.limit(RATE_LIMIT)
     async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
-        target_url = _resolve_target_url()
+        target_url, headers = _resolve_target()
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
                 resp = await client.post(
                     f"{target_url}/chat",
                     json={"prompt": payload.prompt},
+                    headers=headers,
                 )
             except httpx.HTTPError as exc:
                 logger.exception("Upstream call failed")

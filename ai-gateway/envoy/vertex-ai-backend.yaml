@@ -72,6 +72,10 @@ spec:
 ---
 # Pins the Envoy proxy KSA name so the Terraform WIF binding can target it.
 # The Gateway's spec.infrastructure.annotations carry the GSA annotation onto it.
+# Also pins the proxy Service: Envoy Gateway runs it in its controller namespace
+# (envoy-gateway-system) as envoy-<ns>-<gateway>-<hash> by default, so callers
+# use burritbot-ai-gateway.envoy-gateway-system.svc.cluster.local:8080. ClusterIP
+# keeps the default LoadBalancer from exposing the guarded gateway publicly.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -86,3 +90,6 @@ spec:
     kubernetes:
       envoyServiceAccount:
         name: burritbot-ai-gateway
+      envoyService:
+        name: burritbot-ai-gateway
+        type: ClusterIP
