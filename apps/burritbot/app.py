@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -36,6 +37,12 @@ GUARDED: bool = os.environ.get("BURRITBOT_GUARDED", "false").lower() == "true"
 AI_GATEWAY_URL_ENV = "AI_GATEWAY_URL"
 GATEWAY_CHAT_PATH = "/v1/chat/completions"
 GATEWAY_TIMEOUT_SECONDS = 30.0
+
+# Unguarded Vertex calls carry the cluster's cost labels (labels.tf), so the
+# billing export sums model spend by burritbot-io_delivery. The slug is the
+# one Terraform applied with; a GCP label value, like var.delivery.
+DELIVERY_ENV = "BURRITBOT_DELIVERY"
+DELIVERY_LABEL_VALUE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 
 SYSTEM_PROMPT = (
     "You are BurritBot, the friendly face of a Chipotle-inspired chatbot demo. "
@@ -125,16 +132,39 @@ def _client() -> genai.Client:
     return genai.Client(vertexai=True, project=GCP_PROJECT, location=GCP_REGION)
 
 
+def request_labels() -> dict[str, str]:
+    """The cost labels every unguarded Vertex request carries."""
+    delivery = os.environ.get(DELIVERY_ENV, "").strip()
+    if not delivery:
+        raise RuntimeError(
+            f"{DELIVERY_ENV} is not set; unguarded Vertex calls must carry the "
+            "burritbot-io_delivery label"
+        )
+    if not DELIVERY_LABEL_VALUE.match(delivery):
+        raise RuntimeError(
+            f"{DELIVERY_ENV}={delivery!r} is not a GCP label value: lowercase letters, "
+            "digits, '_' or '-', starting with a letter, at most 63 characters"
+        )
+    return {"burritbot-io_owner": "burritbot", "burritbot-io_delivery": delivery}
+
+
+def vertex_config() -> types.GenerateContentConfig:
+    """Request config for the unguarded call; Vertex bills it under its labels."""
+    return types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        temperature=0.3,
+        max_output_tokens=512,
+        labels=request_labels(),
+    )
+
+
 def _ask_vertex(prompt: str) -> tuple[str, int, int]:
     """Unguarded: one generate_content call straight to Vertex."""
+    config = vertex_config()  # an unlabelled call fails before the client exists
     response = _client().models.generate_content(
         model=MODEL_NAME,
         contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            temperature=0.3,
-            max_output_tokens=512,
-        ),
+        config=config,
     )
     usage = getattr(response, "usage_metadata", None)
     input_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0

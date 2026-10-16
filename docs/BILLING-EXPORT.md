@@ -27,6 +27,31 @@ deliveries:
 terraform -chdir=infrastructure/terraform apply -var delivery=<event>-<year>
 ```
 
+## What the model calls carry
+
+Unguarded BurritBot (`apps/burritbot/app.py`) puts the same two labels
+on every Vertex AI `generateContent` request. It reads
+`burritbot-io_delivery` from `BURRITBOT_DELIVERY`, which must hold the
+slug Terraform applied with. If `BURRITBOT_DELIVERY` is unset or is not
+a label value, `/chat` returns `502` naming it, and no unlabelled call
+is sent.
+
+The guarded path does not carry the labels yet. It makes two kinds of
+Vertex AI call: the AI gateway's translation of guarded BurritBot's
+chat completion, and NeMo Guardrails' own model calls.
+
+- **AI gateway:** the OpenAI → Vertex AI translator in Envoy AI Gateway
+  has no `labels` field, so it drops any labels in the request. The
+  `bodyMutation` on the `vertex-ai-gemini` AIServiceBackend runs after
+  translation and can set a top-level `labels` object.
+- **NeMo Guardrails:** each `vertexai` model's `parameters` go to
+  LangChain's `ChatVertexAI`, which takes `labels`. NeMo does not expand
+  `${VAR}` in `config.yaml`, so the value has to be written in.
+
+Both need the slug written into a manifest, and where that slug lives in
+the GitOps tree is not decided yet (#82). Until it is, the second query
+below reads Vertex AI spend by window.
+
 ## One-time setup, out of band
 
 Do not put the export dataset in the Terraform module. `scripts/teardown.sh`
@@ -89,8 +114,8 @@ GROUP BY namespace, service
 ORDER BY net_cost DESC;
 
 -- Vertex AI and the rest of the project in the same window, by service.
--- Model calls carry no delivery label, so this reads the project and the
--- window; other Vertex AI users of the project in that window count too.
+-- Guarded model calls carry no delivery label yet, so this reads the project
+-- and the window; other Vertex AI users of the project in that window count too.
 SELECT
   service.description AS service,
   ROUND(SUM(cost) + SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)), 2) AS net_cost

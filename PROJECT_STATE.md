@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 520 passed, 44 deselected after the
-  #85 skip-path sweep
+  (ruff check, then static suite) 531 passed, 44 deselected after the
+  #82 unguarded Vertex AI request labels
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -73,6 +73,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #83 detailed billing export: a console-only step for a Billing Account Administrator or Costs Manager, with no API, gcloud or Terraform resource; no GCP credential or project exists to check or enable it from a run, so it waits on #17 (the identity, project and billing account) and then on Michael; placed on the critical path between #17 and the first Night Before apply (#18); the stated static count catches up with #78's tests; 519 static green
 - 2026-10-16 · #84 live Terraform checks: the skip was already a fail (#62); validate now runs `init -backend=false` first, plan takes `-var delivery=$BURRITBOT_DELIVERY` (no default, fails naming it) after a GCS-backed init and asserts the delivery label and cost allocation in the plan JSON, each in its own TF_DATA_DIR; #59's Terraform validated and offline-planned with Terraform 1.16.6 (decisions.md); the real-project plan waits on #17's credentials; 519 static green
 - 2026-10-16 · #85 skip paths outside conftest.py: the four the issue names were already gone (the terraform fail in #62/#84, the scripts/ assert and the plain nemoguardrails import in 7f2d773, the asserted Prometheus rules map in ead6cd3); a sweep of tests/ found one more silent pass, the ArgoCD path test returning early for 13 Helm-source Applications, now split into path-source cases that resolve the dir and chart-source cases that assert repoURL and an exact chart version; 520 static green
+- 2026-10-16 · #82 unguarded Vertex AI calls carry `burritbot-io_owner` and `burritbot-io_delivery` (from `BURRITBOT_DELIVERY`; unset or invalid is a 502 naming it); the guarded path's equivalents found (AIServiceBackend `bodyMutation` after the gateway's translation, `ChatVertexAI` `labels` via NeMo model `parameters`), both needing the slug as a manifest literal; where the slug lives waits for Michael; 531 static green
 
 ---
 
@@ -340,7 +341,7 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 520 static tests green. Live tests fail loudly when
+- **Total: 531 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

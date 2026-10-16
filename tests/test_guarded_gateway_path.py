@@ -265,6 +265,7 @@ def test_unguarded_chat_still_calls_vertex(monkeypatch: pytest.MonkeyPatch) -> N
     """Act 1 is unchanged: unguarded BurritBot needs a Vertex project, not the gateway."""
     monkeypatch.delenv("BURRITBOT_GUARDED", raising=False)
     monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.setenv("BURRITBOT_DELIVERY", "summit-2027")
     burritbot = _load(BURRITBOT_APP, "burritbot_app_unguarded_chat")
     resp = TestClient(burritbot.app).post("/chat", json={"prompt": "recommend karaoke songs"})
     assert resp.status_code == 502, resp.text
