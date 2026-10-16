@@ -51,7 +51,7 @@ verbatim by the migration._
 **This project is paused by Michael's decision until after DevOpsDays
 Portland (2026-09-08 to 09-10).** The nearer deadline owns attention:
 Portland's deliverable is the Watch It Burn workshop in
-`~/repos/events/Unleash_an_Agent_Watch_It_Burn`, a different and far
+`~/repos/talks/Unleash_an_Agent_Watch_It_Burn`, a different and far
 more mature repo. This platform's own delivery is not until
 2026-11-09 to 11-12 (see `presentations/` for the event), so the
 runway is real.
