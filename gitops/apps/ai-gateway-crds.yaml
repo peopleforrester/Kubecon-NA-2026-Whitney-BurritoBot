@@ -1,0 +1,41 @@
+# ABOUTME: ArgoCD Application for the AI Gateway CRDs (aigateway.envoyproxy.io) — AIGatewayRoute, AIServiceBackend,
+# ABOUTME: BackendSecurityPolicy. Upstream installs them as their own chart, ahead of the controller.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway-crds
+  namespace: argocd
+  annotations:
+    # Before the ai-gateway Application, whose AIGatewayRoute, AIServiceBackend
+    # and BackendSecurityPolicy need these CRDs.
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # oci://docker.io/envoyproxy/ai-gateway-crds-helm. Agent Router (formerly
+    # Envoy AI Gateway) kept the chart names. Moves with ai-gateway-controller.
+    repoURL: docker.io/envoyproxy
+    chart: ai-gateway-crds-helm
+    targetRevision: v1.2.0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-ai-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

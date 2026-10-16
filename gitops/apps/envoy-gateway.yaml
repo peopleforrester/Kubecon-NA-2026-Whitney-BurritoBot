@@ -1,0 +1,91 @@
+# ABOUTME: ArgoCD Application for Envoy Gateway — the Gateway API controller that programs the AI gateway proxy.
+# ABOUTME: Installs the Gateway API + Envoy Gateway CRDs and hands xDS to the AI Gateway extension server.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway
+  namespace: argocd
+  annotations:
+    # Before the ai-gateway Application (Gateway, Backend, EnvoyProxy,
+    # EnvoyExtensionPolicy need these CRDs) and the AI Gateway controller.
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # oci://docker.io/envoyproxy/gateway-helm; ArgoCD takes OCI Helm repos
+    # without the oci:// scheme. v1.9.2 is the Envoy Gateway release Agent
+    # Router (formerly Envoy AI Gateway) v1.2.0 builds against.
+    repoURL: docker.io/envoyproxy
+    chart: gateway-helm
+    targetRevision: v1.9.2
+    helm:
+      valuesObject:
+        # The chart's crds subchart carries the Gateway API CRDs (GatewayClass,
+        # Gateway, HTTPRoute, BackendTLSPolicy) and the gateway.envoyproxy.io
+        # CRDs. GKE-managed Gateway API CRDs must stay off on this cluster.
+        crds:
+          enabled: true
+        # Its webhook listens on 9443, which the GKE control plane cannot reach
+        # on private nodes; zone-aware routing is not used here.
+        topologyInjector:
+          enabled: false
+        # manifests/envoy-gateway-values.yaml at Agent Router v1.2.0: the
+        # minimal Envoy Gateway configuration every AI Gateway install needs.
+        config:
+          envoyGateway:
+            gateway:
+              controllerName: gateway.envoyproxy.io/gatewayclass-controller
+            logging:
+              level:
+                default: info
+            provider:
+              type: Kubernetes
+            extensionApis:
+              enableEnvoyPatchPolicy: true
+              # Backend is the Vertex AI upstream in vertex-ai-backend.yaml.
+              enableBackend: true
+            extensionManager:
+              hooks:
+                xdsTranslator:
+                  translation:
+                    listener:
+                      includeAll: true
+                    route:
+                      includeAll: true
+                    cluster:
+                      includeAll: true
+                    secret:
+                      includeAll: true
+                  post:
+                    - Translation
+                    - Cluster
+                    - Route
+              service:
+                fqdn:
+                  # The ai-gateway-controller Application's Service.
+                  hostname: ai-gateway-controller.envoy-ai-gateway-system.svc.cluster.local
+                  port: 1063
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      # The Gateway API and EnvoyProxy CRDs are larger than the 256 KiB
+      # last-applied annotation that client-side apply writes.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

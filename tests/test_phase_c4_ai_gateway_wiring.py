@@ -14,6 +14,7 @@ from conftest import PROJECT_ROOT
 KUSTOMIZATION = PROJECT_ROOT / "deploy" / "ai-gateway" / "kustomization.yaml"
 
 EXPECTED_REFS = [
+    "../../ai-gateway/envoy/gatewayclass.yaml",
     "../../ai-gateway/envoy/gateway.yaml",
     "../../ai-gateway/envoy/vertex-ai-backend.yaml",
     "../../ai-gateway/nemo-guardrails/deployment.yaml",

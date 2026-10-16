@@ -111,9 +111,14 @@ def test_nemo_guardrails_pod_running(k8s_core_v1) -> None:
 
 @pytest.mark.live
 def test_envoy_ai_gateway_pod_running(k8s_core_v1) -> None:
+    # Envoy Gateway runs the proxy for burritbot-net/burritbot-ai-gateway in
+    # its own namespace, labelled with the Gateway that owns it.
     pods = k8s_core_v1.list_namespaced_pod(
-        namespace="burritbot-net",
-        label_selector="app.kubernetes.io/name=envoy-ai-gateway",
+        namespace="envoy-gateway-system",
+        label_selector=(
+            "gateway.envoyproxy.io/owning-gateway-name=burritbot-ai-gateway,"
+            "gateway.envoyproxy.io/owning-gateway-namespace=burritbot-net"
+        ),
     )
     running = [p for p in pods.items if p.status and p.status.phase == "Running"]
-    assert running, "No Envoy AI Gateway pods Running in burritbot-net"
+    assert running, "No burritbot-ai-gateway proxy pods Running in envoy-gateway-system"

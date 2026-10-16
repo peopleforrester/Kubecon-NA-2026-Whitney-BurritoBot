@@ -50,6 +50,23 @@ def _helm_charts(files: Files) -> set[str]:
     return charts
 
 
+def _eg_bundles_gateway_api_crds(files: Files) -> bool:
+    """An Application installs Envoy Gateway's gateway-helm with its crds subchart on."""
+    for path, text in files.items():
+        if not path.startswith("gitops/apps/"):
+            continue
+        for doc in yaml.safe_load_all(text):
+            if not doc or doc.get("kind") != "Application":
+                continue
+            source = doc["spec"].get("source") or {}
+            if source.get("chart") != "gateway-helm":
+                continue
+            values = (source.get("helm") or {}).get("valuesObject") or {}
+            if (values.get("crds") or {}).get("enabled", True):
+                return True
+    return False
+
+
 @dataclass(frozen=True)
 class Setting:
     description: str
@@ -86,6 +103,16 @@ FALCO_DAEMONSET = Setting(
     "Falco chart (privileged DaemonSet) in gitops/apps",
     lambda f: "falco" in _helm_charts(f),
 )
+GKE_GATEWAY_API = Setting(
+    "GKE-managed Gateway API CRDs (gateway_api_config with a channel other than CHANNEL_DISABLED)",
+    lambda f: bool(
+        re.search(r'gateway_api_config\s*{[^}]*channel\s*=\s*"CHANNEL_(?!DISABLED")', _terraform(f))
+    ),
+)
+EG_GATEWAY_API_CRDS = Setting(
+    "Envoy Gateway chart (gateway-helm) installing its Gateway API CRDs in gitops/apps",
+    _eg_bundles_gateway_api_crds,
+)
 
 INCOMPATIBLE: dict[str, IncompatiblePair] = {
     # #22: terraform plan stays green; the GKE API rejects it at apply.
@@ -108,6 +135,17 @@ INCOMPATIBLE: dict[str, IncompatiblePair] = {
         "Autopilot forbids privileged containers; the Falco DaemonSet needs "
         "them for its modern-eBPF driver.",
     ),
+    # #68: Envoy Gateway's gateway-helm README: where the provider manages the
+    # Gateway API CRDs, leave the chart's copy off rather than mix two copies.
+    "gke-gateway-api-vs-envoy-gateway-crds": IncompatiblePair(
+        GKE_GATEWAY_API,
+        EG_GATEWAY_API_CRDS,
+        "GKE then owns the Gateway API CRDs and reconciles its own version and "
+        "channel over the copy ArgoCD applies from gateway-helm. Set gateway-helm "
+        "crds.enabled false and install only the Envoy Gateway CRDs "
+        "(gateway-crds-helm, crds.gatewayAPI.enabled false), once GKE's Gateway "
+        "API serves what gateway.yaml uses (BackendTLSPolicy v1).",
+    ),
 }
 
 FILES = load_files()
@@ -128,7 +166,9 @@ def test_no_incompatible_pair_is_set() -> None:
 
 
 @pytest.mark.static
-@pytest.mark.parametrize("setting", [DATAPLANE_V2, FALCO_DAEMONSET], ids=lambda s: s.description)
+@pytest.mark.parametrize(
+    "setting", [DATAPLANE_V2, FALCO_DAEMONSET, EG_GATEWAY_API_CRDS], ids=lambda s: s.description
+)
 def test_enabled_half_is_still_detected(setting: Setting) -> None:
     """Each pair has one half the repo relies on; if its detector goes blind
     (file moved, syntax changed) the pair could never fire."""
@@ -160,6 +200,10 @@ MUTATIONS = {
     "autopilot-vs-falco": [
         "  enable_autopilot = true\n",
     ],
+    "gke-gateway-api-vs-envoy-gateway-crds": [
+        '  gateway_api_config {\n    channel = "CHANNEL_STANDARD"\n  }\n',
+        '  gateway_api_config {\n    channel = "CHANNEL_EXPERIMENTAL"\n  }\n',
+    ],
 }
 
 
@@ -182,3 +226,9 @@ def test_mutation_is_reported(pair: str, snippet: str) -> None:
 def test_mutation_in_a_comment_is_ignored() -> None:
     violations = _violations(_inject_into_cluster("  # network_policy {\n  # enable_autopilot = true\n"))
     assert violations == []
+
+
+@pytest.mark.static
+def test_disabled_gke_gateway_api_is_not_reported() -> None:
+    snippet = '  gateway_api_config {\n    channel = "CHANNEL_DISABLED"\n  }\n'
+    assert _violations(_inject_into_cluster(snippet)) == []

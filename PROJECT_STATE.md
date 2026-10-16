@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 379 passed, 21 deselected after the
-  #67 guarded gateway path
+  (ruff check, then static suite) 409 passed, 32 deselected after the
+  #68 gateway controller install
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -59,6 +59,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #57 exposure path decided: phones reach the audience frontend through a GKE Gateway (global external ALB); the 10/minute limit keys on the client entry that load balancer writes into X-Forwarded-For, trusted only from Google's LB ranges; venue Wi-Fi NAT still shares one budget (follow-up); 365 static green
 - 2026-10-16 · #65 question 133: ship skill and state-persistence rule (llm-coding-workflow 0c68e17) already send promote-time decision entries to decisions.md; the 2026-10-15 stray predates this repo's decisions.md; closed as satisfied, no writer change; 365 static green
 - 2026-10-16 · #67 guarded traffic takes its gateway routes: EnvoyProxy pins the proxy Service (`burritbot-ai-gateway.envoy-gateway-system`, ClusterIP); the frontend sends Host `burritbot.burritbot.local` so `burritbot-audience` matches; guarded BurritBot posts OpenAI chat completions to the gateway (AIGatewayRoute → vertex-ai-gemini) instead of calling Vertex; the guarded egress lock admits the proxy pods; 379 static green
+- 2026-10-16 · #68 gateway controllers installed by ArgoCD: `envoy-gateway` (gateway-helm v1.9.2, Gateway API + EG CRDs, AI Gateway extension manager), `ai-gateway-crds` and `ai-gateway-controller` (v1.2.0, webhook on 10250 with a cert-manager cert, MCP seed kept out of Git), GatewayClass `envoy-ai-gateway`, namespaces `envoy-gateway-system` / `envoy-ai-gateway-system`; `ai-gateway` moves to wave 3; GKE-managed Gateway API is now an incompatible pair; 409 static green
 
 ---
 
@@ -293,7 +294,15 @@ commit.
   gateway body's model matches the AIGatewayRoute; a guarded `/chat`
   fails on the gateway hop, never on Vertex; the egress lock admits the
   proxy pods
-- **Total: 379 static tests green. Live tests fail loudly when
+- Gateway controller install (30), #68: Envoy Gateway and the AI Gateway
+  CRDs and controller are pinned Helm Applications; the extension
+  manager names the controller Service; Backend API on; every Gateway
+  names a synced GatewayClass that Envoy Gateway owns; the webhook port
+  is one the GKE control plane reaches and its cert comes from
+  cert-manager; the MCP seed is neither committed nor reminted; waves
+  put the controllers before `ai-gateway`; GKE-managed Gateway API CRDs
+  and the gateway-helm copy are an incompatible pair
+- **Total: 409 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

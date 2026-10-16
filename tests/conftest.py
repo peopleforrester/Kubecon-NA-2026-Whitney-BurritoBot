@@ -37,6 +37,8 @@ EXPECTED_NAMESPACES = [
     "audience",
     "cert-manager",
     "external-secrets",
+    "envoy-gateway-system",
+    "envoy-ai-gateway-system",
 ]
 
 # Grafana demo credentials (base64 of admin:admin) for wget in test pods.
