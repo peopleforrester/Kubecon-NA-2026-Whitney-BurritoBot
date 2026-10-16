@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 497 passed, 41 deselected after the
-  #79 attribution correction
+  (ruff check, then static suite) 519 passed, 44 deselected after the
+  #83 billing export hand-off
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -70,6 +70,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #70 live fixtures: the k8s, GCP and Terraform skips the issue names were already gone (#61, #62); the installed-CRD schema checks (`tests/helpers/crd_schema.py` `installed_schema`, used by the AI Gateway route and Gateway API floor tests), the CRD presence check and the deployed audience page check now take the shared `k8s_apiextensions_v1` (new, probed like the other #63 fixtures) / `k8s_core_v1` fixtures instead of loading kubeconfig themselves, so every live test on a bare host fails naming kubeconfig, ADC or terraform; 0 skipped; 472 static green
 - 2026-10-16 · #60 cold read confirmed (question 130, decided by Michael): Whitney reads on 2026-10-26, paper-read check 2026-10-23; PORTLAND-CARRY-FORWARD.md, PLAN.md and the critical path updated, test pins the date, reader and check, ABSTRACT-READINESS.md takes the new paper-read date; 474 static green
 - 2026-10-16 · #79 attribution correction: decisions.md gains a dated amendment naming hecaton's coordinator, under Michael's standing rules, as the decider of the #24, #26 and #44 draft approvals and the #26 and #45 draft reruns; no earlier entry edited; the stated static count catches up with #76's tests; 497 static green
+- 2026-10-16 · #83 detailed billing export: a console-only step for a Billing Account Administrator or Costs Manager, with no API, gcloud or Terraform resource; no GCP credential or project exists to check or enable it from a run, so it waits on #17 (the identity, project and billing account) and then on Michael; placed on the critical path between #17 and the first Night Before apply (#18); the stated static count catches up with #78's tests; 519 static green
 
 ---
 
@@ -104,12 +105,19 @@ This platform's own delivery is 2026-11-09 to 11-12 (see
   2026-10-15 entry at the foot of this file).
 
 ### The critical path
-`#17 → #18 → #20`
+`#17 → #83 → #18 → #20`
 
 1. **#17** swap the dead `kk-community-projects` GCP identity and the
    `michael@kodekloud.com` ACME email. Michael lost access to that
    account. Blocks everything below.
-2. **#18** live cluster bring-up. The three verified defects that would
+2. **#83** turn on the detailed usage cost export for the billing
+   account behind the new project (`docs/BILLING-EXPORT.md` steps 1-3:
+   reuse an existing export, or create the `US` dataset and enable it).
+   Console only, by a Billing Account Administrator or Costs Manager,
+   so it is Michael's. It must be on before #18's first apply: usage
+   before the export is on is never exported, apart from the one-time
+   multi-region backfill.
+3. **#18** live cluster bring-up. The three verified defects that would
    have broken it are fixed statically: #22 (Dataplane V2 and legacy
    Calico both enabled, D4), #23 (gateway port, now covered by the #26
    cross-manifest checks) and #24 (Vertex AI backend). Their live
@@ -117,7 +125,7 @@ This platform's own delivery is 2026-11-09 to 11-12 (see
    `terraform plan` did NOT catch it — plan is client-side, the GKE API
    rejects the combination only at apply. Do not read a green plan as
    apply-ready.
-3. **#20** the Grafana screenshot for the README needs a live rehearsal.
+4. **#20** the Grafana screenshot for the README needs a live rehearsal.
 
 Dated against this path (#60, question 130): #18 must land by
 2026-10-23, or the cold read becomes a paper read. Whitney reads
@@ -330,7 +338,7 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 497 static tests green. Live tests fail loudly when
+- **Total: 519 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
