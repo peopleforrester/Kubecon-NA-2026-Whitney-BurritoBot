@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 339 passed, 19 deselected after the
-  #56 audience page checks
+  (ruff check, then static suite) 348 passed, 20 deselected after the
+  #59 cost-label checks
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -53,6 +53,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #53 gateway.yaml verified against upstream AI Gateway CRDs v0.2.0-v1.2.0 and Envoy Gateway v1.7.0/v1.9.2: valid from AI Gateway v0.6.0 (first v1beta1 release); static field sets narrowed to that floor, docs floor 0.2+ → 0.6+, live tests check the installed CRDs; 301 static green
 - 2026-10-16 · #55 fastapi / google-genai / OpenTelemetry pins held at 0.135.3 / 1.71.0 / 1.41.0 + 0.62b0 through the November 2026 delivery (decisions.md); static test keeps the pins equal across both requirements files, pyproject.toml, uv.lock, AGENTS.md and the phase-06 spec; 315 static green
 - 2026-10-16 · #56 audience phone page: `/` (index.html + app.js + styles.css, Feedback button) and the `/qr` projector landing, served by the backend; `FEEDBACK_URL` and `AUDIENCE_PUBLIC_URL` fail the page with a 503 when unset; image context moves to apps/audience-frontend; 339 static green
+- 2026-10-16 · #59 costable delivery: GKE cluster and Secret Manager secret carry `burritbot-io_delivery` (required `var.delivery`), GKE cost allocation on, out-of-band detailed billing export playbook and Cost row queries in docs/BILLING-EXPORT.md, cost envelope re-priced for Gemini 3 Pro; 348 static green
 
 ---
 
@@ -269,7 +270,13 @@ commit.
   and the three canonical asks; `/qr` and `/qr.svg` encode
   AUDIENCE_PUBLIC_URL; an unset or non-http(s) page URL is a 503 that
   names it while `/healthz` and `/chat` keep working
-- **Total: 339 static tests green. Live tests skip cleanly when
+- Cost labels (9), #59: `var.delivery` has no default and validates as a
+  label value; `local.cost_labels` labels the cluster and the secret;
+  GKE cost allocation is on; the billing export dataset stays out of the
+  module teardown destroys; the runbook applies with a delivery slug and
+  reads the Cost row from docs/BILLING-EXPORT.md; both cost envelopes
+  price Gemini 3 Pro
+- **Total: 348 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

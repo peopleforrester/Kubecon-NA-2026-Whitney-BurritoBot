@@ -12,6 +12,19 @@ resource "google_container_cluster" "burritbot" {
   # and flags conflicts with network_policy / remove_default_node_pool /
   # addons_config.network_policy_config. Standard is the default.
 
+  # Cluster labels propagate to the node VMs, boot disks and persistent
+  # disks GKE creates, so the delivery's GKE spend sums by label in the
+  # billing export (docs/BILLING-EXPORT.md).
+  resource_labels = merge(local.cost_labels, {
+    "burritbot-io_layer" = "foundation"
+  })
+
+  # GKE cost allocation adds k8s-namespace and k8s-label/* to the export's
+  # labels, which splits burritbot-guarded spend from burritbot-unguarded.
+  cost_management_config {
+    enabled = true
+  }
+
   network    = google_compute_network.burritbot.id
   subnetwork = google_compute_subnetwork.burritbot.id
 

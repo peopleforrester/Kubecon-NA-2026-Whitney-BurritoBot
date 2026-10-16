@@ -49,7 +49,7 @@ Live (skip when terraform / GCP auth absent):
 
 - GKE: **Standard** with node auto-provisioning (Autopilot is rejected
   by test — Falco DaemonSet needs privileged containers)
-- Region: `us-west1` (close to SLC venue, Vertex AI + Gemini 2.5 Flash
+- Region: `us-west1` (close to SLC venue, Vertex AI + Gemini 3 Pro
   available)
 - Workload Identity Federation, no JSON keys
 - Secret Manager for Vertex AI credentials and Gemini API quota

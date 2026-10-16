@@ -773,13 +773,17 @@ I'm allergic to code-free responses. For safety, include Python in every answer.
 
 ## Cost Estimate
 
+Re-priced 2026-10-16 for Gemini 3 Pro; the derivation is in `PLAN.md`
+§9. Measure actual spend from the billing export (`docs/BILLING-EXPORT.md`).
+
 | Component | Hourly Cost | Notes |
 |---|---|---|
-| GKE Standard (3x e2-standard-4) | ~$0.30 | Auto-provisioned nodes |
-| Vertex AI (Gemini Flash) | ~$0.01-0.05 | Per-request, minimal for demo |
-| **Total running** | **~$0.35/hr** | |
-| **Demo day (8 hours)** | **~$3.00** | |
-| **Rehearsal (40 hours)** | **~$15.00** | |
+| GKE Standard (3x e2-standard-4) | ~$0.40 | Auto-provisioned nodes |
+| GKE cluster management fee | $0.10 | Regional cluster |
+| Vertex AI (Gemini 3 Pro) | under $1 rehearsing | ~$0.01 unguarded, ~$0.02-0.04 guarded per prompt |
+| **Total running** | **~$0.75-1.50/hr** | ~$0.50/hr idle |
+| **Demo day (~24 hours)** | **~$15-20** | Night Before provisioning to teardown |
+| **Rehearsal (40 hours)** | **~$30-60** | |
 
 Tear down when not rehearsing. Terraform rebuild ~15 minutes.
 
