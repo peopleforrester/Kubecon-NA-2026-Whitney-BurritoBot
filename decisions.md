@@ -1095,3 +1095,49 @@ code on the pydantic and protobuf releases the images ship. Moving
 kubernetes back to 37 means bumping the images' pydantic pin. That is a
 runtime change, and it is left until after the November delivery, under
 the same reasoning as #55.
+
+## 2026-10-16T21:26:02Z · decision · The live Terraform checks initialise themselves and plan with a delivery slug; #59's Terraform validated (issue #84)
+
+Issue #84 said `test_terraform_plan` skipped when terraform was absent.
+That skip had already become a `pytest.fail` under #62 (7f2d773). This
+run downloaded Terraform 1.16.6 (SHA256SUMS checked) into a scratch
+directory outside the clone and ran both live checks against it. Both
+failed even with terraform on PATH. Neither ran `terraform init`, and
+the plan passed no `delivery`, which #59 made required with no default.
+
+- `test_terraform_validate` runs `terraform init -backend=false` and
+  then `terraform validate`. It needs only terraform and the registry.
+- `test_terraform_plan` reads the slug from `BURRITBOT_DELIVERY`, with
+  no default, and fails naming it when it is unset or not a label value.
+  It runs a GCS-backed `init` and then `terraform plan -input=false
+  -detailed-exitcode -var=delivery=<slug>`. From `terraform show -json`
+  it asserts that the cluster's `resource_labels` and the secret's
+  `labels` carry `burritbot-io_delivery=<slug>`, and that
+  `cost_management_config` is enabled. `project_id` comes from
+  `terraform.tfvars` or `TF_VAR_project_id`. With `-input=false`, a
+  missing value is an error and not a prompt.
+- Each check uses its own `TF_DATA_DIR` under `tmp_path`. The
+  backend-less init and the GCS init then never share state, and
+  nothing is written to the checkout's `.terraform/`.
+
+Evidence for #59, from this host (no GCP credentials):
+- `terraform init -backend=false` with the committed lock (google and
+  google-beta 7.37.0), then `terraform validate`: valid.
+  `terraform fmt -check -recursive`: clean.
+- An offline plan of a scratch copy, with the backend block removed, an
+  empty state, `-refresh=false` and a placeholder access token. The
+  module has no data sources, so no API calls are made. Run with
+  the delivery slug from the talk's runbook, it gives 21 to add. The cluster's
+  `resource_labels` and the secret's `labels` are both
+  `burritbot-io_owner=burritbot`, `burritbot-io_delivery=<that slug>`
+  and `burritbot-io_layer=foundation`, and
+  `cost_management_config` is `[{enabled: true}]`.
+- `var.delivery` rejects these values: the tfvars placeholder
+  `REPLACE_WITH_DELIVERY_SLUG`, an empty string, a leading digit, a dot
+  and 64 characters. It accepts 63 characters, and a slug that mixes `_` and `-`.
+  Unset under `-input=false`, it fails with "No value for required
+  variable".
+- None of this is a plan against the real project. The committed
+  `test_terraform_plan` reaches that plan only on a host with ADC and
+  the state bucket. Here it fails at the GCS init ("could not find
+  default credentials"), and #17 is what restores that identity.
