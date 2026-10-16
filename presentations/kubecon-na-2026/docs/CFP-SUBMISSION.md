@@ -1,10 +1,10 @@
 # KubeCon NA 2026 CFP Submission — For Review
 
 **Event:** KubeCon + CloudNativeCon North America 2026
-**Location:** Salt Lake City, Utah
-**Dates:** November 9-12, 2026
-**CFP Deadline:** May 31, 2026 at 11:59pm MT
-**Submission Platform:** sessionize.com/kubecon-cloudnativecon-north-america-2026
+**Event record:** location, dates, CFP deadline, submission status and
+travel live in `peopleforrester/conference-knowledge`
+(`events/registry.yaml`, `events/cfp_pipeline.yaml`). Read them there;
+this repo keeps no copy.
 **Speakers:** Whitney Lee and Michael Forrester
 **Demo Repo:** github.com/peopleforrester/burritobot
 
