@@ -21,8 +21,9 @@ clearly-scoped subfolder, scrub the rest of the tree to be event-neutral.
 
 ## Subfolder choice
 `presentations/kubecon-na-2026/` — extensible (`presentations/agentcon-2026/`
-later), self-explanatory, doesn't collide with the `~/repos/events/`
-parent on disk.
+later), self-explanatory, doesn't collide with the group directory the
+repo sits under on disk (`events/` at the time, `~/repos/talks/` since
+the 2026-09 tree restructure).
 
 ## Triage
 

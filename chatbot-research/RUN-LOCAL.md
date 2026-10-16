@@ -33,7 +33,7 @@ Restart your shell and verify with `echo $DISPLAY`.
 ## Step 1 — Clone / pull the repo
 
 ```bash
-cd ~/repos/events/Kubecon-NA-2026-Whitney-BurritoBot
+cd ~/repos/talks/Kubecon-NA-2026-Whitney-BurritoBot
 git pull origin main
 ```
 
