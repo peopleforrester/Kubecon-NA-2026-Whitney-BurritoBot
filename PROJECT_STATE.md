@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 349 passed, 20 deselected after the
-  #62 blind-except lint check
+  (ruff check, then static suite) 353 passed, 20 deselected after the
+  #51 synced-ReferenceGrant check
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -55,6 +55,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #56 audience phone page: `/` (index.html + app.js + styles.css, Feedback button) and the `/qr` projector landing, served by the backend; `FEEDBACK_URL` and `AUDIENCE_PUBLIC_URL` fail the page with a 503 when unset; image context moves to apps/audience-frontend; 339 static green
 - 2026-10-16 · #59 costable delivery: GKE cluster and Secret Manager secret carry `burritbot-io_delivery` (required `var.delivery`), GKE cost allocation on, out-of-band detailed billing export playbook and Cost row queries in docs/BILLING-EXPORT.md, cost envelope re-priced for Gemini 3 Pro; 348 static green
 - 2026-10-16 · #62 ruff gate widened to BLE, S110, S112, PLW1510, PERF102 and TRY401; research.py catches only Playwright errors and logs them; live fixtures and terraform checks fail instead of skipping; 349 static green
+- 2026-10-16 · #51 ReferenceGrant already in burritbot-guarded via deploy/burritbot; new static check proves every ReferenceGrant is rendered by an ArgoCD-synced Kustomization, with a mutation test that drops it from the kustomization; 353 static green
 
 ---
 
@@ -278,7 +279,7 @@ commit.
   module teardown destroys; the runbook applies with a delivery slug and
   reads the Cost row from docs/BILLING-EXPORT.md; both cost envelopes
   price Gemini 3 Pro
-- **Total: 349 static tests green. Live tests fail loudly when
+- **Total: 353 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
