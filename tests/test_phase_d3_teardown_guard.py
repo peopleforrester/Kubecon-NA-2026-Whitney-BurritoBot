@@ -48,6 +48,7 @@ def test_yes_without_env_var_still_prompts(tmp_path: Path) -> None:
         text=True,
         env=env,
         timeout=10,
+        check=False,
     )
     # Without the env var, --yes should still hit the prompt and abort
     # (because stdin is empty / not 'DESTROY').
@@ -81,6 +82,7 @@ def test_yes_with_env_var_skips_prompt(tmp_path: Path) -> None:
         text=True,
         env=env,
         timeout=30,
+        check=False,
     )
     assert proc.returncode == 0, (
         f"--yes plus {ALLOW_ENV}=true must complete without prompting; "

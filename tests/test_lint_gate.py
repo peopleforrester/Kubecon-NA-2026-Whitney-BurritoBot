@@ -1,4 +1,4 @@
-# ABOUTME: Static checks that the light Test command lints before it tests (issue #44).
+# ABOUTME: Static checks that the light Test command lints before it tests (issues #44, #62).
 # ABOUTME: ruff is pinned in the dev group with an explicit rule set, and AGENTS.md runs it.
 
 from __future__ import annotations
@@ -31,6 +31,14 @@ def test_ruff_rule_set_is_explicit() -> None:
     """An explicit select keeps a ruff upgrade from widening the gate on its own."""
     lint = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["tool"]["ruff"]["lint"]
     assert lint.get("select"), "[tool.ruff.lint] has no explicit select"
+
+
+@pytest.mark.static
+def test_ruff_rejects_blind_and_silent_excepts() -> None:
+    """The gate catches the silent fallbacks the 'no fallbacks' rule forbids (issue #62)."""
+    select = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["tool"]["ruff"]["lint"]["select"]
+    missing = [code for code in ("BLE", "S110", "S112", "PLW1510") if code not in select]
+    assert not missing, f"[tool.ruff.lint].select is missing {missing}"
 
 
 @pytest.mark.static

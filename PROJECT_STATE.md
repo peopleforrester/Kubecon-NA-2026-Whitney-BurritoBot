@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 348 passed, 20 deselected after the
-  #59 cost-label checks
+  (ruff check, then static suite) 349 passed, 20 deselected after the
+  #62 blind-except lint check
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -54,6 +54,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #55 fastapi / google-genai / OpenTelemetry pins held at 0.135.3 / 1.71.0 / 1.41.0 + 0.62b0 through the November 2026 delivery (decisions.md); static test keeps the pins equal across both requirements files, pyproject.toml, uv.lock, AGENTS.md and the phase-06 spec; 315 static green
 - 2026-10-16 · #56 audience phone page: `/` (index.html + app.js + styles.css, Feedback button) and the `/qr` projector landing, served by the backend; `FEEDBACK_URL` and `AUDIENCE_PUBLIC_URL` fail the page with a 503 when unset; image context moves to apps/audience-frontend; 339 static green
 - 2026-10-16 · #59 costable delivery: GKE cluster and Secret Manager secret carry `burritbot-io_delivery` (required `var.delivery`), GKE cost allocation on, out-of-band detailed billing export playbook and Cost row queries in docs/BILLING-EXPORT.md, cost envelope re-priced for Gemini 3 Pro; 348 static green
+- 2026-10-16 · #62 ruff gate widened to BLE, S110, S112, PLW1510, PERF102 and TRY401; research.py catches only Playwright errors and logs them; live fixtures and terraform checks fail instead of skipping; 349 static green
 
 ---
 
@@ -235,9 +236,10 @@ commit.
   the Europe 2027 slate) and its sources, README and AGENTS.md name
   talks-knowledge and conference-knowledge, CLAUDE.md links AGENTS.md,
   and PROJECT_STATE.md and decisions.md exist
-- Lint gate (3), #44: ruff is pinned exactly in the dev group with an
-  explicit rule set, and the Test command runs `ruff check .` before
-  the static suite
+- Lint gate (4), #44 and #62: ruff is pinned exactly in the dev group
+  with an explicit rule set that includes the blind-except and
+  silent-swallow checks (BLE, S110, S112, PLW1510), and the Test command
+  runs `ruff check .` before the static suite
 - State file (1), #46: PROJECT_STATE.md has one branch and test status
   section, and its count agrees with the Total line below
 - Decision entries (3), #47: PROJECT_STATE.md holds no decision-entry
@@ -276,8 +278,9 @@ commit.
   module teardown destroys; the runbook applies with a delivery slug and
   reads the Cost row from docs/BILLING-EXPORT.md; both cost envelopes
   price Gemini 3 Pro
-- **Total: 348 static tests green. Live tests skip cleanly when
-  kubeconfig is absent — no mocks, no fallbacks.** Drift in this
+- **Total: 349 static tests green. Live tests fail loudly when
+  kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
+  fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
 
