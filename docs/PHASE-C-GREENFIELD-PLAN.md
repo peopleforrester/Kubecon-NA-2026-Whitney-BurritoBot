@@ -117,9 +117,9 @@ Phase C5 does what is verifiable without a container:
 - If `nemoguardrails` Python package is install-able under uv, import
   it and call its Colang 1.0 parser on each `.co` file. Assert each
   parses without error.
-- If the package can't be installed (size, deps, etc.), the test
-  marks itself as `skip` with a clear reason, and the live-cluster
-  verification stays a Phase D obligation.
+- `nemoguardrails` is in the dev dependency group, so the test imports
+  it directly; a missing package fails the test rather than skipping it
+  (issue #61). Live-cluster verification stays a Phase D obligation.
 
 **Files:**
 - `tests/test_phase_c5_colang_syntax.py` — the parse-if-package-available

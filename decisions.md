@@ -712,3 +712,32 @@ not in `burritbot-net`.
 
 This is deploy configuration. It lands for Michael's review before any
 cluster syncs it; nothing has been applied.
+
+## 2026-10-16T16:37:24Z · amendment · Missing live prerequisites fail the test; nothing in tests/ skips (issue #61)
+
+Governance bans skip paths in tests. Most of the skips this issue
+named were already removed by #62 (7f2d773): the live kubeconfig and
+GCP client fixtures in `tests/conftest.py` call `pytest.fail` naming the
+missing kubeconfig or Application Default Credentials, the Terraform
+checks fail when `terraform` is not on PATH, the phase-08 ABOUTME check
+asserts `scripts/` exists, and the Colang parse test imports
+nemoguardrails directly. A missing kubernetes or google-cloud client
+library fails the fixture with the import error; all of them are in the
+dev group. This change keeps that conftest as it is and finishes the
+rest:
+
+- **The Prometheus rename check asserts** `additionalPrometheusRulesMap`
+  is present instead of returning early when it is absent (an
+  exit-as-skip). With the map removed from `gitops/apps/prometheus.yaml`
+  the check now fails.
+- **The Phase C5 plan is amended.** `docs/PHASE-C-GREENFIELD-PLAN.md`
+  no longer lets the Colang test mark itself skipped when the package
+  is missing.
+- **No in-repo guard test.** A test that lists the banned markers has
+  to spell them out, which trips the dispatcher's skip-markers gate on
+  the diff. That gate already holds the rule.
+
+The static Test command never requests the live fixtures, so it still
+passes everywhere (409 passed). The E2E command exits non-zero with 0
+skipped on a host without a cluster, ADC or terraform, each test naming
+what is missing.
