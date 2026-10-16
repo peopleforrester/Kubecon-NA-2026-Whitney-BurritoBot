@@ -36,7 +36,10 @@ GUARDED: bool = os.environ.get("BURRITBOT_GUARDED", "false").lower() == "true"
 # hostname, or the call would loop back into burritbot-guarded.
 AI_GATEWAY_URL_ENV = "AI_GATEWAY_URL"
 GATEWAY_CHAT_PATH = "/v1/chat/completions"
-GATEWAY_TIMEOUT_SECONDS = 30.0
+# Above the gateway pass it waits on: the guardrails ext_proc on the request
+# and on the response (2 x 2 x 10s messageTimeout) and the AIGatewayRoute's
+# 30s Vertex timeout. The audience route's 80s timeout sits above this.
+GATEWAY_TIMEOUT_SECONDS = 75.0
 
 # Unguarded Vertex calls carry the cluster's cost labels (labels.tf), so the
 # billing export sums model spend by burritbot-io_delivery. The slug is the

@@ -34,6 +34,9 @@ spec:
 # Audience traffic (Act 2): the audience frontend posts /chat to the proxy
 # Service with Host burritbot.burritbot.local, so this route wins. Any other
 # Host falls to the hostname-less route generated from the AIGatewayRoute.
+# The route timeout spans guarded BurritBot's whole /chat, its own gateway
+# pass included, so it sits above BurritBot's GATEWAY_TIMEOUT_SECONDS (75).
+# Unset, Envoy Gateway leaves Envoy's 15s default (tests/test_guarded_timeout_budget.py).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -52,6 +55,8 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      timeouts:
+        request: 80s
       backendRefs:
         - name: burritbot-guarded
           namespace: burritbot-guarded
@@ -64,6 +69,8 @@ spec:
 # Guarded BurritBot's model call lands here: an OpenAI /v1/chat/completions
 # body sent to the proxy Service by name, which is not the audience hostname.
 # The route stays hostname-less (spec.hostnames needs AI Gateway v0.7.0).
+# The Vertex call gets 30s, not the AI Gateway's 60s default; BurritBot's
+# GATEWAY_TIMEOUT_SECONDS covers it plus the guardrails ext_proc both ways.
 apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:
@@ -84,6 +91,8 @@ spec:
             - type: Exact
               name: x-ai-eg-model
               value: gemini-3-pro
+      timeouts:
+        request: 30s
       backendRefs:
         - name: vertex-ai-gemini
           weight: 100

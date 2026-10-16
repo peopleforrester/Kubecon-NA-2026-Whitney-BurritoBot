@@ -47,6 +47,13 @@ BURRITBOT_GUARDED_HOST: str = os.environ.get(
     "BURRITBOT_GUARDED_HOST", "burritbot.burritbot.local"
 )
 
+# How long /chat waits on each target. Guarded traffic passes the guardrails
+# ext_proc on the request and on the response (2 x 2 x 10s messageTimeout),
+# around the burritbot-audience route's 80s timeout, which itself covers
+# BurritBot's own gateway pass to Vertex (tests/test_guarded_timeout_budget.py).
+UNGUARDED_TIMEOUT_SECONDS = 10.0
+GUARDED_TIMEOUT_SECONDS = 125.0
+
 RATE_LIMIT = "10/minute"
 
 # Phones reach the pod through a GKE Gateway (global external Application
@@ -119,11 +126,11 @@ def _render(template: str, **values: str) -> str:
     return template
 
 
-def _resolve_target() -> tuple[str, dict[str, str]]:
-    """Return the upstream URL and extra headers for the selected target."""
+def _resolve_target() -> tuple[str, dict[str, str], float]:
+    """Return the upstream URL, extra headers and timeout for the selected target."""
     if BURRITBOT_TARGET == "burritbot-guarded":
-        return BURRITBOT_GUARDED_URL, {"Host": BURRITBOT_GUARDED_HOST}
-    return BURRITBOT_UNGUARDED_URL, {}
+        return BURRITBOT_GUARDED_URL, {"Host": BURRITBOT_GUARDED_HOST}, GUARDED_TIMEOUT_SECONDS
+    return BURRITBOT_UNGUARDED_URL, {}, UNGUARDED_TIMEOUT_SECONDS
 
 
 class ChatRequest(BaseModel):
@@ -255,8 +262,8 @@ def create_app() -> FastAPI:
     @app.post("/chat", response_model=ChatResponse)
     @limiter.limit(RATE_LIMIT)
     async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
-        target_url, headers = _resolve_target()
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        target_url, headers, timeout = _resolve_target()
+        async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 resp = await client.post(
                     f"{target_url}/chat",

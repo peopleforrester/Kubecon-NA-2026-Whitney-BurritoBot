@@ -1441,3 +1441,72 @@ baked in, an init-time install, or dropping the two PII scanners), so it
 is raised as a follow-up. Live confirmation of all of this rides on #18.
 This is deploy configuration, and as with #66 and #90 it waits for
 Michael's review before any cluster syncs it.
+
+## 2026-10-16T23:29:31Z · decision · Each timeout on the guarded path outlasts the hops inside it; both gateway routes set timeouts.request (issue #92)
+
+Of the three gaps #92 names, two were already closed by #67: the
+`burritbot-ai-gateway` EnvoyProxy pins `envoyService.name`, so the
+Service is `burritbot-ai-gateway.envoy-gateway-system`, and the
+frontend's default `BURRITBOT_GUARDED_URL` names it and sends
+`Host: burritbot.burritbot.local`, the `burritbot-audience` hostname.
+`tests/test_guarded_gateway_path.py` holds both. The third, the
+timeout, was still open, and it was worse than the issue says.
+
+One audience prompt passes the gateway twice. The frontend posts to
+`burritbot-audience`, which hands the request to guarded BurritBot, and
+BurritBot's model call comes back through the gateway to the
+AIGatewayRoute and Vertex. The `burritbot-guardrails` ext_proc (NeMo,
+then LLM Guard, each `messageTimeout: 10s`) runs on the request and on
+the response of both passes.
+
+Envoy starts a route timeout once the request has passed the decoder
+filters, and stops it when the upstream response is complete, before
+the encoder filters. So a route timeout covers neither direction of
+the ext_proc on its own pass, and whoever calls that pass has to.
+
+Before this change:
+
+- `burritbot-audience` set no timeout. Envoy Gateway then leaves
+  Envoy's 15s route default (`internal/gatewayapi/route.go`
+  `processRouteTimeout`, v1.9.2). That 15s covered all of BurritBot's
+  own gateway pass, and BurritBot itself waited 30s.
+- The AIGatewayRoute set no timeout, so Envoy AI Gateway applied 60s
+  (`api/v1beta1/ai_gateway_route.go`, v1.2.0). That is above
+  BurritBot's 30s.
+- The frontend waited 10s for the lot.
+
+Now each timeout is above every hop inside it, so the innermost failing
+hop gives the error the phone sees:
+
+- AIGatewayRoute rule `timeouts.request: 30s`, the Vertex call. 30s is
+  the budget BurritBot already gave the model call. `timeouts` is in
+  the rule field set every release from the 0.6 floor serves (#53).
+- BurritBot `GATEWAY_TIMEOUT_SECONDS` 30 → 75, above 4 × 10s of ext_proc
+  plus 30s.
+- `burritbot-audience` rule `timeouts.request: 80s`, above BurritBot's 75.
+- The frontend's `GUARDED_TIMEOUT_SECONDS` is 125, above 4 × 10s of
+  ext_proc plus 80s. `_resolve_target()` now returns the timeout with
+  the URL and Host. The unguarded target keeps its 10s
+  (`UNGUARDED_TIMEOUT_SECONDS`), and #92 does not ask for a change
+  there.
+
+These are ceilings, not expected latency. A clean prompt takes a few
+seconds. The alternative was to cut `messageTimeout`, but it has to
+stay above the adapter's 8s `SCANNER_TIMEOUT_SECONDS` (#66), so it
+cannot shrink without the scanners' own budget shrinking first.
+
+`tests/test_guarded_timeout_budget.py` reads the messageTimeouts and
+both route timeouts from `gateway.yaml` and the two constants from the
+code. It fails on the pre-change values with all five gaps named.
+Mutation cases restore the 10s frontend timeout, drop each route
+timeout, and shorten BurritBot's timeout, the audience route's
+timeout or the ext_proc budget.
+
+Not fixed here: the #57 GKE Gateway for phones is not built yet. A
+global external Application Load Balancer's backend service timeout
+defaults to 30s, below the frontend's 125s. When that Gateway is added,
+its GCPBackendPolicy `timeoutSec` must sit above the frontend's guarded
+timeout. Raised as a follow-up.
+
+This is deploy configuration, and it waits for Michael's review before
+any cluster syncs it, as with #66, #90 and #91.
