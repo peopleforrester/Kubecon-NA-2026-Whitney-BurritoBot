@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 472 passed, 41 deselected after the
-  #70 apiextensions fixture probe
+  (ruff check, then static suite) 474 passed, 41 deselected after the
+  #60 cold-read schedule check
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -68,6 +68,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #74 Gateway API floor v1.2 → v1.4+: BackendTLSPolicy `gateway.networking.k8s.io/v1` (vertex-ai-backend.yaml) first ships in v1.4.0, v1.2/v1.3 serve only v1alpha3 (experimental), confirmed from the release CRDs; phase-05 spec, spec scorecard and the AI gateway skill say v1.4+ (the skill's AI Gateway line 0.2+ → 0.6+ too); `tests/test_gateway_api_floor.py` derives the floor from the manifests, holds the docs to it and checks the installed CRDs live; 467 static green
 - 2026-10-16 · #75 readiness against the accepted abstract (Sessionize 1249553, talks-knowledge#12): `presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md` rates the nine checklist points, 2 READY-STATIC, 4 PARTIAL, 3 MISSING (MCP server, GenAI observability, recorded fallback); not ready; CFP-SUBMISSION.md header says it is a draft; 471 static green
 - 2026-10-16 · #70 live fixtures: the k8s, GCP and Terraform skips the issue names were already gone (#61, #62); the installed-CRD schema checks (`tests/helpers/crd_schema.py` `installed_schema`, used by the AI Gateway route and Gateway API floor tests), the CRD presence check and the deployed audience page check now take the shared `k8s_apiextensions_v1` (new, probed like the other #63 fixtures) / `k8s_core_v1` fixtures instead of loading kubeconfig themselves, so every live test on a bare host fails naming kubeconfig, ADC or terraform; 0 skipped; 472 static green
+- 2026-10-16 · #60 cold read confirmed (question 130, decided by Michael): Whitney reads on 2026-10-26, paper-read check 2026-10-23; PORTLAND-CARRY-FORWARD.md, PLAN.md and the critical path updated, test pins the date, reader and check, ABSTRACT-READINESS.md takes the new paper-read date; 474 static green
 
 ---
 
@@ -115,6 +116,11 @@ This platform's own delivery is 2026-11-09 to 11-12 (see
    rejects the combination only at apply. Do not read a green plan as
    apply-ready.
 3. **#20** the Grafana screenshot for the README needs a live rehearsal.
+
+Dated against this path (#60, question 130): #18 must land by
+2026-10-23, or the cold read becomes a paper read. Whitney reads
+`RUNBOOK.md` cold on Monday 2026-10-26, 10:00 to 16:00 Central, 14 days
+before the event opens on 2026-11-09.
 
 ### Doable any time, needs nothing external
 - **#15** cut a dated release (`v0.1.0-static`)
@@ -233,8 +239,9 @@ commit.
   own namespace (`from: Same`, see decisions.md)
 - Incompatible settings registry (9), #26: Dataplane V2 vs Calico
   policy / addon, Autopilot vs Falco, each with its reason and mutations
-- Portland carry-forward (6), #27: the carry-forward map covers every
-  proven and unmeasured result, the cold read sits a week clear of the
+- Portland carry-forward (8), #27 and #60: the carry-forward map covers every
+  proven and unmeasured result, the cold read (2026-10-26, Whitney,
+  paper-read check 2026-10-23, #60) sits a week clear of the
   event, and the runbook provisions the night before, puts existing rule
   files on screen in Act 2, keeps Act 1 to the canonical prompts, and
   has a Measurements record
@@ -321,7 +328,7 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 472 static tests green. Live tests fail loudly when
+- **Total: 474 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

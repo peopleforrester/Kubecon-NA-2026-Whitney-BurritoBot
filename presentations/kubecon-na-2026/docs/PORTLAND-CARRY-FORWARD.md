@@ -104,18 +104,19 @@ day. It caught four unwinnable challenges only because a co-presenter
 happened to read the lab cold inside the last 72 hours. This time the
 read is scheduled.
 
-- **When:** proposed for 2026-10-30, ten days before the event opens on
-  2026-11-09. That leaves a fix window long enough to act on what the
-  read finds. A read at T-72h does not replace it.
-- **Who:** a co-presenter who has not run this runbook before. Whitney
-  fits, and it mirrors how Portland's catch was made. The date and the
-  reader are proposals for Michael and Whitney to confirm.
+- **When:** Monday 2026-10-26, 10:00 to 16:00 Central, in Austin. That
+  is 14 days before the event opens on 2026-11-09, which leaves a fix
+  window long enough to act on what the read finds. A read at T-72h
+  does not replace it. Confirmed by Michael on #60 (question 130 in
+  `decisions.md`).
+- **Who:** Whitney reads: a co-presenter who has not run this runbook
+  before, which mirrors how Portland's catch was made.
 - **What:** run `RUNBOOK.md` from Night Before through Teardown, cold,
   against a live cluster, with the Measurements record open. File an
   issue for every place the reader stops or guesses. That rehearsal
   fills the first Rehearsal column.
 - **Gate:** nothing has ever run on a cluster. #22, #23 and #24 have
   landed, which leaves #17 (the GCP identity swap, which blocks
-  everything) and then #18 (live bring-up). If #18 has not happened by
-  2026-10-27, the cold read becomes a paper read. The first live run
+  everything) and then #18 (live bring-up). If #18 has not landed by
+  2026-10-23, the cold read becomes a paper read. The first live run
   then becomes the risk to plan around.

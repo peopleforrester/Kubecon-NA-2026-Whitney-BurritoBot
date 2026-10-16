@@ -22,8 +22,8 @@ wording. Where a point can be read more than one way, the row says so.
 
 No point is verified live. Nothing has run on a cluster (`PROJECT_STATE.md`),
 and every row below waits on the critical path `#17 → #18`. The cold read
-in `PORTLAND-CARRY-FORWARD.md` turns into a paper read if #18 has not
-happened by 2026-10-27.
+in `PORTLAND-CARRY-FORWARD.md` (Whitney, 2026-10-26) turns into a paper
+read if #18 has not landed by 2026-10-23.
 
 ## Verdict
 

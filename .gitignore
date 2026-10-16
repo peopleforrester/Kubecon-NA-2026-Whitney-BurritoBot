@@ -78,3 +78,4 @@ tfplan
 
 # Conversation transcripts stay local — never in the repo (routed by MRF pipeline)
 transcripts/
+pytest-of-*/
