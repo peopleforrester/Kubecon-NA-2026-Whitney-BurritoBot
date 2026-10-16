@@ -16,6 +16,7 @@ KUSTOMIZATION = PROJECT_ROOT / "deploy" / "ai-gateway" / "kustomization.yaml"
 
 EXPECTED_REFS = [
     "../../ai-gateway/envoy/gateway.yaml",
+    "../../ai-gateway/envoy/vertex-ai-backend.yaml",
     "../../ai-gateway/nemo-guardrails/deployment.yaml",
     "../../ai-gateway/nemo-guardrails/configmap-config.yaml",
     "../../ai-gateway/nemo-guardrails/configmap-rails.yaml",

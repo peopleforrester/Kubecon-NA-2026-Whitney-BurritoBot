@@ -1,0 +1,88 @@
+# ABOUTME: Vertex AI upstream for the AIGatewayRoute — AIServiceBackend, Envoy Backend, TLS, and auth.
+# ABOUTME: Auth is GKE Workload Identity via ADC on the proxy pod; no service account key file exists.
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: vertex-ai-gemini
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  schema:
+    name: GCPVertexAI
+  backendRef:
+    name: vertex-ai-gemini
+    kind: Backend
+    group: gateway.envoyproxy.io
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: vertex-ai-gemini
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  endpoints:
+    - fqdn:
+        hostname: us-west1-aiplatform.googleapis.com
+        port: 443
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: vertex-ai-gemini
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  targetRefs:
+    - group: gateway.envoyproxy.io
+      kind: Backend
+      name: vertex-ai-gemini
+  validation:
+    wellKnownCACertificates: System
+    hostname: us-west1-aiplatform.googleapis.com
+---
+# GCPCredentials with neither credentialsFile nor workloadIdentityFederationConfig
+# makes the ExtProc sidecar mint tokens from Application Default Credentials. On
+# GKE that is the Envoy proxy pod's KSA (pinned by the EnvoyProxy below), which
+# Workload Identity maps to the burritbot-ai-gateway GSA. ADC requires v1beta1.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: BackendSecurityPolicy
+metadata:
+  name: vertex-ai-gemini
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  targetRefs:
+    - group: aigateway.envoyproxy.io
+      kind: AIServiceBackend
+      name: vertex-ai-gemini
+  type: GCPCredentials
+  gcpCredentials:
+    projectName: kk-community-projects
+    region: us-west1
+---
+# Pins the Envoy proxy KSA name so the Terraform WIF binding can target it.
+# The Gateway's spec.infrastructure.annotations carry the GSA annotation onto it.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: burritbot-ai-gateway
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyServiceAccount:
+        name: burritbot-ai-gateway

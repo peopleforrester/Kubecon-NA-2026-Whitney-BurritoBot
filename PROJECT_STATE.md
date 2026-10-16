@@ -31,7 +31,7 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  210 passed, 16 deselected after the #23 fix (gateway ExtProc ports)
+  219 passed, 16 deselected after the #24 fix (Vertex AI AIServiceBackend)
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -59,7 +59,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 210 static tests green (203 at pause; +3 for #22; +4 for #23). Zero open Dependabot alerts, zero open PRs.
+- 219 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -186,7 +186,8 @@ commit.
 - D4 tf dataplane: Dataplane V2 with no legacy Calico blocks (3), closes #22
 - ESO controller GSA + WIF binding wired into iam.tf (5)
 - Gateway backendRef ports match their Services (4), closes #23
-- **Total: 210 static tests green. Live tests skip cleanly when
+- Vertex AI AIServiceBackend + WIF-bound gateway GSA; every route backendRef resolves (9), closes #24
+- **Total: 219 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.

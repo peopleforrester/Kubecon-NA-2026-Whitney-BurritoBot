@@ -66,6 +66,12 @@ variable "eso_controller_service_account_id" {
   default     = "eso-controller"
 }
 
+variable "ai_gateway_service_account_id" {
+  description = "Account ID of the WIF-bound Envoy AI Gateway GSA that calls Vertex AI."
+  type        = string
+  default     = "burritbot-ai-gateway"
+}
+
 variable "vertex_secret_id" {
   description = "Secret Manager secret ID holding any Vertex AI quota metadata."
   type        = string

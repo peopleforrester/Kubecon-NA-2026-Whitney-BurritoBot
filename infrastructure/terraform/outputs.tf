@@ -27,6 +27,11 @@ output "workload_service_account_email" {
   value       = google_service_account.workload.email
 }
 
+output "ai_gateway_service_account_email" {
+  description = "Email of the WIF-bound Envoy AI Gateway service account that calls Vertex AI."
+  value       = google_service_account.ai_gateway.email
+}
+
 output "node_service_account_email" {
   description = "Email of the node service account attached to the GKE nodes."
   value       = google_service_account.nodes.email
