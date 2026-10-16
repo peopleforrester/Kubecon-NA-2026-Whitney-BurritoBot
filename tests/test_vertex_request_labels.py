@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 from types import ModuleType
 
@@ -12,11 +11,11 @@ import pytest
 from fastapi.testclient import TestClient
 from google.genai import models as genai_models
 
-from conftest import PROJECT_ROOT, TERRAFORM_DIR
+from conftest import PROJECT_ROOT
+from helpers.cost_labels import terraform_cost_labels
 
 
 BURRITBOT_APP = PROJECT_ROOT / "apps" / "burritbot" / "app.py"
-LABELS_TF = TERRAFORM_DIR / "labels.tf"
 DELIVERY_ENV = "BURRITBOT_DELIVERY"
 SLUG = "summit-2027"
 
@@ -32,12 +31,7 @@ def _load(name: str) -> ModuleType:
 
 
 def _terraform_cost_labels() -> dict[str, str]:
-    """local.cost_labels from labels.tf, with var.delivery standing for the slug."""
-    body = re.search(r"cost_labels\s*=\s*\{(.*?)\}", LABELS_TF.read_text(), re.S)
-    assert body, "labels.tf has no local.cost_labels"
-    pairs = re.findall(r'"([^"]+)"\s*=\s*("[^"]*"|var\.delivery)', body.group(1))
-    assert pairs, "local.cost_labels is empty"
-    return {k: SLUG if v == "var.delivery" else v.strip('"') for k, v in pairs}
+    return terraform_cost_labels(SLUG)
 
 
 @pytest.mark.static

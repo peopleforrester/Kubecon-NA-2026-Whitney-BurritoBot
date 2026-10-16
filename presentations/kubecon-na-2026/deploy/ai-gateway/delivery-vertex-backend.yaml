@@ -1,0 +1,12 @@
+# ABOUTME: Strategic-merge patch: the AI gateway's Vertex AI requests carry this delivery's cost labels.
+# ABOUTME: Replaces the base placeholder; the slug must equal the runbook's `-var delivery=`.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: vertex-ai-gemini
+  namespace: burritbot-net
+spec:
+  bodyMutation:
+    set:
+      - path: labels
+        value: '{"burritbot-io_owner": "burritbot", "burritbot-io_delivery": "kubecon-na-2026"}'

@@ -16,6 +16,15 @@ spec:
     name: vertex-ai-gemini
     kind: Backend
     group: gateway.envoyproxy.io
+  # Cost labels on every Vertex AI request (docs/BILLING-EXPORT.md). The
+  # OpenAI → Vertex translator has no labels field; this mutation runs on the
+  # translated body. The delivery overlay (presentations/<event>/deploy/)
+  # replaces the placeholder, which is too long for a label value, so a sync
+  # without an overlay has its model calls rejected rather than mislabelled.
+  bodyMutation:
+    set:
+      - path: labels
+        value: '{"burritbot-io_owner": "burritbot", "burritbot-io_delivery": "unset-the-delivery-overlay-under-presentations-sets-burritbot-io-delivery"}'
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: Backend

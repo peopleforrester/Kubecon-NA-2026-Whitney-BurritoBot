@@ -23,6 +23,9 @@ close. See
    ```bash
    terraform -chdir=infrastructure/terraform apply -var delivery=kubecon-na-2026
    ```
+   The model calls carry the same slug from this delivery's overlay
+   (`presentations/kubecon-na-2026/deploy/`), which ArgoCD syncs. If the
+   slug ever changes, change it in both places.
 
 2. **Bootstrap ArgoCD once** (the only `kubectl apply` the rules allow):
    ```bash
