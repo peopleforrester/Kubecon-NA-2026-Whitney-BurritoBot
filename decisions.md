@@ -1602,3 +1602,81 @@ checked, used only on this host) built the overlay. It differs from the
 Not verified here: no cluster and no browser engine. app.js was not run
 in a browser (no node or Chromium on this host), and no real phone has
 sent a token.
+
+## 2026-10-16T23:59:36Z · decision · Both scanners scan both hops; on the model hop the net reads Vertex's own reply and refuses a prompt rewrite the gateway would drop (issue #94)
+
+#94 asks two things: how NeMo Guardrails and LLM Guard join the Envoy
+path, and which hops each one scans.
+
+How they join is already settled. #66 put a `burritbot-extproc` gRPC
+adapter in each scanner pod, and the `burritbot-guardrails` entries name
+its port 50051, never the scanners' REST ports (#73 confirmed both
+scanners speak REST only). The version half of the issue is #91:
+llm-guard-api runs 0.3.16, the last release. No 0.3.17 exists, and the
+docs now say 0.3.16.
+
+Which hops: both scanners scan both hops, prompt and reply. #49 put the
+policy on the Gateway because the phase-05 spec has every guarded call
+traverse both scanners. The call that reaches Vertex is guarded
+BurritBot's model call, so the model hop stays covered. The audience hop
+stays covered too, because only there does a block reach the phone as
+the net's own 403, and only there does LLM Guard's rewrite of the prompt
+stick. Scanning only the audience hop would also have met the spec's
+wording, but it would reverse #49 and leave the gateway's Vertex route
+with no net.
+
+What the model hop really carries was read from Envoy AI Gateway source
+at v0.6.0 (the floor, #53) and v1.2.0 (installed, #68). Both releases
+behave the same way:
+
+- `insertAIGatewayExtProcFilter` puts the gateway's own ext_proc ahead of
+  the first ext_proc on the listener. That is ahead of this policy's.
+- **Request.** The gateway's ext_proc reads the OpenAI body first and
+  keeps it (`originalRequestBodyRaw`). The upstream filter translates
+  that copy for Vertex. So the net reads the OpenAI body and can block
+  it, but a rewrite it hands back never reaches Vertex.
+- **Reply.** The upstream ext_proc skips responses. The gateway's
+  router-level ext_proc translates Vertex's reply to OpenAI, and on the
+  way back it runs after the net. So the net saw Vertex's own
+  `generateContent` body, with `candidates`, not `choices`. The adapter
+  found no model text in it and passed it unscanned. The gateway decodes
+  gzip and brotli, so a compressed reply would also have passed the net
+  unread.
+
+The changes:
+
+- The adapter reads text from Vertex `candidates[].content.parts[].text`.
+  A rewrite of the reply sticks, because the gateway translates the body
+  the net hands back.
+- A non-empty response body with a `content-encoding` other than
+  identity is refused with a 502 naming the scanner. It is never passed
+  unread.
+- On an OpenAI request, a scanner rewrite is refused with a 403
+  (`lost_rewrites`), not forwarded. The audience hop has already run the
+  same scanners over the same prompt, so this only bites when BurritBot
+  sends text the audience hop did not see.
+- Guarded BurritBot sends `Accept-Encoding: identity` on the model call,
+  so Vertex answers uncompressed. A gateway answer of 400 or above whose
+  JSON names a scanner in `blocked_by` is relayed to the caller with the
+  same status and body. Before this, a block on the model hop reached
+  the phone as BurritBot's 502, "upstream model call failed". It now
+  reaches the phone in the same form as a block on the audience hop.
+  Making the reply scan on the model hop real is what makes this
+  matter.
+
+The timeout budget (#92) already counts the ext_proc both ways on both
+passes, so it is unchanged.
+
+Tests: `tests/test_guardrails_extproc.py` checks the Vertex reply
+parsing. A real gRPC round trip refuses a Vertex reply with a 503 when
+the scanner is down, where before it passed. It refuses a gzip reply
+with a 502. It also covers the request-rewrite refusal and the rewrites
+that do stick. `tests/test_guarded_gateway_path.py` checks the identity
+header and which gateway answers are relayed. 641 static green.
+
+Not verified here: nothing has run on a cluster (#18). The live
+round trip through Envoy, the AI Gateway and Vertex rides on it. The
+phone page still shows a guardrails 403 as "Something went wrong
+(HTTP 403)". That is raised as a follow-up. This is deploy
+configuration and application code, and as with #66, #90, #91 and #92
+it waits for Michael's review before any cluster syncs it.

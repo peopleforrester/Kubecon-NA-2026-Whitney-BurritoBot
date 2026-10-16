@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -11,6 +12,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import JSONResponse
 from google import genai
 from google.genai import types
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -40,6 +42,9 @@ GATEWAY_CHAT_PATH = "/v1/chat/completions"
 # and on the response (2 x 2 x 10s messageTimeout) and the AIGatewayRoute's
 # 30s Vertex timeout. The audience route's 80s timeout sits above this.
 GATEWAY_TIMEOUT_SECONDS = 75.0
+# The guardrails read Vertex's reply before the gateway translates it, and
+# refuse one they cannot read, so the model call asks for it uncompressed.
+GATEWAY_HEADERS = {"Accept-Encoding": "identity"}
 
 # Unguarded Vertex calls carry the cluster's cost labels (labels.tf), so the
 # billing export sums model spend by burritbot-io_delivery. The slug is the
@@ -109,11 +114,44 @@ def parse_gateway_response(body: dict[str, Any]) -> tuple[str, int, int]:
     )
 
 
+class GuardrailsRefused(Exception):
+    """The guardrails on the gateway refused the model call; relayed to the caller as they wrote it."""
+
+    def __init__(self, status_code: int, body: dict[str, Any]) -> None:
+        super().__init__(f"guardrails refused the model call ({status_code}): {body}")
+        self.status_code = status_code
+        self.body = body
+
+
+def guardrails_refusal(status_code: int, content: bytes) -> dict[str, Any] | None:
+    """The guardrails' refusal in a gateway answer, or None when the answer is something else.
+
+    The net names the scanner that refused in "blocked_by" (ai-gateway/extproc/adapter.py).
+    """
+    if status_code < 400:
+        return None
+    try:
+        body = json.loads(content)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if isinstance(body, dict) and isinstance(body.get("blocked_by"), str):
+        return body
+    return None
+
+
 def _ask_gateway(prompt: str) -> tuple[str, int, int]:
     """Guarded: one chat completion through the AI gateway."""
     url = f"{_gateway_url()}{GATEWAY_CHAT_PATH}"
     try:
-        resp = httpx.post(url, json=gateway_request_body(prompt), timeout=GATEWAY_TIMEOUT_SECONDS)
+        resp = httpx.post(
+            url, json=gateway_request_body(prompt), headers=GATEWAY_HEADERS, timeout=GATEWAY_TIMEOUT_SECONDS
+        )
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"AI gateway call to {url} failed: {exc}") from exc
+    refused = guardrails_refusal(resp.status_code, resp.content)
+    if refused is not None:
+        raise GuardrailsRefused(resp.status_code, refused)
+    try:
         resp.raise_for_status()
     except httpx.HTTPError as exc:
         raise RuntimeError(f"AI gateway call to {url} failed: {exc}") from exc
@@ -192,9 +230,14 @@ def create_app() -> FastAPI:
         return {"status": "ok", "model": MODEL_NAME, "guarded": GUARDED}
 
     @app.post("/chat", response_model=ChatResponse)
-    def chat(request: ChatRequest) -> ChatResponse:
+    def chat(request: ChatRequest) -> ChatResponse | JSONResponse:
         try:
             reply, input_tokens, output_tokens = ask(request.prompt)
+        except GuardrailsRefused as exc:
+            # The net stopped the model call. The phone gets the net's own answer,
+            # as when it stops the prompt on its way to BurritBot.
+            logger.info("%s", exc)
+            return JSONResponse(status_code=exc.status_code, content=exc.body)
         except Exception as exc:
             logger.exception("Model call failed")
             raise HTTPException(

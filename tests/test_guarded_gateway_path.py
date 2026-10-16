@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import socket
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 from types import ModuleType
 from urllib.parse import urlsplit
 
+import httpx
 import pytest
 import yaml
 from fastapi.testclient import TestClient
@@ -242,6 +244,45 @@ def test_gateway_response_is_read_from_the_openai_shape(monkeypatch: pytest.Monk
     assert reply == ("Try the carnitas.", 42, 7)
     with pytest.raises(ValueError, match="choices"):
         burritbot.parse_gateway_response({"choices": []})
+
+
+@pytest.mark.static
+def test_gateway_call_asks_for_an_uncompressed_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The net reads Vertex's reply before the gateway translates it, and refuses one it cannot read (#94)."""
+    monkeypatch.delenv("BURRITBOT_GUARDED", raising=False)
+    burritbot = _load(BURRITBOT_APP, "burritbot_app_gateway_encoding")
+    with httpx.Client() as client:
+        request = client.build_request(
+            "POST", "http://gateway.invalid/v1/chat/completions", json={}, headers=burritbot.GATEWAY_HEADERS
+        )
+    assert request.headers["accept-encoding"] == "identity"
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("status_code", [403, 502, 503])
+def test_a_guardrails_refusal_of_the_model_call_is_relayed(monkeypatch: pytest.MonkeyPatch, status_code: int) -> None:
+    """A refusal by the net on the model hop reaches the phone as the net wrote it, not as a 502 (#94)."""
+    monkeypatch.delenv("BURRITBOT_GUARDED", raising=False)
+    burritbot = _load(BURRITBOT_APP, "burritbot_app_gateway_refusal")
+    refusal = {"detail": "BurritBot's guardrails stopped this reply.", "blocked_by": "nemo-guardrails"}
+    assert burritbot.guardrails_refusal(status_code, json.dumps(refusal).encode()) == refusal
+
+
+@pytest.mark.static
+@pytest.mark.parametrize(
+    ("status_code", "content"),
+    [
+        (200, b'{"blocked_by": "llm-guard"}'),
+        (400, b'{"detail": "BurritBot\'s guardrails could not read this request"}'),
+        (500, b"upstream connect error"),
+        (403, b'{"blocked_by": ["llm-guard"]}'),
+    ],
+    ids=["success", "no-scanner-named", "not-json", "malformed-scanner"],
+)
+def test_other_gateway_answers_are_not_relayed(monkeypatch: pytest.MonkeyPatch, status_code: int, content: bytes) -> None:
+    monkeypatch.delenv("BURRITBOT_GUARDED", raising=False)
+    burritbot = _load(BURRITBOT_APP, "burritbot_app_gateway_not_refusal")
+    assert burritbot.guardrails_refusal(status_code, content) is None
 
 
 @pytest.mark.static

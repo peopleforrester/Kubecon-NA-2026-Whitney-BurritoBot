@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 624 passed, 52 deselected after the
-  #88 per-browser audience limit (question 157)
+  (ruff check, then static suite) 641 passed, 52 deselected after the
+  #94 model-hop guardrails
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -80,6 +80,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #91 llm-guard Deployment checked against the `laiyer/llm-guard-api` image (registry config, app layers, v0.3.16 source): image 0.3.9 → 0.3.16, the last release (upstream archived 2026-07-08; no 0.3.17 exists, docs said 0.3.17+); the API reads `CONFIG_FILE` (was `LLM_GUARD_CONFIG`, read by nothing); config.yaml rewritten to the API schema (`type` + `params`, constructor arguments only; the flat keys, `enabled`, `cache` and `telemetry` were dropped unread), `lazy_load: false`, no auth, OTLP/HTTP tracing and metrics to :4318; uid 1001 kept (image files world-readable), `HF_HOME` on the emptyDir under the image's HOME `/home/user` (was `/home/llm-guard`), cache 4Gi → 6Gi for ~4.3 GiB of models, startupProbe, readiness on `/readyz`; `tests/test_llm_guard_api_image.py` holds it with mutation cases, a docs version pin and live analyze calls; Anonymize/Sensitive still need spaCy `zh_core_web_sm`, which the image lacks (follow-up); 595 static green
 - 2026-10-17 · #92 guarded path timeouts: Host and proxy Service already fixed by #67 (decisions.md); the frontend's 10s guarded timeout and Envoy's 15s default on `burritbot-audience` both cut the guarded chain; AIGatewayRoute rule `timeouts.request: 30s` (was the 60s AI Gateway default), BurritBot `GATEWAY_TIMEOUT_SECONDS` 30 → 75, `burritbot-audience` `timeouts.request: 80s`, frontend `GUARDED_TIMEOUT_SECONDS` 125 (unguarded keeps 10); `tests/test_guarded_timeout_budget.py` derives each bound from the manifests; 604 static green
 - 2026-10-17 · #88 question 157 (decided by the coordinator under Michael's standing rules): the audience `/chat` limit is 10/minute per browser token (`X-Audience-Token`, random, kept in localStorage) under a 300/minute per-address ceiling; a tokenless phone is held to 10/minute on its address; both numbers are set by `presentations/kubecon-na-2026/deploy/audience`, which the ArgoCD `audience` Application now syncs, and the app refuses to start without them; Phase 7 spec, RUNBOOK step 8 and the Room network row updated; 624 static green
+- 2026-10-17 · #94 the guardrails ExtProc already reached the `burritbot-extproc` gRPC adapter (#66) and llm-guard-api is 0.3.16, the last release (#91); which hops each scanner scans: both scanners, both hops (the Gateway target, #49), prompt and reply. Checked against Envoy AI Gateway v0.6.0 and v1.2.0 source: on the model hop the gateway's own ext_proc runs ahead of the net, so the net saw Vertex's reply before translation and passed it unscanned, and a prompt rewrite there would be dropped. The adapter now scans Vertex `candidates`, refuses an encoded reply (502) and a model-hop prompt rewrite (403); guarded BurritBot asks the gateway for `Accept-Encoding: identity` and relays a refusal naming its scanner with the net's status and body; 641 static green
 
 ---
 
@@ -330,12 +331,13 @@ commit.
   `AUDIENCE_ADDRESS_LIMIT`; the page keeps and sends the token; the
   delivery overlay sets 10/minute and 300/minute and the `audience`
   Application syncs it; the base sets neither
-- Guarded gateway path (14), #67: the frontend's guarded URL and the
+- Guarded gateway path (22), #67, #94: the frontend's guarded URL and the
   guarded `AI_GATEWAY_URL` are the Service the EnvoyProxy names; the
   frontend's guarded Host is a `burritbot-audience` hostname; the
   gateway body's model matches the AIGatewayRoute; a guarded `/chat`
   fails on the gateway hop, never on Vertex; the egress lock admits the
-  proxy pods
+  proxy pods; the model call asks for an uncompressed reply and only a
+  refusal naming its scanner is relayed
 - Gateway controller install (30), #68: Envoy Gateway and the AI Gateway
   CRDs and controller are pinned Helm Applications; the extension
   manager names the controller Service; Backend API on; every Gateway
@@ -347,14 +349,16 @@ commit.
 - Live fixtures fail loudly (8), #63, #70: each cluster and GCP client
   fixture errors in a probe run with no kubeconfig and no ADC, the
   probe exits non-zero, and the message names the command that fixes it
-- Guardrails ext_proc adapter (40), #66: each ExtProc backend resolves
+- Guardrails ext_proc adapter (49), #66, #94: each ExtProc backend resolves
   to a `burritbot-extproc` container configured for the scanner it
   names, never the scanner's REST port; messageTimeout sits above the
   adapter's scanner timeout and failOpen stays off; the adapter reads
   BurritBot and OpenAI bodies, reads both scanners' REST replies and
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
-  unreadable
+  unreadable; on the model hop it scans Vertex's own reply (a 503 with
+  the scanner down), refuses a compressed reply with a 502 and a prompt
+  rewrite the gateway would drop with a 403
 - NeMo Guardrails microservice 25.07 (15), #90: the container's
   `GUARDRAILS_PORT`, http containerPort, Service http port and the
   adapter's `SCANNER_URL` agree; the config and rails ConfigMaps sit at
@@ -375,7 +379,7 @@ commit.
   above the ext_proc both ways plus the AIGatewayRoute's Vertex timeout;
   neither route is left on its default; mutation tests restore the old
   10s, drop each route timeout and shorten or swell each hop
-- **Total: 624 static tests green. Live tests fail loudly when
+- **Total: 641 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
