@@ -101,6 +101,12 @@ an earlier EKS-based platform delivered live as a conference talk in 2026-03.
 That repo lives on disk as a local-only reference; see
 `docs/KUBEAUTO-REUSE-MAP.md` for exactly what carries forward.
 
+The BurritoBot in the `Unleash_an_Agent_Watch_It_Burn` workshop repo
+(kagent on EKS, one cluster per attendee, a browser terminal, a secret
+recipe to protect) is a separate project, not an ancestor of this one.
+The two share a burrito theme and nothing else; work on that workshop,
+including tutorials built on it, lives in that repo.
+
 ## License
 
 Apache 2.0 (pending) — matching the upstream lineage.
