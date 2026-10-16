@@ -160,3 +160,6 @@ fail explicitly rather than silently fall back to defaults.
 - The exact per-phase session commands are in the active talk's
   `presentations/<event>/docs/BUILD-INSTRUCTIONS.md` §
   "Claude Code Execution Strategy".
+
+Test command: `uv run --managed-python --frozen pytest -m static`
+E2E command: `uv run --managed-python --frozen pytest -m live`
