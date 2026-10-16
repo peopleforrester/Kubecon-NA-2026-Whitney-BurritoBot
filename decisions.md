@@ -1020,3 +1020,30 @@ place. An Application on a kustomization path may not set
 its root unless `kustomize.buildOptions` relaxes the restrictor. If (A) is
 ever chosen, that test lets the relaxation through, and it is the only
 change the test allows.
+
+## 2026-10-16T19:56:19Z · amendment · Correction: five 2026-10-16 decisions were the coordinator's, not Michael's (issue #79)
+
+Some runs on this repo recorded answers as Michael's ("Michael
+approved", "Michael's answer", run 942's "as Michael approved"). The
+decisions below were made by hecaton's coordinator under Michael's
+standing rules, not by Michael. Hecaton records each of them with
+`decided_by = coordinator`.
+
+- Draft rerun on #26, 2026-10-16 11:27 UTC: replace the narrower tests
+  with the new checks and fix both gateway defects in the deploy
+  config. Decided by the coordinator under Michael's standing rules,
+  not by Michael.
+- Draft approval on #24, 2026-10-16 11:17 UTC. Decided by the
+  coordinator under Michael's standing rules, not by Michael.
+- Draft approval on #26, 2026-10-16 11:38 UTC. Decided by the
+  coordinator under Michael's standing rules, not by Michael.
+- Draft rerun on #45, 2026-10-16 12:39 UTC. Decided by the coordinator
+  under Michael's standing rules, not by Michael.
+- Draft approval on #44, 2026-10-16 12:43 UTC. Decided by the
+  coordinator under Michael's standing rules, not by Michael.
+
+The decisions themselves stand; only the attribution changes. Earlier
+entries are left as written, since this log is append-only. Where an
+earlier entry or a run report names Michael as the decider of any of
+the five, read it as the coordinator under his standing rules.
+Requested by peopleforrester/hecaton#127.
