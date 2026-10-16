@@ -56,12 +56,14 @@ the `RUNBOOK.md` **Measurements** record. Blank cells mean unmeasured.
    has loaded it. The Real devices row still requires one iOS Safari and
    one Android Chrome phone, each on venue Wi-Fi and on cellular.
 3. **Room network.** The Room network row records whether venue Wi-Fi
-   held. Reading the code turned up a second risk. The frontend's
-   `10/minute` limit is keyed on the connecting address, uvicorn runs
-   without `--proxy-headers`, and no Ingress manifest exists yet. So
-   whatever sits in front of the pod (the venue NAT, a load balancer or
-   both), a room of phones shares one budget of about 10 prompts a minute
-   in total.
+   held. Reading the code turned up a second risk: the frontend's
+   `10/minute` limit was keyed on the connecting address, so whatever sat
+   in front of the pod put the room in one budget. #57 chose the exposure
+   path, a GKE Gateway (global external Application Load Balancer), and
+   keyed the limit on the client entry that load balancer writes into
+   `X-Forwarded-For`. The venue NAT is still a shared address: phones on
+   one venue Wi-Fi share its 10 prompts a minute, and the Room network
+   row's `429` count shows how much that cost.
 4. **Cost.** This talk has never been costed either. It can be costed
    by label now (#59, the GCP counterpart of
    `Unleash_an_Agent_Watch_It_Burn#392`): the GKE cluster and the Secret

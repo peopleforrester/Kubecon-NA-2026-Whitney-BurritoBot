@@ -1,4 +1,4 @@
-# ABOUTME: ClusterIP Service for the audience frontend — fronted by an Ingress at demo time.
+# ABOUTME: ClusterIP Service for the audience frontend — fronted by a GKE Gateway (global external ALB).
 # ABOUTME: Listens on 8080 and matches the audience-frontend Deployment label.
 ---
 apiVersion: v1

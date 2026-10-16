@@ -105,10 +105,13 @@ Run this checklist T-60 minutes before the talk. Everything here is
    `200` from `/` with the Feedback button in the header, and open `/qr`
    on the projector laptop: the URL printed under the code is the one
    phones will open.
-   The frontend's `10/minute` limit is keyed on the connecting address,
-   and uvicorn runs without proxy headers, so a room of phones behind one
-   NAT or one load balancer shares a single budget. Watch for `429`s in
-   the first minute of Act 1 and record them under **Room network**.
+   The frontend's `10/minute` limit is per phone address. Behind the GKE
+   Gateway it keys on the client entry the load balancer writes into
+   `X-Forwarded-For`, so the load balancer no longer puts the room in one
+   budget. The venue NAT still can: phones on the same venue Wi-Fi leave
+   through one public address and share its 10 prompts a minute. Phones
+   on cellular each get their own. Watch for `429`s in the first minute
+   of Act 1 and record them under **Room network**.
 
 ---
 
