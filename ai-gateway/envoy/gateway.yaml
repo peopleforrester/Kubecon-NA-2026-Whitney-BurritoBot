@@ -85,6 +85,13 @@ spec:
 # The guardrails net: NeMo Guardrails, then LLM Guard, on every route attached
 # to the gateway (the audience HTTPRoute and the HTTPRoute generated from the
 # AIGatewayRoute above). Entries run in list order.
+#
+# Both scanners serve REST, not envoy.service.ext_proc.v3, so each entry names
+# the extproc port (50051) of the burritbot-extproc sidecar in the scanner's
+# pod (ai-gateway/extproc/adapter.py), never the scanner's own port 8000.
+# failOpen stays unset (false): a broken net refuses traffic. messageTimeout
+# replaces Envoy's 200ms default, which no scanner meets; it sits above the
+# adapter's SCANNER_TIMEOUT_SECONDS so a slow scanner gets the adapter's 503.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyExtensionPolicy
 metadata:
@@ -101,7 +108,8 @@ spec:
   extProc:
     - backendRefs:
         - name: nemo-guardrails
-          port: 8000
+          port: 50051
+      messageTimeout: 10s
       processingMode:
         request:
           body: Buffered
@@ -109,7 +117,8 @@ spec:
           body: Buffered
     - backendRefs:
         - name: llm-guard
-          port: 8000
+          port: 50051
+      messageTimeout: 10s
       processingMode:
         request:
           body: Buffered

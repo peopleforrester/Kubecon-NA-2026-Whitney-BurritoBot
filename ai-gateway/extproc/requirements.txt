@@ -1,0 +1,4 @@
+envoy-data-plane==2.2.0
+betterproto2==0.9.1
+grpclib==0.4.9
+httpx==0.28.1

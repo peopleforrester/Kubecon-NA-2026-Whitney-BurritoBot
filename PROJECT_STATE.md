@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 365 passed, 20 deselected after the
-  #57 audience rate-limit key
+  (ruff check, then static suite) 405 passed, 24 deselected after the
+  #66 guardrails ext_proc adapter
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -57,6 +57,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #62 ruff gate widened to BLE, S110, S112, PLW1510, PERF102 and TRY401; research.py catches only Playwright errors and logs them; live fixtures and terraform checks fail instead of skipping; 349 static green
 - 2026-10-16 · #51 ReferenceGrant already in burritbot-guarded via deploy/burritbot; new static check proves every ReferenceGrant is rendered by an ArgoCD-synced Kustomization, with a mutation test that drops it from the kustomization; 353 static green
 - 2026-10-16 · #57 exposure path decided: phones reach the audience frontend through a GKE Gateway (global external ALB); the 10/minute limit keys on the client entry that load balancer writes into X-Forwarded-For, trusted only from Google's LB ranges; venue Wi-Fi NAT still shares one budget (follow-up); 365 static green
+- 2026-10-16 · #66 the guardrails ExtProc reaches a gRPC ext_proc server: a `burritbot-extproc` sidecar (ai-gateway/extproc/adapter.py) in each scanner pod turns buffered bodies into NeMo `/v1/guardrail/checks` and LLM Guard `/analyze/*` calls, blocks with a 403, applies LLM Guard sanitization, and fails closed (503 scanner down, 400 unreadable body); the policy names port 50051 with a 10s messageTimeout; 405 static green
 
 ---
 
@@ -285,7 +286,15 @@ commit.
   client entry it appended to X-Forwarded-For, a direct peer on itself;
   a load-balancer request without a client entry is a 400; two phones
   behind the load balancer each get their own 10/minute budget
-- **Total: 365 static tests green. Live tests fail loudly when
+- Guardrails ext_proc adapter (40), #66: each ExtProc backend resolves
+  to a `burritbot-extproc` container configured for the scanner it
+  names, never the scanner's REST port; messageTimeout sits above the
+  adapter's scanner timeout and failOpen stays off; the adapter reads
+  BurritBot and OpenAI bodies, reads both scanners' REST replies and
+  refuses unreadable ones; a real in-process gRPC round trip refuses a
+  prompt with a 503 when the scanner is down and a 400 when the body is
+  unreadable
+- **Total: 405 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

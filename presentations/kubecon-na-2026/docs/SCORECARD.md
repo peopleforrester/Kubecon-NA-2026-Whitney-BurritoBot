@@ -69,7 +69,7 @@ the skeleton at `spec/SCORECARD.md` is the build-time template.
 |--------------|-------|---------|--------|-------|
 | NeMo Guardrails | The Net | 0.11+ | YELLOW | Colang 2.0: burrito-only, jailbreak-detect, topic-enforcement, output-sanitize |
 | Content scanners | The Net | 0.3.17+ | YELLOW | Input + output scanner lists populated; double-escaped regex |
-| Envoy AI Gateway | The Net | 0.6+ | YELLOW | Gateway + HTTPRoute + AIGatewayRoute; EnvoyExtensionPolicy chains both ExtProc filters |
+| Envoy AI Gateway | The Net | 0.6+ | YELLOW | Gateway + HTTPRoute + AIGatewayRoute; EnvoyExtensionPolicy chains both ExtProc filters through the burritbot-extproc gRPC sidecars (#66) |
 
 ### Phase 6 — Application
 
