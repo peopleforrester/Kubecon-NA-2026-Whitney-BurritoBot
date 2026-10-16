@@ -168,6 +168,10 @@ fail explicitly rather than silently fall back to defaults.
 - Read `PROJECT_STATE.md` first every session.
 - Update `PROJECT_STATE.md` at every transition (plan approval, phase
   completion, pre-commit).
+- Append decision entries (approvals, amendments, backward steps,
+  conditional skips, and promote-time entries such as main
+  fast-forwarded with known failures) to the append-only
+  `decisions.md`, never to `PROJECT_STATE.md`.
 - Run each phase as a separate Claude Code session to avoid context window
   overflow.
 - The exact per-phase session commands are in the active talk's

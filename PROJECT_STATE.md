@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 265 passed, 16 deselected after the
-  #46 state-file refresh
+  (ruff check, then static suite) 268 passed, 16 deselected after the
+  #47 decision-entry move
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -46,6 +46,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #40 identity check: README gains "The Talk" (title, speakers, argument, event, status, Europe 2027 slate, sources) and "Where things live"; AGENTS.md names talks-knowledge for the register and abstracts; 261 static green
 - 2026-10-16 · #44 lint gate: ruff 0.17.1 pinned in the dev group with an explicit rule set; Test command runs `ruff check .` before the static suite; first-run findings fixed; 264 static green
 - 2026-10-16 · #46 pre-lifecycle body refreshed: pause replaced by Open Work, stale counts and duplicate Branch & Test Status removed, resolved known gaps marked; 265 static green
+- 2026-10-16 · #47 the 2026-10-15 promote entry moves from the foot of this file to decisions.md; AGENTS.md sends every decision entry, promote-time ones included, to decisions.md; 268 static green
 
 ---
 
@@ -232,7 +233,10 @@ commit.
   the static suite
 - State file (1), #46: PROJECT_STATE.md has one branch and test status
   section, and its count agrees with the Total line below
-- **Total: 265 static tests green. Live tests skip cleanly when
+- Decision entries (3), #47: PROJECT_STATE.md holds no decision-entry
+  headings, the 2026-10-15 promote entry sits in decisions.md, and
+  AGENTS.md sends promote-time entries there
+- **Total: 268 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
@@ -338,7 +342,3 @@ passes. **Do not green-wash the scorecard.**
 - `spec/phases/phase-0[1-8]-*.md` — per-phase specs with completion promises
 - Local reuse source: `~/repos/_archive/events/kubeauto-ai-day/` (local-only)
 - Remote reuse source: https://github.com/peopleforrester/kubeauto-ai-day
-
-## 2026-10-15T12:00:00Z · 3.3 · Main fast-forwarded with known test failures
-
-On Michael's instruction, main was fast-forwarded to staging to ship the Dependabot fix with these failures, all present on main before the fix, accepted: test_terraform_plan and test_gke_cluster_is_standard_with_wif_and_nap need live GCP; the credential has expired (invalid_grant).
