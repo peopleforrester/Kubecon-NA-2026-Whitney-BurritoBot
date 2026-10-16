@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 416 passed, 32 deselected after the
-  #63 live-fixture probes
+  (ruff check, then static suite) 417 passed, 32 deselected after the
+  #70 apiextensions fixture probe
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -63,6 +63,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #61 no skip paths: the last exit-as-skip (Prometheus rules-map early return) now asserts; the Phase C5 plan no longer lets the Colang test skip; live fixtures and Terraform checks already fail naming what is missing (#62); the E2E command exits non-zero with 0 skipped on a bare host; 409 static green
 - 2026-10-16 · #63 live fixtures proven loud: a subprocess probe requests each kubeconfig and GCP client fixture with no kubeconfig and no ADC and sees a setup error, a non-zero exit and the command that fixes it (`gcloud container clusters get-credentials` or `gcloud auth application-default login`); 416 static green
 - 2026-10-16 · #72 duplicate of #68: Envoy Gateway v1.9.2, AI Gateway CRDs and controller v1.2.0 and GatewayClass `envoy-ai-gateway` are already installed by ArgoCD; recorded in decisions.md, no manifest change; 416 static green
+- 2026-10-16 · #70 live fixtures: the k8s, GCP and Terraform skips the issue names were already gone (#61, #62); the installed-CRD schema checks and the deployed audience page check now take the shared `k8s_apiextensions_v1` (new, probed like the other #63 fixtures) / `k8s_core_v1` fixtures instead of loading kubeconfig themselves, so all 32 live tests on a bare host fail naming kubeconfig, ADC or terraform; 0 skipped; 417 static green
 
 ---
 
@@ -305,10 +306,10 @@ commit.
   cert-manager; the MCP seed is neither committed nor reminted; waves
   put the controllers before `ai-gateway`; GKE-managed Gateway API CRDs
   and the gateway-helm copy are an incompatible pair
-- Live fixtures fail loudly (7), #63: each cluster and GCP client
+- Live fixtures fail loudly (8), #63, #70: each cluster and GCP client
   fixture errors in a probe run with no kubeconfig and no ADC, the
   probe exits non-zero, and the message names the command that fixes it
-- **Total: 416 static tests green. Live tests fail loudly when
+- **Total: 417 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

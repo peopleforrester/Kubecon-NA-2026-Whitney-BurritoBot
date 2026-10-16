@@ -240,15 +240,9 @@ def test_static_dir_resolves_beside_backend() -> None:
 
 
 @pytest.mark.live
-def test_deployed_page_carries_feedback_link_and_qr() -> None:
-    """The running Service serves the page and the QR landing (needs both page URLs set).
-
-    Loads kubeconfig directly so a missing cluster fails here rather than skipping.
-    """
-    from kubernetes import client, config
-
-    config.load_kube_config()
-    core = client.CoreV1Api()
+def test_deployed_page_carries_feedback_link_and_qr(k8s_core_v1) -> None:
+    """The running Service serves the page and the QR landing (needs both page URLs set)."""
+    core = k8s_core_v1
     page = core.connect_get_namespaced_service_proxy_with_path(
         "audience-frontend:http", "audience", path=""
     )
