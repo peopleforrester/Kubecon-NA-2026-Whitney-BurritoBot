@@ -459,8 +459,10 @@ suite pass on a bare host are gone:
   amended in `docs/PHASE-C-GREENFIELD-PLAN.md`.
 - **The Prometheus rename check asserts** `additionalPrometheusRulesMap`
   is present instead of returning early when it is absent.
-- **A static AST guard** (`tests/test_no_skip_paths.py`) keeps skip,
-  skipif, importorskip, xfail, exit and KNOWN_OPEN out of tests/.
+- **No in-repo guard test.** A test that lists the banned markers has
+  to spell them out, which trips the dispatcher's skip-markers gate on
+  the diff. That gate already holds the rule, so the suite does not
+  repeat it.
 
 The static Test command never requests the live fixtures, so it still
 passes everywhere. The E2E command now exits non-zero on a host

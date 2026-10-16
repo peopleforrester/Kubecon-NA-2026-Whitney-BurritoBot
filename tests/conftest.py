@@ -49,7 +49,7 @@ GRAFANA_BASIC_AUTH = "Basic YWRtaW46YWRtaW4="
 # a loaded kubeconfig. They run only under the E2E command (`pytest -m
 # live`); the Test command (`pytest -m static`) never requests these
 # fixtures. A missing kubeconfig, client library or credential fails the
-# test with a message naming what is missing. Nothing skips.
+# test with a message naming what is missing.
 
 
 def _kube_client():
