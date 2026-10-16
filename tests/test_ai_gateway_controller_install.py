@@ -287,11 +287,8 @@ def test_controllers_sync_before_the_gateway_resources() -> None:
         "backendtlspolicies.gateway.networking.k8s.io",
     ],
 )
-def test_crd_is_installed(crd: str, k8s_custom_objects) -> None:
-    from kubernetes import client  # type: ignore
-
-    # k8s_custom_objects loads the kubeconfig and fails the test without one.
-    client.ApiextensionsV1Api().read_custom_resource_definition(crd)
+def test_crd_is_installed(crd: str, k8s_apiextensions_v1) -> None:
+    k8s_apiextensions_v1.read_custom_resource_definition(crd)
 
 
 def _condition(obj: dict, kind: str) -> dict:

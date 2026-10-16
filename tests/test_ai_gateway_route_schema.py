@@ -306,17 +306,17 @@ LIVE_OBJECTS = [
 
 @pytest.mark.live
 @pytest.mark.parametrize("crd_name,version,pick", LIVE_OBJECTS, ids=[c for c, _, _ in LIVE_OBJECTS])
-def test_installed_crd_accepts_gateway_yaml(crd_name: str, version: str, pick) -> None:
-    schema = installed_schema(crd_name, version)
+def test_installed_crd_accepts_gateway_yaml(k8s_apiextensions_v1, crd_name: str, version: str, pick) -> None:
+    schema = installed_schema(k8s_apiextensions_v1, crd_name, version)
     obj = pick(_docs())
     violations = openapi_violations(obj, schema)
     assert not violations, f"installed {crd_name} {version} would refuse or strip {obj['metadata']['name']}: {violations}"
 
 
 @pytest.mark.live
-def test_installed_route_crd_refuses_the_pre_49_shape() -> None:
+def test_installed_route_crd_refuses_the_pre_49_shape(k8s_apiextensions_v1) -> None:
     """The walker is not vacuous: the old targetRefs/schema/filters are unknown to the installed CRD."""
-    schema = installed_schema("aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
+    schema = installed_schema(k8s_apiextensions_v1, "aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
     route = copy.deepcopy(_route(_docs()))
     route["spec"]["targetRefs"] = [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "burritbot-audience"}]
     route["spec"]["schema"] = {"name": "OpenAI"}

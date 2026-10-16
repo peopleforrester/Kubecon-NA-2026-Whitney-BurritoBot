@@ -20,6 +20,7 @@ LIVE_FIXTURES = {
     "k8s_custom_objects": "gcloud container clusters get-credentials",
     "k8s_networking_v1": "gcloud container clusters get-credentials",
     "k8s_rbac_v1": "gcloud container clusters get-credentials",
+    "k8s_apiextensions_v1": "gcloud container clusters get-credentials",
     "gcp_container_client": "gcloud auth application-default login",
     "gcp_secret_manager_client": "gcloud auth application-default login",
 }
