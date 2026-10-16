@@ -75,3 +75,26 @@ resource "google_service_account_iam_member" "eso_controller_wif_binding" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${var.project_id}.svc.id.goog[external-secrets/external-secrets]"
 }
+
+# Envoy AI Gateway service account: the ExtProc sidecar in the Envoy proxy
+# pod calls Vertex AI with Application Default Credentials, which Workload
+# Identity resolves to this GSA. The proxy KSA name is pinned by the
+# burritbot-ai-gateway EnvoyProxy; Envoy Gateway runs proxies in its
+# controller namespace.
+resource "google_service_account" "ai_gateway" {
+  account_id   = var.ai_gateway_service_account_id
+  display_name = "burritbot Envoy AI Gateway service account (WIF)"
+  description  = "Federated to the Envoy AI Gateway proxy KSA. No JSON key."
+}
+
+resource "google_project_iam_member" "ai_gateway_vertex_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.ai_gateway.email}"
+}
+
+resource "google_service_account_iam_member" "ai_gateway_wif_binding" {
+  service_account_id = google_service_account.ai_gateway.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[envoy-gateway-system/burritbot-ai-gateway]"
+}

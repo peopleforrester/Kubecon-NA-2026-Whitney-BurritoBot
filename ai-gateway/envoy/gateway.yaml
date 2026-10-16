@@ -12,6 +12,14 @@ metadata:
     app.kubernetes.io/part-of: burritbot
 spec:
   gatewayClassName: envoy-ai-gateway
+  # The proxy pod's KSA calls Vertex AI via ADC; see vertex-ai-backend.yaml.
+  infrastructure:
+    annotations:
+      iam.gke.io/gcp-service-account: burritbot-ai-gateway@kk-community-projects.iam.gserviceaccount.com
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: burritbot-ai-gateway
   listeners:
     - name: http
       protocol: HTTP

@@ -6,6 +6,8 @@ kind: Kustomization
 resources:
   # Gateway custom resources (Phase 5).
   - ../../ai-gateway/envoy/gateway.yaml
+  # Vertex AI upstream the AIGatewayRoute routes to (WIF-authenticated).
+  - ../../ai-gateway/envoy/vertex-ai-backend.yaml
   # NeMo Guardrails (Phase C2) — Deployment + Service + 2 ConfigMaps.
   - ../../ai-gateway/nemo-guardrails/deployment.yaml
   - ../../ai-gateway/nemo-guardrails/configmap-config.yaml
