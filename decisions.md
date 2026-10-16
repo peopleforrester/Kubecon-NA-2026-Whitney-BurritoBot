@@ -741,3 +741,64 @@ The static Test command never requests the live fixtures, so it still
 passes everywhere (409 passed). The E2E command exits non-zero with 0
 skipped on a host without a cluster, ADC or terraform, each test naming
 what is missing.
+
+## 2026-10-16T16:44:49Z · decision · The guardrails ExtProc reaches a burritbot-extproc gRPC sidecar, not the scanners' REST ports (issue #66)
+
+The `burritbot-guardrails` EnvoyExtensionPolicy named `nemo-guardrails:8000`
+and `llm-guard:8000` as ExtProc backends. Envoy's ext_proc filter speaks
+gRPC `envoy.service.ext_proc.v3.ExternalProcessor`; both scanners serve
+REST (the NeMo Guardrails microservice `/v1/guardrail/checks`,
+llm-guard-api `/analyze/prompt` and `/analyze/output`). With failOpen
+false, every request through the gateway would have been a 500.
+
+- **An ext_proc adapter, not a different hook.** The issue offered moving
+  enforcement elsewhere. Moving it into BurritBot's code would make the
+  app guard itself, while the talk's claim is that the platform says no
+  and the gateway is the single choke point (phase-05 spec). The net
+  stays on the gateway.
+- **One sidecar per scanner pod.** `ai-gateway/extproc/adapter.py` runs as
+  `burritbot-extproc` (the name Kyverno's `require-burritbot-sidecar-naming`
+  demands) beside each scanner and calls it on `127.0.0.1:8000`. `SCANNER`
+  picks the REST contract. The Services gain an `extproc` port, 50051,
+  which the policy names. Port 9000 was avoided: the #23 mutation tests
+  use it as the drifted port they must catch. The two ExtProc entries,
+  their order and their buffered bodies are unchanged.
+- **What the adapter does.** It reads the user text from BurritBot's
+  `{"prompt"}` or an OpenAI `{"messages"}` body, and the model text from
+  `{"reply"}` or OpenAI `{"choices"}`. A blocked prompt or reply gets a
+  403 JSON body naming the scanner and its findings. When LLM Guard
+  sanitizes text (Anonymize, Sensitive), the body is rewritten and its
+  content-length set. Responses with no model text (health checks,
+  error details) pass unscanned because there is nothing to scan.
+- **Fail closed.** A request body with no readable user text is a 400.
+  An unreachable scanner, an error status or a reply outside the
+  contract is a 503. Unscanned text never goes through. `failOpen`
+  stays unset (false).
+- **Timeouts.** Envoy's ext_proc `message_timeout` defaults to 200ms,
+  which no scanner meets: NeMo's rails can call Gemini. Each entry now sets
+  `messageTimeout: 10s`. The adapter's `SCANNER_TIMEOUT_SECONDS` is 8, so a
+  slow scanner gets the adapter's explicit 503 rather than Envoy's 500.
+- **New dependencies (2026-10-16):** `envoy-data-plane==2.2.0`
+  (2026-07-21), `betterproto2==0.9.1` and `grpclib==0.4.9`, in the image's
+  `ai-gateway/extproc/requirements.txt` and in the dev group so the
+  static tests run the real adapter. Why: Envoy publishes no Python
+  stubs for ext_proc, and generating them needs the whole Envoy, xds,
+  udpa and validate proto tree. envoy-data-plane ships that tree
+  generated, with a grpclib `ExternalProcessorBase`. betterproto2 is
+  pinned at 0.9.1 because envoy-data-plane 2.2.0 needs `<0.10`. OSV
+  listed no advisory for any of these versions, or for h2 4.4.1 or
+  protobuf 7.36.2, on 2026-10-16. httpx stays at the existing 0.28.1 pin.
+
+Tests: `tests/test_guardrails_extproc.py` resolves each ExtProc backend
+through its Service to the container behind it and requires the adapter
+there. Mutation tests point an entry back at port 8000, drop the timeout,
+set it under the adapter's and turn failOpen on. A real in-process gRPC
+round trip shows the adapter refusing with a 503 when the scanner is down
+and a 400 when the body is unreadable. The live tests port-forward to
+each sidecar and expect the salsa prompt refused with a 403.
+
+Not verified here: nothing has run on a cluster (#18). The image
+`burritbot-extproc:0.1.0` is not built or pushed; this run had no Docker
+access. The adapter targets the REST contracts as documented, and the
+scanner Deployments themselves have unverified gaps, which are raised as
+follow-ups.

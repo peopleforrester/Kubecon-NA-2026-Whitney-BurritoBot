@@ -73,7 +73,7 @@ BODY_MODES = {"Streamed", "Buffered", "BufferedPartial", "FullDuplexStreamed"}
 EXTPROC_TARGET_KINDS = {"Gateway", "HTTPRoute", "GRPCRoute", "UDPRoute", "TCPRoute", "TLSRoute"}
 
 # The guardrails scanners, in filter-chain order.
-EXPECTED_EXTPROC_BACKENDS = [("nemo-guardrails", 8000), ("llm-guard", 8000)]
+EXPECTED_EXTPROC_BACKENDS = [("nemo-guardrails", 50051), ("llm-guard", 50051)]
 
 # Docs that pin the Envoy AI Gateway release this manifest needs.
 AI_GATEWAY_FLOOR = "0.6"
