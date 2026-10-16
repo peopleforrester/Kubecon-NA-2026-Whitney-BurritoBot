@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.manifest_graph import kustomized_paths, load_manifests
 
 
 DASHBOARDS_DIR = PROJECT_ROOT / "observability" / "grafana" / "dashboards"
@@ -82,4 +83,15 @@ def test_configmap_embeds_valid_dashboard_json(json_path: Path) -> None:
     source = json.loads(json_path.read_text())
     assert parsed.get("uid") == source.get("uid"), (
         f"embedded uid != source uid for {json_path.name}"
+    )
+
+
+@pytest.mark.parametrize("json_path", JSON_FILES, ids=lambda p: p.name)
+@pytest.mark.static
+def test_configmap_is_synced_by_an_application(json_path: Path) -> None:
+    """The sidecar only imports ConfigMaps that reach the cluster (#87)."""
+    cm_path = str(_configmap_for(json_path).relative_to(PROJECT_ROOT))
+    synced = kustomized_paths(PROJECT_ROOT, load_manifests(PROJECT_ROOT))
+    assert cm_path in synced, (
+        f"{cm_path} is rendered by no ArgoCD-synced kustomization, so Grafana never loads it"
     )
