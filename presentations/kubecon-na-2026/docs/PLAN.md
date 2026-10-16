@@ -1,4 +1,4 @@
-# Full Plan — burritbot (Can Your Chatbot Run kubectl?)
+# Full Plan — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 
 Execution plan for the KubeCon NA 2026 demo platform. The authoritative spec
 is `BUILD-INSTRUCTIONS.md` (preserved verbatim with a preamble noting the two
@@ -9,7 +9,7 @@ do, in what order, with what reuse, and what decisions remain open.
 
 ## 1. Talk Framing
 
-- **Title:** "Can Your Chatbot Run kubectl? Guardrails for LLMs on Kubernetes"
+- **Title:** "BurritoBot Said Let's Dance, the Platform Said No"
 - **Event:** KubeCon NA 2026, Salt Lake City
 - **Speakers:** Whitney Lee and Michael Forrester
 - **Duration:** ~30 minutes (demo runs in ≤25, leaving ~5 for Q&A)

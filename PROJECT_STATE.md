@@ -31,20 +31,20 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  248 passed, 16 deselected after the #27 Portland carry-forward
-  checks
+  253 passed, 16 deselected after the #33 accepted-talk-title checks
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16T11:01:07Z · init-state migrated pre-lifecycle file → Phase 3.3
 - 2026-10-16 · #27 Portland carry-forward: PORTLAND-CARRY-FORWARD.md + runbook Night Before / rule-on-screen / Measurements; 248 static green
+- 2026-10-16 · #33 accepted talk title replaces the old working title repo-wide; 253 static green
 
 ---
 
 _Everything below this line is the pre-lifecycle body, preserved
 verbatim by the migration._
 
-# Project State — burritbot (Can Your Chatbot Run kubectl?)
+# Project State — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 
 ## PAUSED — 2026-08-26
 
@@ -61,7 +61,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 248 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27). Zero open Dependabot alerts, zero open PRs.
+- 253 static tests green (203 at pause; +3 for #22; +4 for #23; +9 for #24; net +23 for #26; +6 for #27; +5 for #33). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -204,7 +204,9 @@ commit.
   event, and the runbook provisions the night before, puts existing rule
   files on screen in Act 2, keeps Act 1 to the canonical prompts, and
   has a Measurements record
-- **Total: 248 static tests green. Live tests skip cleanly when
+- Accepted talk title (5), #33: no file carries the old working title,
+  and every file that names the talk carries the accepted one
+- **Total: 253 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
