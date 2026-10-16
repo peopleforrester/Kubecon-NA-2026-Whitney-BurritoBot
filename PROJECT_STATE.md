@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 409 passed, 32 deselected after the
-  #61 skip-path removal
+  (ruff check, then static suite) 416 passed, 32 deselected after the
+  #63 live-fixture probes
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -61,6 +61,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #67 guarded traffic takes its gateway routes: EnvoyProxy pins the proxy Service (`burritbot-ai-gateway.envoy-gateway-system`, ClusterIP); the frontend sends Host `burritbot.burritbot.local` so `burritbot-audience` matches; guarded BurritBot posts OpenAI chat completions to the gateway (AIGatewayRoute → vertex-ai-gemini) instead of calling Vertex; the guarded egress lock admits the proxy pods; 379 static green
 - 2026-10-16 · #68 gateway controllers installed by ArgoCD: `envoy-gateway` (gateway-helm v1.9.2, Gateway API + EG CRDs, AI Gateway extension manager), `ai-gateway-crds` and `ai-gateway-controller` (v1.2.0, webhook on 10250 with a cert-manager cert, MCP seed kept out of Git), GatewayClass `envoy-ai-gateway`, namespaces `envoy-gateway-system` / `envoy-ai-gateway-system`; `ai-gateway` moves to wave 3; GKE-managed Gateway API is now an incompatible pair; 409 static green
 - 2026-10-16 · #61 no skip paths: the last exit-as-skip (Prometheus rules-map early return) now asserts; the Phase C5 plan no longer lets the Colang test skip; live fixtures and Terraform checks already fail naming what is missing (#62); the E2E command exits non-zero with 0 skipped on a bare host; 409 static green
+- 2026-10-16 · #63 live fixtures proven loud: a subprocess probe requests each kubeconfig and GCP client fixture with no kubeconfig and no ADC and sees a setup error, a non-zero exit and the command that fixes it (`gcloud container clusters get-credentials` or `gcloud auth application-default login`); 416 static green
 
 ---
 
@@ -303,7 +304,10 @@ commit.
   cert-manager; the MCP seed is neither committed nor reminted; waves
   put the controllers before `ai-gateway`; GKE-managed Gateway API CRDs
   and the gateway-helm copy are an incompatible pair
-- **Total: 409 static tests green. Live tests fail loudly when
+- Live fixtures fail loudly (7), #63: each cluster and GCP client
+  fixture errors in a probe run with no kubeconfig and no ADC, the
+  probe exits non-zero, and the message names the command that fixes it
+- **Total: 416 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

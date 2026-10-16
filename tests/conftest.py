@@ -60,7 +60,11 @@ def _load_kubeconfig() -> None:
     try:
         config.load_kube_config()
     except config.ConfigException as exc:
-        pytest.fail(f"kubeconfig not loaded; live cluster fixtures need one: {exc}")
+        pytest.fail(
+            "kubeconfig not loaded; live cluster fixtures need one. Run "
+            "`gcloud container clusters get-credentials` for the demo cluster "
+            f"before `pytest -m live`: {exc}"
+        )
 
 
 @pytest.fixture(scope="session")
