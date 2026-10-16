@@ -6,10 +6,6 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-import shutil
-import socket
-import subprocess
-import time
 import urllib.request
 from collections.abc import Callable, Iterator
 
@@ -17,6 +13,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.kubectl_helpers import port_forward
 
 
 def _load_adapter():
@@ -244,38 +241,12 @@ def test_mutation_microservice_drift_is_caught(mutate: Callable[[dict], None], e
 # --- live: the microservice serves the burritbot config ---------------------
 
 
-def _closed_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 @pytest.fixture
 def forwarded_microservice() -> Iterator[int]:
     """kubectl port-forward to the nemo-guardrails Service's http port. Needs kubectl and the cluster."""
-    kubectl = shutil.which("kubectl")
-    assert kubectl, "kubectl is not on PATH; the live microservice check port-forwards with it"
     remote = next(p["port"] for p in _service(_docs())["spec"]["ports"] if p["name"] == "http")
-    local = _closed_port()
-    proc = subprocess.Popen(
-        [kubectl, "-n", NAMESPACE, "port-forward", f"svc/{SCANNER}", f"{local}:{remote}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    try:
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            assert proc.poll() is None, f"port-forward exited: {proc.stdout.read().decode()}"
-            with socket.socket() as s:
-                if s.connect_ex(("127.0.0.1", local)) == 0:
-                    break
-            time.sleep(0.5)
-        else:
-            raise AssertionError(f"port-forward to svc/{SCANNER}:{remote} never opened")
+    with port_forward(NAMESPACE, SCANNER, remote) as local:
         yield local
-    finally:
-        proc.terminate()
-        proc.wait(timeout=10)
 
 
 @pytest.mark.live

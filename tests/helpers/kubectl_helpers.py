@@ -5,8 +5,12 @@ from __future__ import annotations
 
 import re
 import shutil
+import socket
 import subprocess
 import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 
 def kubectl_available() -> bool:
@@ -91,6 +95,35 @@ def apply_manifest(path: str, namespace: str | None = None) -> str:
     """Apply a Kubernetes manifest file and return stdout."""
     args = ["apply", "-f", path]
     return run_kubectl(args, namespace=namespace).stdout
+
+
+@contextmanager
+def port_forward(namespace: str, service: str, remote_port: int, timeout: float = 20) -> Iterator[int]:
+    """kubectl port-forward to a Service port; yields the local port. Fails when kubectl or the Service is missing."""
+    kubectl = shutil.which("kubectl")
+    assert kubectl, f"kubectl is not on PATH; the live check port-forwards to svc/{service} with it"
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        local = s.getsockname()[1]
+    proc = subprocess.Popen(
+        [kubectl, "-n", namespace, "port-forward", f"svc/{service}", f"{local}:{remote_port}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    try:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            assert proc.poll() is None, f"port-forward exited: {proc.stdout.read().decode()}"
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", local)) == 0:
+                    break
+            time.sleep(0.5)
+        else:
+            raise AssertionError(f"port-forward to svc/{service}:{remote_port} never opened")
+        yield local
+    finally:
+        proc.terminate()
+        proc.wait(timeout=10)
 
 
 def delete_manifest(

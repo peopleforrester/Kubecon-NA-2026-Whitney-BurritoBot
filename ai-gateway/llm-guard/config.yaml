@@ -1,93 +1,100 @@
-# ABOUTME: LLM Guard 0.3.17+ scanner config — both input and output scanners are populated.
-# ABOUTME: Loaded by the llm-guard container in the burritbot-net gateway pod.
+# ABOUTME: llm-guard-api 0.3.16 scanner config (CONFIG_FILE): input and output scanners, each a type plus params.
+# ABOUTME: Loaded by the llm-guard container in the burritbot-net gateway pod; schema is the API's app/config.py.
 ---
+# Keys outside the API's schema are dropped unread, and each scanner's params
+# are passed to its llm_guard 0.3.16 constructor, so an unknown param stops
+# the API at startup. tests/test_llm_guard_api_image.py holds both.
 app:
-  name: burritbot-llm-guard
-  namespace: burritbot-net
+  # The OTel service.name; the API builds its resource from this, not OTEL_SERVICE_NAME.
+  name: llm-guard
   log_level: INFO
+  log_json: true
+  # Load every scanner before uvicorn listens, so a Ready pod can scan. Lazy
+  # loading would build them on the first audience prompt, past the adapter's
+  # timeout, once per concurrent request.
+  lazy_load: false
 
-cache:
-  # Redis is optional in the demo; in-memory is fine at rehearsal scale.
-  type: memory
-  ttl_seconds: 300
+# No auth block: the burritbot-extproc adapter on 127.0.0.1 sends no credentials.
+
+# OTLP/HTTP; with no endpoint here the exporters read OTEL_EXPORTER_OTLP_ENDPOINT.
+tracing:
+  exporter: otel_http
+metrics:
+  exporter: otel_http
 
 input_scanners:
   - type: PromptInjection
-    enabled: true
-    threshold: 0.85
-    model: ProtectAI/deberta-v3-base-prompt-injection-v2
+    # The API always loads ProtectAI/deberta-v3-base-prompt-injection-v2 (ONNX).
+    params:
+      threshold: 0.85
   - type: TokenLimit
-    enabled: true
-    max_tokens: 1024
-    encoding: cl100k_base
+    params:
+      limit: 1024
+      encoding_name: cl100k_base
   - type: BanTopics
     # Act 1 of the demo invites audience members to submit lighthearted
     # off-topic prompts (dance moves, party planning, karaoke). BanTopics
     # is the second line of defense behind the burrito-only Colang rail —
     # it catches paraphrases the rail misses with zero-shot classification.
-    enabled: true
-    threshold: 0.6
-    topics:
-      - dancing
-      - parties
-      - karaoke
-      - coding
-      - politics
-      - medical advice
-      - legal advice
-      - financial advice
+    params:
+      threshold: 0.6
+      topics:
+        - dancing
+        - parties
+        - karaoke
+        - coding
+        - politics
+        - medical advice
+        - legal advice
+        - financial advice
   - type: BanSubstrings
-    enabled: true
-    match_type: word
-    case_sensitive: false
-    substrings:
-      - "ignore previous"
-      - "system prompt"
-      - "jailbreak"
-      - "developer mode"
-      - "roleplay as"
+    params:
+      match_type: word
+      case_sensitive: false
+      substrings:
+        - "ignore previous"
+        - "system prompt"
+        - "jailbreak"
+        - "developer mode"
+        - "roleplay as"
   - type: Language
-    enabled: true
-    valid_languages:
-      - en
-    threshold: 0.6
+    params:
+      valid_languages:
+        - en
+      threshold: 0.6
   - type: Anonymize
-    enabled: true
-    hidden_names:
-      - CHIPOTLE_EMPLOYEE
-    entity_types:
-      - CREDIT_CARD
-      - US_SSN
-      - EMAIL_ADDRESS
-      - PHONE_NUMBER
+    params:
+      hidden_names:
+        - CHIPOTLE_EMPLOYEE
+      entity_types:
+        - CREDIT_CARD
+        - US_SSN
+        - EMAIL_ADDRESS
+        - PHONE_NUMBER
 
 output_scanners:
   - type: NoRefusal
-    enabled: true
-    threshold: 0.7
+    params:
+      threshold: 0.7
   - type: Regex
-    enabled: true
-    # Use double-escaped backslashes — YAML strips one layer.
-    patterns:
-      - "(?i)system\\s*prompt"
-      - "(?i)ignore\\s+(all|the|previous)\\s+instructions"
-      - "(?i)you\\s+are\\s+now"
-    is_blocked: true
+    params:
+      # Use double-escaped backslashes — YAML strips one layer.
+      patterns:
+        - "(?i)system\\s*prompt"
+        - "(?i)ignore\\s+(all|the|previous)\\s+instructions"
+        - "(?i)you\\s+are\\s+now"
+      is_blocked: true
   - type: Sensitive
-    enabled: true
-    entity_types:
-      - CREDIT_CARD
-      - US_SSN
-      - EMAIL_ADDRESS
-      - PHONE_NUMBER
-    redact: true
+    params:
+      entity_types:
+        - CREDIT_CARD
+        - US_SSN
+        - EMAIL_ADDRESS
+        - PHONE_NUMBER
+      redact: true
   - type: Bias
-    enabled: true
-    threshold: 0.8
+    params:
+      threshold: 0.8
   - type: MaliciousURLs
-    enabled: true
-    threshold: 0.8
-
-telemetry:
-  otel_endpoint: http://otel-collector.monitoring.svc.cluster.local:4317
-  emit_gen_ai_attributes: true
+    params:
+      threshold: 0.8

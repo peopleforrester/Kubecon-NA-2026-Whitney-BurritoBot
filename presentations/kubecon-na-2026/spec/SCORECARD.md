@@ -67,7 +67,7 @@ that lie.
 | CNCF Project | Layer | Version | Status | Notes |
 |--------------|-------|---------|--------|-------|
 | NeMo Guardrails | The Net | 0.11+ | RED | Four Colang rails |
-| LLM Guard | The Net | 0.3.17+ | RED | Input + output scanners |
+| LLM Guard | The Net | 0.3.16 | RED | Input + output scanners |
 | Envoy AI Gateway | The Net | 0.6+ | RED | Gateway API v1.4+ (BackendTLSPolicy v1) |
 
 ### Phase 6 — Application
