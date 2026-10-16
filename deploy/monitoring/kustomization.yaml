@@ -7,10 +7,12 @@ kind: Kustomization
 # LoadRestrictionsRootOnly refuses a file outside this directory (#76).
 resources:
   - ../../security/eso/grafana-admin
+  - ../../observability/grafana/dashboards
 
 # Note: kube-prometheus-stack, otel-collector, loki, tempo, promtail are not
 # referenced here — they ship as standalone ArgoCD Applications under
 # gitops/apps/ (B3, B4, B6) and are picked up by the recursive root app-of-apps.
 # This wrapper is for namespace-scoped resources that complement those charts:
-# ExternalSecrets, ConfigMap-wrapped Grafana dashboards (TODO Phase C),
+# ExternalSecrets, the ConfigMap-wrapped Grafana dashboards the sidecar
+# imports (label grafana_dashboard, gitops/apps/prometheus.yaml), and
 # PodMonitor/ServiceMonitor extras (TODO Phase C).

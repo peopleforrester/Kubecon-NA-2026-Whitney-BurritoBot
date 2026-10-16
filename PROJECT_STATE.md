@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 542 passed, 46 deselected after the
-  #82 delivery overlays (question 152)
+  (ruff check, then static suite) 545 passed, 46 deselected after the
+  #87 Grafana dashboard sync
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -75,6 +75,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #85 skip paths outside conftest.py: the four the issue names were already gone (the terraform fail in #62/#84, the scripts/ assert and the plain nemoguardrails import in 7f2d773, the asserted Prometheus rules map in ead6cd3); a sweep of tests/ found one more silent pass, the ArgoCD path test returning early for 13 Helm-source Applications, now split into path-source cases that resolve the dir and chart-source cases that assert repoURL and an exact chart version; 520 static green
 - 2026-10-16 · #82 unguarded Vertex AI calls carry `burritbot-io_owner` and `burritbot-io_delivery` (from `BURRITBOT_DELIVERY`; unset or invalid is a 502 naming it); the guarded path's equivalents found (AIServiceBackend `bodyMutation` after the gateway's translation, `ChatVertexAI` `labels` via NeMo model `parameters`), both needing the slug as a manifest literal; where the slug lives waits for Michael; 531 static green
 - 2026-10-16 · #82 question 152 (decided by hecaton's research under Michael's standing rules): the delivery slug lives in kustomize overlays under `presentations/kubecon-na-2026/deploy/{burritbot,ai-gateway}`, which the ArgoCD `burritbot` and `ai-gateway` Applications now sync; they set `BURRITBOT_DELIVERY`, the AIServiceBackend labels `bodyMutation` and both NeMo `vertexai` models' labels; the platform base carries a placeholder too long to be a label value; the Vertex AI Cost row query filters by `burritbot-io_delivery`; 542 static green
+- 2026-10-17 · #87 Grafana dashboards reach the cluster: `observability/grafana/dashboards/kustomization.yaml` lists the three dashboard ConfigMaps and `deploy/monitoring` references that directory (no TODO left for them); a static test holds each dashboard ConfigMap to a file an ArgoCD-synced kustomization renders; 545 static green
 
 ---
 
@@ -342,7 +343,7 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 542 static tests green. Live tests fail loudly when
+- **Total: 545 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
@@ -410,9 +411,9 @@ them up without re-discovering them.
   then NeMo Guardrails (C2), LLM Guard (C3) and the Vertex AI backend
   (#24) are wired into `deploy/ai-gateway/`, and the OTel Collector and
   Falco ship as their own Helm Applications under `gitops/apps/` (B4,
-  B5). Still open: the Grafana dashboard ConfigMaps exist under
-  `observability/grafana/dashboards/` (C1) but no sync target lists
-  them, and the ServiceMonitor / PodMonitor extras are still TODO in
+  B5). The Grafana dashboard ConfigMaps (C1) sync through
+  `deploy/monitoring` since #87. Still open: the ServiceMonitor /
+  PodMonitor extras are still TODO in
   `deploy/monitoring/kustomization.yaml`.
 - **The `deploy/<x>/` wrapper Applications never run kustomize (#54,
   confirmed against ArgoCD `release-3.3` source).**
