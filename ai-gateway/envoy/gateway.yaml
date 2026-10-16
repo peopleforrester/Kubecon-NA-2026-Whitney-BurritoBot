@@ -76,7 +76,7 @@ spec:
       extProc:
         backendRef:
           name: nemo-guardrails
-          port: 9000
+          port: 8000
         processingMode:
           requestBody: BUFFERED
           responseBody: BUFFERED
@@ -84,7 +84,7 @@ spec:
       extProc:
         backendRef:
           name: llm-guard
-          port: 9100
+          port: 8000
         processingMode:
           requestBody: BUFFERED
           responseBody: BUFFERED

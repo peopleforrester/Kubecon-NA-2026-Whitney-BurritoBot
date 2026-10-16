@@ -31,7 +31,7 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  206 passed, 16 deselected after the #22 fix (Dataplane V2 / Calico)
+  210 passed, 16 deselected after the #23 fix (gateway ExtProc ports)
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -59,7 +59,7 @@ Do not resume work here without Michael saying so.
 ### State at the pause
 - Branch `staging`, working tree clean, `staging` and `main` both in
   sync with origin. Nothing unpushed, nothing stashed.
-- 206 static tests green (203 at pause; +3 for #22). Zero open Dependabot alerts, zero open PRs.
+- 210 static tests green (203 at pause; +3 for #22; +4 for #23). Zero open Dependabot alerts, zero open PRs.
 - **Nothing has ever run on a cluster.** No GCP resources exist; the
   Terraform state bucket created in June was deleted in the same
   session, verified empty.
@@ -185,7 +185,8 @@ commit.
 - Phase D (GCP live prereqs) — D1 tf gcs backend (4) + D2 tf private cluster (5) + D3 teardown guard (3) — **offline portion complete**
 - D4 tf dataplane: Dataplane V2 with no legacy Calico blocks (3), closes #22
 - ESO controller GSA + WIF binding wired into iam.tf (5)
-- **Total: 206 static tests green. Live tests skip cleanly when
+- Gateway backendRef ports match their Services (4), closes #23
+- **Total: 210 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
