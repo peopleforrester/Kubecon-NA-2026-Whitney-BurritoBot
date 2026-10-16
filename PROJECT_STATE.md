@@ -31,7 +31,8 @@ path in the "PAUSED" section below: `#17 → #22 / #23 / #24 → #18 → #20`.
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local static suite
-  210 passed, 16 deselected after the #23 fix (gateway ExtProc ports)
+  236 passed, 16 deselected after the #26 cross-manifest reference
+  and incompatible-settings checks
 
 ## Phase History
 _(append-only. Each phase transition adds one line, oldest first.)_
@@ -183,10 +184,20 @@ commit.
 - Phase G (Genericize) — G1 move talk artifacts + G2 scrub platform refs + G3 rewrite README/instructions/state + G4 GitHub description + G5 leak test (1) — **complete**
 - Phase C (Greenfield) — C1 grafana dashboard ConfigMaps (13) + C2 nemo-guardrails (10) + C3 llm-guard (10) + C4 ai-gateway wiring (7) + C5 colang parse (4) — **complete**
 - Phase D (GCP live prereqs) — D1 tf gcs backend (4) + D2 tf private cluster (5) + D3 teardown guard (3) — **offline portion complete**
-- D4 tf dataplane: Dataplane V2 with no legacy Calico blocks (3), closes #22
+- D4 tf dataplane: Dataplane V2 enabled (1), closes #22; its Calico
+  exclusions moved to the incompatible-settings registry below
 - ESO controller GSA + WIF binding wired into iam.tf (5)
-- Gateway backendRef ports match their Services (4), closes #23
-- **Total: 210 static tests green. Live tests skip cleanly when
+- Cross-manifest references (23), #26: every backendRef / parentRef /
+  targetRef resolves to a defined object, on a port the Service exposes
+  and a container serves, with ReferenceGrants and listener
+  allowedRoutes honoured; mutation tests inject #23/#24-shaped defects.
+  Replaces the #23 gateway-port test. Known open, tracked in KNOWN_OPEN:
+  #24 (`vertex-ai-gemini` undefined), no ReferenceGrant for the
+  HTTPRoute's cross-namespace backend, and the Gateway listener refusing
+  the HTTPRoute's own namespace
+- Incompatible settings registry (9), #26: Dataplane V2 vs Calico
+  policy / addon, Autopilot vs Falco, each with its reason and mutations
+- **Total: 236 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
