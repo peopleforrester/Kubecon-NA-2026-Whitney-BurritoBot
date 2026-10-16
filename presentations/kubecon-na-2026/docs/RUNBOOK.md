@@ -7,6 +7,37 @@ architecture doc.
 
 ---
 
+## Night Before
+
+Provision the evening before the talk, not the morning of. DevOpsDays
+Portland did this for the Watch It Burn workshop: its fleet peaked at
+479 routed hosts by 05:45 PT and was torn down within three hours of
+close. See
+`PORTLAND-CARRY-FORWARD.md` for what carried over from that delivery.
+
+1. **Bring up the cluster** (Terraform rebuild is ~15 minutes):
+   ```bash
+   terraform -chdir=infrastructure/terraform apply
+   ```
+
+2. **Bootstrap ArgoCD once** (the only `kubectl apply` the rules allow):
+   ```bash
+   kubectl apply -f gitops/bootstrap/app-of-apps.yaml
+   ```
+   Wait for the root app to reach `Synced/Healthy`, then run the
+   **Pre-flight** checklist below in full. Everything that fails tonight
+   is a fix; everything that fails at T-60 is a rollback.
+
+3. **Send one canonical prompt down each path** from a phone on cellular
+   data: *teach me some salsa dance moves*. Expect choreography from the
+   unguarded path and a redirect to the menu from the guarded path. Note
+   the result in the **Measurements** record below.
+
+4. **Leave it running.** Do not tear down overnight. Write down the time
+   provisioning started; the Cost row in **Measurements** needs it.
+
+---
+
 ## Pre-flight
 
 Run this checklist T-60 minutes before the talk. Everything here is
@@ -64,6 +95,10 @@ Run this checklist T-60 minutes before the talk. Everything here is
 8. **Audience URL reachable from phones:**
    Hit the audience frontend URL from the venue Wi-Fi before the lights
    come down. The venue NAT often breaks things that passed in rehearsal.
+   The frontend's `10/minute` limit is keyed on the connecting address,
+   and uvicorn runs without proxy headers, so a room of phones behind one
+   NAT or one load balancer shares a single budget. Watch for `429`s in
+   the first minute of Act 1 and record them under **Room network**.
 
 ---
 
@@ -76,9 +111,12 @@ Chipotle incident narration. Audience sees a wide-open BurritBot.
    ./scripts/cast-net.sh status
    ```
 
-2. Narrate the Chipotle chatbot incident. Invite the audience to try to
-   jailbreak BurritBot live. Expected audience behaviour: prompt-injection
-   attempts, off-topic questions, attempts to exfiltrate the system prompt.
+2. Narrate the Chipotle chatbot incident. Invite the audience to send
+   BurritBot the lighthearted off-topic asks from their phones: *teach me
+   some salsa dance moves*, *how do I throw a hot dog party*, *recommend
+   karaoke songs for a wedding*. The unguarded bot writes the
+   choreography. Prompt injection, jailbreak and data extraction are
+   driven by the presenters, never crowdsourced from the room.
 
 3. While the audience plays: pull up the `Cast the Net — Before / After`
    dashboard on the shared screen. The left panel will start lighting up
@@ -130,14 +168,53 @@ Same audience, same prompts — The Net catches the problems.
    - **The Web**: ArgoCD sync status, Gateway API routes, SPIFFE
      identities — the platform scaffolding holding the live demo up.
 
-3. Close the act with the scorecard: pull up `docs/SCORECARD.md` in the
-   browser, talk through what's real vs. aspirational. Do not green-wash.
+3. **Put the rule that fired on screen.** The dashboard proves something
+   was caught; the policy file is the argument of the talk. Show the
+   rule itself, not just the `cast-net.sh` switch:
+   - Audience off-topic asks →
+     `ai-gateway/nemo-guardrails/rails/burrito-only.co` (the `ask off
+     topic` examples are the canonical Act 1 prompts).
+   - Presenter-driven injection and jailbreak →
+     `ai-gateway/nemo-guardrails/rails/jailbreak-detect.co`, then the
+     `PromptInjection` scanner in `ai-gateway/llm-guard/config.yaml`.
+   - Pod admission → `security/kyverno/policies/require-burritbot-labels.yaml`.
+   - Runtime shell escape → `security/falco/rules/burritbot-the-net.yaml`.
+
+4. Close the act with the scorecard: pull up
+   `presentations/kubecon-na-2026/docs/SCORECARD.md` in the browser, talk
+   through what's real vs. aspirational. Do not green-wash.
+
+---
+
+## Measurements
+
+Portland's pacing result was attendee perception, not measurement, and
+nobody wrote down whether the network held or what the delivery cost.
+Fill this record at every full rehearsal and on the day. A stopwatch per
+segment costs nothing and answers what to cut if the slot shrinks. Blank
+cells are unmeasured; do not backfill from memory.
+
+| Segment | Budget | Rehearsal | Day-of | Notes |
+|---|---|---|---|---|
+| Pre-flight | T-60, read-only | — | — | Duration of the checklist, not part of the slot |
+| Act 1 | ≤ 5 min (hard rule) | — | — | |
+| Cast the Net | — | — | — | Command to first block on the dashboard |
+| Act 2 | — | — | — | Include the rule-on-screen walk |
+| Q&A | ~5 min (`PLAN.md`) | — | — | |
+
+| Record | What to capture | Rehearsal | Day-of |
+|---|---|---|---|
+| Real devices | Audience page on at least one iOS Safari and one Android Chrome phone, on venue Wi-Fi and on cellular: loads, no overlapping elements, prompt submits | — | — |
+| Room network | Venue Wi-Fi held for the whole slot (yes / no / when it dropped); count of `429` responses from the per-address rate limit | — | — |
+| Cost | Spend from provisioning start (Night Before) to teardown complete, GKE and Vertex AI separately, from billing export | — | — |
 
 ---
 
 ## Teardown
 
-Post-talk cleanup. Not time-pressured — do it back at the hotel.
+Post-talk cleanup. Finish within three hours of the session closing,
+as Portland did, and write the time teardown completed into the Cost
+row of **Measurements**.
 
 1. Recall traffic and stop any in-flight probes:
    ```bash
