@@ -1,0 +1,22 @@
+# ABOUTME: ReferenceGrant letting the gateway's HTTPRoute in burritbot-net reach the guarded Service.
+# ABOUTME: Without it Gateway API refuses the cross-namespace backendRef and the guarded path has no backend.
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: burritbot-net-to-guarded
+  namespace: burritbot-guarded
+  labels:
+    app.kubernetes.io/name: burritbot
+    app.kubernetes.io/part-of: burritbot
+    burritbot.io/layer: application
+    burritbot.io/guarded: "true"
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: burritbot-net
+  to:
+    - group: ""
+      kind: Service
+      name: burritbot-guarded
