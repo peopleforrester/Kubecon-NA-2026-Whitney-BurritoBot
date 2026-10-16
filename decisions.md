@@ -40,3 +40,30 @@ the workshop platform (terminal auth, browser IDE, notebook tab, Bedrock
 tutor, fleet converge) does not transfer here. Reopen only if Michael
 decides the talk should adopt the workshop's secret-recipe narrative,
 which would amend CLAUDE.md and the CFP first.
+
+## 2026-10-16T14:00:00Z · decision · The gateway listener admits only routes in burritbot-net (issue #26)
+
+The cross-manifest checks added for #26 found that the Gateway
+listener in `ai-gateway/envoy/gateway.yaml` admitted routes only from
+namespaces labelled `burritbot.io/layer: application`, while the one
+route it serves, the `burritbot-audience` HTTPRoute, lives in
+`burritbot-net` (labelled `the-net`). The route was never admitted, so
+the guarded path had no listener.
+
+Two ways to admit it: relabel or reselect so `burritbot-net` matches,
+or move the route into an application namespace. The route cannot
+move: the AIGatewayRoute's `targetRefs` is a local reference, so the
+HTTPRoute it guards must share its namespace. The listener is set to
+`allowedRoutes.namespaces.from: Same`.
+
+`Same` is also the tighter choice. The gateway is the single choke
+point; under the old selector `burritbot-unguarded` and `audience`
+could attach their own routes and claim hostnames on it. Application
+namespaces now reach the gateway only as backends. The guarded
+Service is opened to the route by a ReferenceGrant in
+`burritbot-guarded` (`apps/burritbot/k8s/referencegrant-guarded.yaml`)
+scoped to that one Service and to HTTPRoutes from `burritbot-net`.
+
+Reopen if an application namespace needs to own its own route on this
+gateway; widen the listener to a selector naming that namespace rather
+than all of `burritbot.io/layer: application`.

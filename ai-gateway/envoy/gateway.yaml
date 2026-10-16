@@ -24,12 +24,12 @@ spec:
     - name: http
       protocol: HTTP
       port: 8080
+      # Only routes in burritbot-net attach: the AIGatewayRoute's targetRef
+      # is local, so the HTTPRoute it guards must live here too. Application
+      # namespaces reach the gateway as backends, never as route owners.
       allowedRoutes:
         namespaces:
-          from: Selector
-          selector:
-            matchLabels:
-              burritbot.io/layer: application
+          from: Same
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

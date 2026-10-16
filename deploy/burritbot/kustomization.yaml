@@ -8,5 +8,6 @@ resources:
   - ../../apps/burritbot/k8s/deployment-guarded.yaml
   - ../../apps/burritbot/k8s/service-unguarded.yaml
   - ../../apps/burritbot/k8s/service-guarded.yaml
+  - ../../apps/burritbot/k8s/referencegrant-guarded.yaml
   - ../../apps/burritbot/k8s/serviceaccount-burritbot-unguarded.yaml
   - ../../apps/burritbot/k8s/serviceaccount-burritbot-guarded.yaml
