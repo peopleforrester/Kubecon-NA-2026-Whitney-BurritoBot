@@ -1,5 +1,5 @@
 # ABOUTME: Kyverno ClusterPolicy that generates a NetworkPolicy locking guarded BurritBot egress.
-# ABOUTME: Guarded BurritBot can only reach burritbot-net (the gateway) and kube-system DNS.
+# ABOUTME: Guarded BurritBot can only reach the burritbot-net gateway's proxy pods and DNS.
 ---
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
@@ -12,7 +12,8 @@ metadata:
     policies.kyverno.io/subject: NetworkPolicy
     policies.kyverno.io/description: >-
       Generates a NetworkPolicy in the burritbot-guarded namespace that
-      restricts egress to burritbot-net (the AI gateway) and kube-system DNS
+      restricts egress to the proxy pods of the burritbot-net AI gateway
+      (Envoy Gateway runs them in envoy-gateway-system) and kube-system DNS
       only. If someone deletes the NetworkPolicy by hand, Kyverno re-creates
       it on the next reconcile — guarded BurritBot cannot escape the net.
 spec:
@@ -47,12 +48,14 @@ spec:
               - to:
                   - namespaceSelector:
                       matchLabels:
-                        kubernetes.io/metadata.name: burritbot-net
+                        kubernetes.io/metadata.name: envoy-gateway-system
+                    podSelector:
+                      matchLabels:
+                        gateway.envoyproxy.io/owning-gateway-name: burritbot-ai-gateway
+                        gateway.envoyproxy.io/owning-gateway-namespace: burritbot-net
                 ports:
                   - protocol: TCP
                     port: 8080
-                  - protocol: TCP
-                    port: 443
               - to:
                   - namespaceSelector:
                       matchLabels:

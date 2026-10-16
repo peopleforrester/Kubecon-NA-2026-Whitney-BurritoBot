@@ -47,12 +47,13 @@ spec:
           env:
             - name: MODEL_NAME
               value: gemini-3-pro
-            - name: GOOGLE_CLOUD_PROJECT
-              value: kk-community-projects
-            - name: GOOGLE_CLOUD_LOCATION
-              value: us-west1
             - name: BURRITBOT_GUARDED
               value: "true"
+            # No GOOGLE_CLOUD_* here: guarded BurritBot never calls Vertex. Its
+            # model call goes to the gateway proxy Service (name pinned by the
+            # EnvoyProxy) and matches the AIGatewayRoute, not the audience route.
+            - name: AI_GATEWAY_URL
+              value: http://burritbot-ai-gateway.envoy-gateway-system.svc.cluster.local:8080
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector.monitoring.svc.cluster.local:4317
             - name: OTEL_SERVICE_NAME

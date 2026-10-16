@@ -582,3 +582,50 @@ only because this repo had no `decisions.md` until init-state created
 it in `aeb91f8` on 2026-10-16. #65 closes as already satisfied. The
 #47 rule in AGENTS.md and `tests/test_decision_entries_location.py`
 still catch a stray entry.
+
+## 2026-10-16T16:14:31Z · decision · Guarded traffic enters the gateway by its pinned proxy Service and is split by Host; guarded BurritBot calls Vertex only through the AIGatewayRoute (issue #67)
+
+Three gaps kept guarded traffic off the routes it was meant to take.
+
+- **Proxy Service name.** Envoy Gateway runs the proxy in its controller
+  namespace (`envoy-gateway-system`, the namespace the Terraform WIF
+  binding already names) as `envoy-<ns>-<gateway>-<hash>`. The
+  `burritbot-ai-gateway` EnvoyProxy now sets `envoyService.name:
+  burritbot-ai-gateway` and `type: ClusterIP`, both defined in the
+  EnvoyProxy CRD of Envoy Gateway v1.7.0 and v1.9.2. ClusterIP also
+  stops the default `LoadBalancer` from putting the guarded gateway on
+  an external IP. Callers use
+  `burritbot-ai-gateway.envoy-gateway-system.svc.cluster.local:8080`.
+  Gateway namespace mode was not chosen: it is a controller-wide
+  setting in a chart this repo does not pin.
+- **Routes split by Host.** The audience frontend sends
+  `Host: burritbot.burritbot.local` (`BURRITBOT_GUARDED_HOST`) on the
+  guarded target, so `burritbot-audience` wins. Every other Host falls
+  to the hostname-less HTTPRoute generated from `burritbot-gemini-route`.
+  A path split was not chosen: both routes would share the `*` virtual
+  host. Hostnames on the AIGatewayRoute need AI Gateway v0.7.0, above
+  the 0.6 floor.
+- **Guarded model call.** With `BURRITBOT_GUARDED=true`, `app.py` posts
+  an OpenAI chat completion (`/v1/chat/completions`, `model:
+  gemini-3-pro`, system and user messages, `max_completion_tokens`,
+  all read by the v0.6.0 OpenAI→GCPVertexAI translator) to
+  `AI_GATEWAY_URL`, and reads `choices[0].message.content` and `usage`.
+  A guarded pod without `AI_GATEWAY_URL` fails at startup. The guarded
+  Deployment drops `GOOGLE_CLOUD_*`. Unguarded BurritBot still calls
+  Vertex through google-genai, and both run the same image.
+- **Egress lock.** `restrict-burritbot-network` let guarded BurritBot
+  reach only pods in `burritbot-net`, where no proxy runs. It now admits
+  the pods labelled `gateway.envoyproxy.io/owning-gateway-name:
+  burritbot-ai-gateway` / `owning-gateway-namespace: burritbot-net` in
+  `envoy-gateway-system` on 8080, plus DNS. The unused 443 port is gone.
+- **Dependency.** `httpx==0.28.1` joins `apps/burritbot/requirements.txt`
+  (2026-10-16) for the gateway call. It is already pinned at 0.28.1 in
+  the audience image and the dev group, and google-genai 1.71.0 already
+  installs it, so no new package enters the lock.
+
+`tests/test_guarded_gateway_path.py` holds the three hops to the
+manifests: the frontend URL and the guarded `AI_GATEWAY_URL` against
+the EnvoyProxy, WIF namespace and listener port; the audience Host
+against the route hostnames; and the model in the gateway body against
+the route's `x-ai-eg-model` match. A guarded `/chat` with no Vertex
+project fails on the gateway hop, not on Vertex.
