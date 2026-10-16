@@ -1,6 +1,6 @@
 # Claude Code Build Instructions: burritbot — KubeCon NA 2026 Demo Platform
 
-> **Preserved verbatim as received**, with two small deviations tracked here:
+> **Preserved verbatim as received**, with three small deviations tracked here:
 >
 > 1. **Speaker ordering normalized** to "Whitney Lee and Michael Forrester"
 >    in any descriptions added around this spec (the spec body references the
@@ -18,6 +18,9 @@
 >    removed after 2026-06-24 and must not be reintroduced. The spec text
 >    below still shows the original 1.5-flash string — the *actual*
 >    `apps/burritbot/app.py` file uses `gemini-3-pro`.
+> 3. **Talk title updated** to the accepted title, "BurritoBot Said Let's
+>    Dance, the Platform Said No" (accepted 2026-08-04). The spec body
+>    originally carried the earlier working title.
 >
 > Everything else is verbatim as received. Do not paraphrase when executing
 > phases — reference this file directly. Companion planning / reuse docs
@@ -29,7 +32,7 @@
 
 ## Context for Claude Code
 
-You are building the demo infrastructure for a KubeCon NA 2026 talk called "Can Your Chatbot Run kubectl? Guardrails for LLMs on Kubernetes" co-presented by Michael Forrester and Whitney Lee. The project is named **burritbot** after the ogre-faced spider, whose hunting strategy maps to the architecture: enormous eyes (OTel observability) to see everything coming, and a net actively cast over prey (the enforcement stack catching bad prompts). Whitney Lee's spinybacked-orbweaver handles auto-instrumentation (the eyes). The burritbot stack handles enforcement (the net).
+You are building the demo infrastructure for a KubeCon NA 2026 talk called "BurritoBot Said Let's Dance, the Platform Said No" co-presented by Michael Forrester and Whitney Lee. The project is named **burritbot** after the ogre-faced spider, whose hunting strategy maps to the architecture: enormous eyes (OTel observability) to see everything coming, and a net actively cast over prey (the enforcement stack catching bad prompts). Whitney Lee's spinybacked-orbweaver handles auto-instrumentation (the eyes). The burritbot stack handles enforcement (the net).
 
 The demo has two acts: Act 1 deploys an unguarded chatbot and lets the audience break it. Act 2 layers on the burritbot guardrails stack and shows the same attacks being blocked, logged, and traced.
 
@@ -41,7 +44,7 @@ This repo is forked from the kubeauto-idp codebase (EKS-based). Your job is to c
 
 ```markdown
 # burritbot — KubeCon NA 2026 Demo Platform
-# "Can Your Chatbot Run kubectl? Guardrails for LLMs on Kubernetes"
+# "BurritoBot Said Let's Dance, the Platform Said No"
 
 ## What This Is
 A GKE cluster running a complete AI guardrails demo for a KubeCon talk.

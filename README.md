@@ -62,8 +62,8 @@ build-day plan) live under `presentations/<event>/` so the platform
 itself stays event-neutral. Today:
 
 - `presentations/kubecon-na-2026/` — Whitney Lee and Michael Forrester,
-  KubeCon NA 2026, Salt Lake City. *"Can Your Chatbot Run kubectl?
-  Guardrails for LLMs on Kubernetes."*
+  KubeCon NA 2026, Salt Lake City. *"BurritoBot Said Let's Dance, the
+  Platform Said No."*
 
 Future deliveries get their own sibling subfolder under `presentations/`.
 

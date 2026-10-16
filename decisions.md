@@ -67,3 +67,15 @@ scoped to that one Service and to HTTPRoutes from `burritbot-net`.
 Reopen if an application namespace needs to own its own route on this
 gateway; widen the listener to a selector naming that namespace rather
 than all of `burritbot.io/layer: application`.
+
+## 2026-10-16T16:00:00Z · amendment · Talk title set to the accepted title (issue #33)
+
+Per Michael, 2026-09-30, the talk title in `presentations/kubecon-na-2026/` is "BurritoBot
+Said Let's Dance, the Platform Said No" (accepted 2026-08-04, matching
+`conference-management/events/registry.yaml`). The earlier working
+title is replaced everywhere in the repo, including inside bodies that
+are otherwise kept verbatim: the pre-lifecycle body of
+`PROJECT_STATE.md` (its heading) and the spec body of
+`presentations/kubecon-na-2026/docs/BUILD-INSTRUCTIONS.md` (listed as
+deviation 3 in its preamble). `tests/test_accepted_talk_title.py`
+keeps the old title from coming back.

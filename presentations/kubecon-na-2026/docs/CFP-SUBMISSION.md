@@ -12,7 +12,7 @@
 
 ## Session Title
 
-Can Your Chatbot Run kubectl? Guardrails for LLMs on Kubernetes
+BurritoBot Said Let's Dance, the Platform Said No
 
 ---
 
