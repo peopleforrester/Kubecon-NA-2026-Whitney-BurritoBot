@@ -191,3 +191,25 @@ What it changes:
   `uv run --managed-python --frozen ruff check . && uv run --managed-python --frozen pytest -m static`.
   `tests/test_lint_gate.py` keeps the pin, the explicit rule set and
   the command in place.
+
+## 2026-10-16T23:30:00Z · amendment · The pre-lifecycle body of PROJECT_STATE.md is refreshed (issue #46)
+
+The #21 migration kept the pre-lifecycle body verbatim. That body is
+no longer kept verbatim: #46 edits its stale sections in place, and
+the earlier text stays in git history.
+
+- `## PAUSED — 2026-08-26` becomes `## Open Work`. The pause's end
+  condition (after DevOpsDays Portland, 2026-09-10) has passed. The
+  critical path drops #22, #23 and #24, which are fixed statically,
+  to `#17 → #18 → #20`, and #21 leaves the any-time list.
+- `## Branch & Test Status` (80 passing) is removed; the lifecycle
+  header's `## Branch & Tests` is the one status section and gains the
+  remote line. The `Total: N static tests` line and the Phase 8
+  mentions stay, for `test_critical_fix_a6` and
+  `test_phase_08_hardening`.
+- "this session" labels on the 2026-04-25 senior review are dated.
+  Known gaps C11 and C12 are marked fixed (D1, D2), C13 mitigated
+  (D3), and the deploy-manifest gap narrowed to what is still open.
+- `tests/test_critical_fix_a6_project_state_truthful.py` gains a
+  check that the file has one branch and test status section whose
+  count agrees with the Total line.
