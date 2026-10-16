@@ -140,8 +140,9 @@ Notes:
 FROM python:3.13-slim
 
 WORKDIR /app
+# requirements.txt is uv.lock exported with hashes (scripts/export-image-requirements.sh).
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --no-deps --require-hashes -r requirements.txt
 
 COPY app.py .
 

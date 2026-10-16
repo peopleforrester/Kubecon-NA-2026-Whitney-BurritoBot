@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from conftest import PROJECT_ROOT
+from helpers.image_requirements import requirement_pins
 
 
 BURRITBOT_REQUIREMENTS = PROJECT_ROOT / "apps" / "burritbot" / "requirements.txt"
@@ -39,7 +40,8 @@ def _exact_pins(lines: list[str]) -> dict[str, str]:
 
 
 def _requirements(path: Path) -> dict[str, str]:
-    return _exact_pins(path.read_text(encoding="utf-8").splitlines())
+    # The image files are `uv export` output (#78): pins carry hashes and markers.
+    return requirement_pins(path)
 
 
 def _image_pins() -> dict[str, str]:

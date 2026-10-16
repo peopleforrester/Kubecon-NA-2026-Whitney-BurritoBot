@@ -41,6 +41,35 @@ known-first-party = ["conftest", "helpers"]
 lines-after-imports = 2
 
 [dependency-groups]
+# One group per container image (#78). The groups resolve together with
+# dev in uv.lock, and each image's requirements.txt is `uv export` of its
+# group with hashes (scripts/export-image-requirements.sh), so pip installs
+# the locked transitive set instead of resolving one at docker build time.
+image-burritbot = [
+    "fastapi==0.135.3",
+    "google-genai==1.71.0",
+    "httpx==0.28.1",
+    "opentelemetry-api==1.41.0",
+    "opentelemetry-exporter-otlp==1.41.0",
+    "opentelemetry-instrumentation-fastapi==0.62b0",
+    "opentelemetry-sdk==1.41.0",
+    "pydantic==2.12.5",
+    "uvicorn[standard]==0.44.0",
+]
+image-audience-frontend = [
+    "fastapi==0.135.3",
+    "httpx==0.28.1",
+    "pydantic==2.12.5",
+    "qrcode==8.2",
+    "slowapi==0.1.9",
+    "uvicorn[standard]==0.44.0",
+]
+image-extproc = [
+    "betterproto2==0.9.1",
+    "envoy-data-plane==2.2.0",
+    "grpclib==0.4.9",
+    "httpx==0.28.1",
+]
 dev = [
     "betterproto2==0.9.1",
     "envoy-data-plane==2.2.0",

@@ -14,7 +14,8 @@ and guarded BurritBot paths.
   FastAPI, enforces a 10/minute per-IP rate limit (slowapi or a small
   hand-rolled dependency), references both `burritbot-unguarded` and
   `burritbot-guarded` upstream targets
-- `apps/audience-frontend/backend/requirements.txt`
+- `apps/audience-frontend/backend/requirements.txt` — `uv export` of
+  the `image-audience-frontend` group in uv.lock, pinned with hashes
 - `apps/audience-frontend/backend/Dockerfile`
 - `apps/audience-frontend/static/` — single-page frontend (HTML + JS)
   with a chat box and a QR code generator

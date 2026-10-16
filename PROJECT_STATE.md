@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 474 passed, 41 deselected after the
-  #60 cold-read schedule check
+  (ruff check, then static suite) 519 passed, 44 deselected after the
+  #78 image dependency lock
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -69,6 +69,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #75 readiness against the accepted abstract (Sessionize 1249553, talks-knowledge#12): `presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md` rates the nine checklist points, 2 READY-STATIC, 4 PARTIAL, 3 MISSING (MCP server, GenAI observability, recorded fallback); not ready; CFP-SUBMISSION.md header says it is a draft; 471 static green
 - 2026-10-16 · #70 live fixtures: the k8s, GCP and Terraform skips the issue names were already gone (#61, #62); the installed-CRD schema checks (`tests/helpers/crd_schema.py` `installed_schema`, used by the AI Gateway route and Gateway API floor tests), the CRD presence check and the deployed audience page check now take the shared `k8s_apiextensions_v1` (new, probed like the other #63 fixtures) / `k8s_core_v1` fixtures instead of loading kubeconfig themselves, so every live test on a bare host fails naming kubeconfig, ADC or terraform; 0 skipped; 472 static green
 - 2026-10-16 · #60 cold read confirmed (question 130, decided by Michael): Whitney reads on 2026-10-26, paper-read check 2026-10-23; PORTLAND-CARRY-FORWARD.md, PLAN.md and the critical path updated, test pins the date, reader and check, ABSTRACT-READINESS.md takes the new paper-read date; 474 static green
+- 2026-10-16 · #78 images install from uv.lock: `image-burritbot`, `image-audience-frontend` and `image-extproc` dependency groups resolve with dev; each image's requirements.txt is `uv export` of its group with hashes (scripts/export-image-requirements.sh) and the Dockerfiles run `pip install --no-deps --require-hashes`; shared resolution moves dev to the images' pydantic 2.12.5, protobuf 6.33.6 and kubernetes 36.0.3; 519 static green
 
 ---
 
@@ -328,7 +329,14 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 474 static tests green. Live tests fail loudly when
+- Image dependency lock (22), #78: every Dockerfile is a known image
+  whose requirements.txt equals `uv export` of its `image-*` group,
+  every requirement is hashed and at its uv.lock version, starlette,
+  anyio, urllib3 and protobuf are pinned in the images that pull them
+  in, and the one pip install runs with --no-deps --require-hashes; a
+  live test installs each file into a clean Python 3.13 venv from PyPI
+  and runs `pip check`
+- **Total: 519 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

@@ -18,7 +18,9 @@ RUN apt-get update \
 WORKDIR /app/backend
 
 COPY --chown=audience:audience backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+# requirements.txt is uv.lock exported with hashes (scripts/export-image-requirements.sh):
+# every transitive package is pinned there, so pip checks hashes and resolves nothing.
+RUN pip install --no-cache-dir --no-deps --require-hashes -r /app/backend/requirements.txt
 
 # main.py finds the page at ../static, the same layout as the repo.
 COPY --chown=audience:audience backend/main.py /app/backend/main.py

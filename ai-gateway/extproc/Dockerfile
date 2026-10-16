@@ -16,7 +16,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --chown=burritbot:burritbot requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# requirements.txt is uv.lock exported with hashes (scripts/export-image-requirements.sh):
+# every transitive package is pinned there, so pip checks hashes and resolves nothing.
+RUN pip install --no-cache-dir --no-deps --require-hashes -r /app/requirements.txt
 
 COPY --chown=burritbot:burritbot adapter.py /app/adapter.py
 

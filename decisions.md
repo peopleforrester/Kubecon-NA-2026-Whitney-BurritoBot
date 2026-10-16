@@ -1020,3 +1020,51 @@ place. An Application on a kustomization path may not set
 its root unless `kustomize.buildOptions` relaxes the restrictor. If (A) is
 ever chosen, that test lets the relaxation through, and it is the only
 change the test allows.
+## 2026-10-16T19:53:01Z · decision · Each image installs a hashed requirements file exported from uv.lock (issue #78)
+
+Before this change, the BurritBot, audience-frontend and burritbot-extproc
+Dockerfiles ran `pip install -r requirements.txt` on files that pinned
+only the top-level packages. pip resolved starlette, anyio, urllib3,
+protobuf and the rest of the transitive set at `docker build` time. So
+the #39 advisory guard and the #55 pin check covered the dev lock, not
+what shipped, and two builds of one commit could differ. The extproc
+image (#66) had the same pattern, and this change covers it too.
+
+Issue #78 offered two options. This run combined them: hashed, fully
+pinned requirements, generated from uv.lock.
+
+- Each image's top-level pins move into a `pyproject.toml` dependency
+  group: `image-burritbot`, `image-audience-frontend` and
+  `image-extproc`. The versions are unchanged. uv resolves these groups
+  together with `dev` in the one uv.lock, so each package has one
+  locked version (a static test fails if the lock forks a package).
+  That keeps #39's checks valid for every image.
+- `scripts/export-image-requirements.sh` writes each requirements.txt
+  as `uv export --frozen --only-group <group> --no-emit-project`. Every
+  package is pinned and carries its sha256 hashes from the lock.
+- The Dockerfiles run `pip install --no-cache-dir --no-deps
+  --require-hashes`. pip checks hashes and resolves nothing.
+- `tests/test_image_dependency_lock.py` (static) checks four things:
+  every Dockerfile is a known image, each requirements.txt equals a
+  fresh `uv export` of its group, every installed version is the
+  uv.lock version, and the install line carries both flags. Its live
+  test installs each file into a clean Python 3.13 venv from PyPI and
+  runs `pip check`, which proves the exported set is complete.
+
+Dependencies: uvicorn 0.44.0, opentelemetry-exporter-otlp 1.41.0 and
+their transitive packages (uvloop, httptools, watchfiles, python-dotenv,
+websockets and the OTLP proto/grpc/http exporters) enter uv.lock. They
+are not new to the project, because the images already installed them.
+The images pin pydantic 2.12.5, and a shared resolution holds dev to
+the same version. Three dev packages therefore move. pydantic goes from
+2.14.1 to 2.12.5, and pydantic-core from 2.50.1 to 2.41.5.
+protobuf goes from 7.36.2 to 6.33.6, because opentelemetry-proto 1.41.0
+requires protobuf<7. The kubernetes client goes from 37.0.1 back to
+36.0.3, because 37.x requires pydantic>=2.13.5. The kubernetes client
+serves only the live test fixtures, and the CoreV1, AppsV1,
+CustomObjects, NetworkingV1, RbacAuthorizationV1 and kubeconfig APIs
+they use exist in 36.x. As a result, the static suite now runs the app
+code on the pydantic and protobuf releases the images ship. Moving
+kubernetes back to 37 means bumping the images' pydantic pin. That is a
+runtime change, and it is left until after the November delivery, under
+the same reasoning as #55.
