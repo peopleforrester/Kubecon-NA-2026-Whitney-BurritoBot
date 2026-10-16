@@ -154,7 +154,7 @@ def test_frontend_sends_the_audience_host_on_the_guarded_target(
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-guarded")
     monkeypatch.delenv("BURRITBOT_GUARDED_HOST", raising=False)
     frontend = _load(FRONTEND_MAIN, "audience_frontend_main_guarded_host")
-    url, headers = frontend._resolve_target()
+    url, headers, _ = frontend._resolve_target()
     assert url == frontend.BURRITBOT_GUARDED_URL
     assert headers.get("Host") in _audience_hostnames(), (
         f"guarded request Host is {headers.get('Host')!r}; {AUDIENCE_ROUTE} matches "
@@ -166,7 +166,7 @@ def test_frontend_sends_the_audience_host_on_the_guarded_target(
 def test_frontend_unguarded_target_keeps_its_own_host(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BURRITBOT_TARGET", "burritbot-unguarded")
     frontend = _load(FRONTEND_MAIN, "audience_frontend_main_unguarded_host")
-    url, headers = frontend._resolve_target()
+    url, headers, _ = frontend._resolve_target()
     assert url == frontend.BURRITBOT_UNGUARDED_URL
     assert "Host" not in headers
 

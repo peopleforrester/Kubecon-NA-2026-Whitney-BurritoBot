@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 595 passed, 51 deselected after the
-  #91 llm-guard-api 0.3.16 alignment
+  (ruff check, then static suite) 604 passed, 51 deselected after the
+  #92 guarded timeout budget
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -78,6 +78,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #87 Grafana dashboards reach the cluster: `observability/grafana/dashboards/kustomization.yaml` lists the three dashboard ConfigMaps and `deploy/monitoring` references that directory (no TODO left for them); a static test holds each dashboard ConfigMap to a file an ArgoCD-synced kustomization renders; 545 static green
 - 2026-10-17 · #90 nemo-guardrails Deployment checked against NVIDIA's 25.07 microservice docs and OpenAPI (NGC refuses anonymous pulls, so not the image): it listens on `GUARDRAILS_PORT` 7331 (was 8000, the open-source server's), serves config id `burritbot` from `CONFIG_STORE_PATH=/config-store` with `config.yml` and `rails/` under `/config-store/burritbot/` (was `NEMO_GUARDRAILS_CONFIG_PATH=/config`, which it does not read), `DEFAULT_CONFIG_ID=burritbot`, probes on `/v1/health` (was `/v1/rails/configs`); the Service's http port and the adapter's `SCANNER_URL` move to 7331; `tests/test_nemo_guardrails_microservice.py` holds the contract with mutation cases and a live checks call; 560 static green
 - 2026-10-17 · #91 llm-guard Deployment checked against the `laiyer/llm-guard-api` image (registry config, app layers, v0.3.16 source): image 0.3.9 → 0.3.16, the last release (upstream archived 2026-07-08; no 0.3.17 exists, docs said 0.3.17+); the API reads `CONFIG_FILE` (was `LLM_GUARD_CONFIG`, read by nothing); config.yaml rewritten to the API schema (`type` + `params`, constructor arguments only; the flat keys, `enabled`, `cache` and `telemetry` were dropped unread), `lazy_load: false`, no auth, OTLP/HTTP tracing and metrics to :4318; uid 1001 kept (image files world-readable), `HF_HOME` on the emptyDir under the image's HOME `/home/user` (was `/home/llm-guard`), cache 4Gi → 6Gi for ~4.3 GiB of models, startupProbe, readiness on `/readyz`; `tests/test_llm_guard_api_image.py` holds it with mutation cases, a docs version pin and live analyze calls; Anonymize/Sensitive still need spaCy `zh_core_web_sm`, which the image lacks (follow-up); 595 static green
+- 2026-10-17 · #92 guarded path timeouts: Host and proxy Service already fixed by #67 (decisions.md); the frontend's 10s guarded timeout and Envoy's 15s default on `burritbot-audience` both cut the guarded chain; AIGatewayRoute rule `timeouts.request: 30s` (was the 60s AI Gateway default), BurritBot `GATEWAY_TIMEOUT_SECONDS` 30 → 75, `burritbot-audience` `timeouts.request: 80s`, frontend `GUARDED_TIMEOUT_SECONDS` 125 (unguarded keeps 10); `tests/test_guarded_timeout_budget.py` derives each bound from the manifests; 604 static green
 
 ---
 
@@ -359,7 +360,13 @@ commit.
   the configured models, and startup/readiness/liveness on the API's
   health paths; the docs pin the deployed version; mutation tests
   restore the #66 shape and drift each value
-- **Total: 595 static tests green. Live tests fail loudly when
+- Guarded timeout budget (9), #92: the frontend's guarded timeout sits
+  above the guardrails ext_proc both ways plus the `burritbot-audience`
+  route timeout, which sits above BurritBot's gateway timeout, which sits
+  above the ext_proc both ways plus the AIGatewayRoute's Vertex timeout;
+  neither route is left on its default; mutation tests restore the old
+  10s, drop each route timeout and shorten or swell each hop
+- **Total: 604 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
