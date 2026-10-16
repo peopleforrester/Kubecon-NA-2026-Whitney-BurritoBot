@@ -17,7 +17,7 @@ NAMESPACES_FILE = PROJECT_ROOT / "gitops" / "namespaces" / "namespaces.yaml"
 ESO_DIR = PROJECT_ROOT / "security" / "eso"
 
 ESO_APP = GITOPS_APPS / "external-secrets.yaml"
-CLUSTER_SECRET_STORE = ESO_DIR / "cluster-secret-store.yaml"
+CLUSTER_SECRET_STORE = ESO_DIR / "cluster-secret-store" / "cluster-secret-store.yaml"
 
 WIF_ANNOTATION_KEY = "iam.gke.io/gcp-service-account"
 IRSA_ANNOTATION_KEY = "eks.amazonaws.com/role-arn"

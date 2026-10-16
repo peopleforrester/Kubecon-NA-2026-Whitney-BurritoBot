@@ -1,0 +1,9 @@
+# ABOUTME: Envoy Gateway custom resources for The Net, rendered by deploy/ai-gateway.
+# ABOUTME: Lists files in this directory only, so kustomize's default load restrictor accepts it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - gatewayclass.yaml
+  - gateway.yaml
+  - vertex-ai-backend.yaml

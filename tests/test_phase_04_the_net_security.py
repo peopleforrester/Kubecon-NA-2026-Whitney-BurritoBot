@@ -50,6 +50,8 @@ def test_kyverno_required_policies_exist() -> None:
 def test_kyverno_policies_are_valid_yaml_and_kind() -> None:
     """Every Kyverno policy parses as YAML with kind: ClusterPolicy or Policy."""
     for path in KYVERNO_DIR.glob("*.yaml"):
+        if path.name == "kustomization.yaml":
+            continue  # renders the policies for deploy/security (#76); not a policy
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert doc is not None, f"{path.name} is empty"
         kind = doc.get("kind")

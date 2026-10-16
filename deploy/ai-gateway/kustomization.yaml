@@ -3,16 +3,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Each entry is a directory with its own kustomization.yaml. kustomize's
+# default LoadRestrictionsRootOnly refuses a file outside this directory
+# but accepts a directory kustomization from anywhere (#76).
 resources:
-  # Gateway custom resources (Phase 5) and the GatewayClass the Gateway names.
-  - ../../ai-gateway/envoy/gatewayclass.yaml
-  - ../../ai-gateway/envoy/gateway.yaml
-  # Vertex AI upstream the AIGatewayRoute routes to (WIF-authenticated).
-  - ../../ai-gateway/envoy/vertex-ai-backend.yaml
+  # Gateway custom resources (Phase 5), the GatewayClass the Gateway names,
+  # and the Vertex AI upstream the AIGatewayRoute routes to (WIF-authenticated).
+  - ../../ai-gateway/envoy
   # NeMo Guardrails (Phase C2) — Deployment + Service + 2 ConfigMaps.
-  - ../../ai-gateway/nemo-guardrails/deployment.yaml
-  - ../../ai-gateway/nemo-guardrails/configmap-config.yaml
-  - ../../ai-gateway/nemo-guardrails/configmap-rails.yaml
+  - ../../ai-gateway/nemo-guardrails
   # ProtectAI scanner (Phase C3) — Deployment + Service + ConfigMap.
-  - ../../ai-gateway/llm-guard/deployment.yaml
-  - ../../ai-gateway/llm-guard/configmap.yaml
+  - ../../ai-gateway/llm-guard

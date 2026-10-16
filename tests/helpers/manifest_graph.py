@@ -294,8 +294,12 @@ def missing_reference_grants(manifests: list[Manifest]) -> dict[str, str]:
     return out
 
 
-def _kustomization_files(root: Path, directory: Path) -> set[str]:
-    """Repo-relative files a Kustomization in directory renders, following nested ones.
+# File names ArgoCD's tool detection takes as a Kustomize source.
+KUSTOMIZATION_NAMES = ("kustomization.yaml", "kustomization.yml", "Kustomization")
+
+
+def _kustomization_resources(directory: Path) -> Iterator[tuple[Path, str, Path]]:
+    """(kustomization dir, resource entry, resolved target) for every resource, following nested ones.
 
     A resource that is a directory must hold its own kustomization.yaml, as
     kustomize requires. A resource that names nothing raises: kustomize build
@@ -303,16 +307,41 @@ def _kustomization_files(root: Path, directory: Path) -> set[str]:
     """
     with (directory / "kustomization.yaml").open(encoding="utf-8") as fh:
         kustomization = yaml.safe_load(fh)
-    files: set[str] = set()
     for resource in kustomization.get("resources") or []:
         target = (directory / resource).resolve()
-        if target.is_dir():
-            files |= _kustomization_files(root, target)
-        elif target.is_file():
-            files.add(str(target.relative_to(root)))
-        else:
+        if not target.exists():
             raise FileNotFoundError(f"{directory / 'kustomization.yaml'}: resource {resource!r} does not exist")
-    return files
+        yield directory, resource, target
+        if target.is_dir():
+            yield from _kustomization_resources(target)
+
+
+def _app_source_paths(manifests: list[Manifest]) -> Iterator[tuple[Manifest, dict]]:
+    """(Application, source) for every source of every Application, single- or multi-source."""
+    for app in manifests:
+        if app.group != "argoproj.io" or app.kind != "Application":
+            continue
+        spec = app.doc["spec"]
+        for source in [spec["source"]] if "source" in spec else spec.get("sources") or []:
+            yield app, source
+
+
+def _kustomize_roots(root: Path, manifests: list[Manifest]) -> Iterator[tuple[Manifest, dict, Path]]:
+    """(Application, source, directory) for every source path that holds a kustomization.yaml."""
+    for app, source in _app_source_paths(manifests):
+        path = source.get("path")
+        if path and (root / path / "kustomization.yaml").is_file():
+            yield app, source, root / path
+
+
+def kustomization_files(root: Path, directory: Path) -> set[str]:
+    """Repo-relative files the kustomization in directory renders, nested kustomizations included."""
+    resolved = root.resolve()
+    return {
+        str(target.relative_to(resolved))
+        for _, _, target in _kustomization_resources(directory)
+        if target.is_file()
+    }
 
 
 def kustomized_paths(root: Path, manifests: list[Manifest]) -> set[str]:
@@ -323,14 +352,59 @@ def kustomized_paths(root: Path, manifests: list[Manifest]) -> set[str]:
     Helm-chart Applications (no path) contribute nothing.
     """
     resolved = root.resolve()
-    files: set[str] = set()
-    for app in manifests:
-        if app.group != "argoproj.io" or app.kind != "Application":
+    return {
+        path
+        for _, _, directory in _kustomize_roots(resolved, manifests)
+        for path in kustomization_files(resolved, directory)
+    }
+
+
+def directory_typed_kustomizations(root: Path, manifests: list[Manifest]) -> dict[str, str]:
+    """Applications that set source.directory on a path ArgoCD would otherwise build with kustomize (#76).
+
+    ArgoCD takes an explicitly configured source type before detecting one, so
+    a directory: block makes the source plain Directory. The kustomization is
+    then read as a manifest, never built, and none of its resources sync.
+    """
+    resolved = root.resolve()
+    out: dict[str, str] = {}
+    for app, source in _app_source_paths(manifests):
+        path = source.get("path")
+        if not path or "directory" not in source:
             continue
-        path = app.doc["spec"].get("source", {}).get("path")
-        if path and (resolved / path / "kustomization.yaml").is_file():
-            files |= _kustomization_files(resolved, resolved / path)
-    return files
+        found = [n for n in KUSTOMIZATION_NAMES if (resolved / path / n).is_file()]
+        if found:
+            out[f"Application {app.name}"] = (
+                f"{app.label}: source.directory forces the Directory type on {path}, "
+                f"so its {found[0]} is never built"
+            )
+    return out
+
+
+def load_restrictor_relaxed(build_options: str) -> bool:
+    """True when kustomize build options lift the default LoadRestrictionsRootOnly."""
+    args = build_options.replace("=", " ").split()
+    return any(a == "--load-restrictor" and b == "LoadRestrictionsNone" for a, b in zip(args, args[1:]))
+
+
+def files_outside_kustomization_root(root: Path, manifests: list[Manifest]) -> dict[str, str]:
+    """File resources a synced Kustomization lists from outside its own directory (#76).
+
+    kustomize's default LoadRestrictionsRootOnly refuses a file that is not in
+    or below the kustomization's directory, and the whole build fails. A
+    directory holding its own kustomization.yaml may sit anywhere.
+    """
+    resolved = root.resolve()
+    out: dict[str, str] = {}
+    for _, _, top in _kustomize_roots(resolved, manifests):
+        for directory, resource, target in _kustomization_resources(top):
+            if target.is_file() and not target.is_relative_to(directory.resolve()):
+                kustomization = (directory / "kustomization.yaml").resolve().relative_to(resolved)
+                out[f"{kustomization}: {resource}"] = (
+                    f"{kustomization} lists the file {resource}, outside its root; "
+                    f"kustomize refuses it under LoadRestrictionsRootOnly"
+                )
+    return out
 
 
 def unsynced_reference_grants(manifests: list[Manifest], synced: set[str]) -> dict[str, str]:

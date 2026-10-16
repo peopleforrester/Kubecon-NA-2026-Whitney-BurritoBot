@@ -6,40 +6,33 @@ from __future__ import annotations
 import re
 
 import pytest
-import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.manifest_graph import kustomization_files
 
 
 KUSTOMIZATION = PROJECT_ROOT / "deploy" / "ai-gateway" / "kustomization.yaml"
 
+# Repo-relative files deploy/ai-gateway must render, through the per-directory
+# kustomizations it references (#76).
 EXPECTED_REFS = [
-    "../../ai-gateway/envoy/gatewayclass.yaml",
-    "../../ai-gateway/envoy/gateway.yaml",
-    "../../ai-gateway/envoy/vertex-ai-backend.yaml",
-    "../../ai-gateway/nemo-guardrails/deployment.yaml",
-    "../../ai-gateway/nemo-guardrails/configmap-config.yaml",
-    "../../ai-gateway/nemo-guardrails/configmap-rails.yaml",
-    "../../ai-gateway/llm-guard/deployment.yaml",
-    "../../ai-gateway/llm-guard/configmap.yaml",
+    "ai-gateway/envoy/gatewayclass.yaml",
+    "ai-gateway/envoy/gateway.yaml",
+    "ai-gateway/envoy/vertex-ai-backend.yaml",
+    "ai-gateway/nemo-guardrails/deployment.yaml",
+    "ai-gateway/nemo-guardrails/configmap-config.yaml",
+    "ai-gateway/nemo-guardrails/configmap-rails.yaml",
+    "ai-gateway/llm-guard/deployment.yaml",
+    "ai-gateway/llm-guard/configmap.yaml",
 ]
 
 
-def _kustomization() -> dict:
-    with KUSTOMIZATION.open() as fp:
-        for doc in yaml.safe_load_all(fp):
-            if doc and doc.get("kind") == "Kustomization":
-                return doc
-    raise AssertionError("no Kustomization in deploy/ai-gateway/")
-
-
 @pytest.mark.static
-@pytest.mark.parametrize("ref", EXPECTED_REFS, ids=lambda r: r.rsplit("/", 1)[-1])
+@pytest.mark.parametrize("ref", EXPECTED_REFS, ids=lambda r: r.split("/", 1)[-1])
 def test_kustomization_references(ref: str) -> None:
-    k = _kustomization()
-    resources = k.get("resources", []) or []
-    assert ref in resources, (
-        f"deploy/ai-gateway/kustomization.yaml missing reference to {ref}"
+    rendered = kustomization_files(PROJECT_ROOT, KUSTOMIZATION.parent)
+    assert ref in rendered, (
+        f"deploy/ai-gateway/kustomization.yaml does not render {ref}"
     )
 
 

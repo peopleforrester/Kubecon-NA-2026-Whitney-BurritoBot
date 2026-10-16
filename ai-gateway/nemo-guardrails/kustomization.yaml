@@ -1,0 +1,9 @@
+# ABOUTME: NeMo Guardrails Deployment + Service + ConfigMaps, rendered by deploy/ai-gateway.
+# ABOUTME: config.yaml and rails/ are the sources the ConfigMaps carry, not cluster objects.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - configmap-config.yaml
+  - configmap-rails.yaml

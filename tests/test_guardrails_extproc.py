@@ -20,6 +20,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
+from helpers.manifest_graph import kustomization_files
 
 
 EXTPROC_DIR = PROJECT_ROOT / "ai-gateway" / "extproc"
@@ -252,9 +253,9 @@ def test_adapter_dockerfile_runs_the_adapter_as_non_root() -> None:
 @pytest.mark.static
 def test_scanner_deployments_are_synced() -> None:
     """The sidecars ride in the scanner Deployments ArgoCD already syncs."""
-    resources = yaml.safe_load(AI_GATEWAY_KUSTOMIZATION.read_text(encoding="utf-8"))["resources"]
+    rendered = kustomization_files(PROJECT_ROOT, AI_GATEWAY_KUSTOMIZATION.parent)
     for path in DEPLOYMENTS.values():
-        assert f"../../{path.relative_to(PROJECT_ROOT)}" in resources
+        assert str(path.relative_to(PROJECT_ROOT)) in rendered
 
 
 # --- the adapter's body contracts ------------------------------------------

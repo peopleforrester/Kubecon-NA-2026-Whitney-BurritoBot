@@ -19,8 +19,6 @@ spec:
     repoURL: https://github.com/peopleforrester/burritobot.git
     targetRevision: main
     path: deploy/burritbot
-    directory:
-      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: burritbot-guarded

@@ -1,0 +1,13 @@
+# ABOUTME: BurritBot unguarded + guarded manifests, rendered by deploy/burritbot.
+# ABOUTME: Lists files in this directory only, so kustomize's default load restrictor accepts it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment-unguarded.yaml
+  - deployment-guarded.yaml
+  - service-unguarded.yaml
+  - service-guarded.yaml
+  - referencegrant-guarded.yaml
+  - serviceaccount-burritbot-unguarded.yaml
+  - serviceaccount-burritbot-guarded.yaml

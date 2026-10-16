@@ -3,11 +3,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Each entry is a directory with its own kustomization.yaml. kustomize's
+# default LoadRestrictionsRootOnly refuses a file outside this directory
+# but accepts a directory kustomization from anywhere (#76).
 resources:
-  - ../../security/kyverno/policies/require-burritbot-labels.yaml
-  - ../../security/kyverno/policies/require-burritbot-sidecar-naming.yaml
-  - ../../security/kyverno/policies/restrict-burritbot-network.yaml
-  - ../../security/eso/cluster-secret-store.yaml
+  - ../../security/kyverno/policies
+  - ../../security/eso/cluster-secret-store
 
 # Note: the burritbot Falco rules previously lived as a raw .yaml under
 # security/falco/rules/ — they are now folded into the Falco chart's
