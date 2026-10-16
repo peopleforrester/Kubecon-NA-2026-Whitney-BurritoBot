@@ -6,6 +6,16 @@ variable "project_id" {
   type        = string
 }
 
+variable "delivery" {
+  description = "Slug of the delivery this cluster serves (e.g. <event>-<year>); labels its spend in the billing export."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9_-]{0,62}$", var.delivery))
+    error_message = "delivery must be a GCP label value: lowercase letters, digits, '_' or '-', starting with a letter, at most 63 characters."
+  }
+}
+
 variable "region" {
   description = "GCP region for the GKE cluster and regional resources."
   type        = string

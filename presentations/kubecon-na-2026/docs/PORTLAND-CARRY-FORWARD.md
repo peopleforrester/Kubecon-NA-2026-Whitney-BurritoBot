@@ -62,13 +62,15 @@ the `RUNBOOK.md` **Measurements** record. Blank cells mean unmeasured.
    whatever sits in front of the pod (the venue NAT, a load balancer or
    both), a room of phones shares one budget of about 10 prompts a minute
    in total.
-4. **Cost.** This talk has never been costed either, and labels cannot
-   cost it today. The GKE cluster in `infrastructure/terraform/gke.tf`
-   carries no `resource_labels` (only the Secret Manager secret is
-   labelled), and no billing export is configured. This is the GCP
-   counterpart of `Unleash_an_Agent_Watch_It_Burn#392`. The cost envelope
-   in `PLAN.md` still prices Gemini 2.5 Flash, which retires on
-   2026-10-16. The Cost row records spend from Night Before provisioning
+4. **Cost.** This talk has never been costed either. It can be costed
+   by label now (#59, the GCP counterpart of
+   `Unleash_an_Agent_Watch_It_Burn#392`): the GKE cluster and the Secret
+   Manager secret carry `burritbot-io_delivery`, GKE cost allocation
+   splits spend by namespace, and `docs/BILLING-EXPORT.md` sets up the
+   detailed billing export and holds the queries. The export has to be
+   turned on in the console before the first Night Before. The cost
+   envelope in `PLAN.md` is re-priced for Gemini 3 Pro, but it is still
+   an estimate. The Cost row records spend from Night Before provisioning
    to teardown, with GKE and Vertex AI separated.
 
 ---

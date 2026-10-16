@@ -404,3 +404,40 @@ against a live cluster. Headless Chromium rendered the page with
 iPhone SE, iPhone 13 and Pixel 7 emulation (320, 390 and 412 px wide):
 no horizontal overflow, and the Feedback button showed in the header.
 That is not the device check.
+
+## 2026-10-16T15:08:29Z · decision · A delivery is costed by the burritbot-io_delivery label; the billing export dataset stays out of Terraform (issue #59)
+
+Issue #59 asked for GKE resource labels and a billing export so a
+delivery can be costed by label. Terraform is deploy configuration, so
+this lands for Michael's review before it is applied.
+
+- **The delivery labels itself.** `var.delivery` is required with no
+  default and validates as a GCP label value. `local.cost_labels`
+  (`labels.tf`) carries `burritbot-io_owner` and
+  `burritbot-io_delivery`; the GKE cluster (`resource_labels`, which
+  GKE copies to node VMs and disks) and the Secret Manager secret merge
+  them. An apply without a slug fails rather than labelling spend under
+  the wrong delivery. The runbook's Night Before apply passes
+  `-var delivery=<slug>` with the talk's own slug.
+- **GKE cost allocation is on** (`cost_management_config`). It adds
+  `k8s-namespace` and `k8s-label/*` to the detailed export, which
+  splits guarded from unguarded spend. It only reaches the detailed
+  usage cost export, and rows take up to three days to land.
+- **The export dataset is out of band.** `scripts/teardown.sh` runs
+  `terraform destroy` within hours of a delivery, before billing rows
+  land, and a billing account has one detailed export. So the dataset is
+  created once with `bq mk` and the export enabled in the console (the
+  only way Cloud Billing export can be enabled), the same pattern as the
+  state bucket. `docs/BILLING-EXPORT.md` holds the steps and the Cost
+  row queries.
+- **Vertex AI spend is read by project, service and time window.**
+  Model calls carry no labels yet, so another Vertex AI user of the
+  project inside the window would be counted too.
+- **Cost envelope re-priced** in `PLAN.md` §9 and the
+  BUILD-INSTRUCTIONS table for Gemini 3 Pro at list prices checked
+  2026-10-16 ($2 / $12 per 1M input / output tokens, ≤200K prompts),
+  the $0.10/hr regional cluster fee, and the night-before provisioning
+  window. They are still estimates until a rehearsal is measured.
+
+Not verified here: no `terraform` binary on the build host, so
+`terraform validate` / `plan` did not run against these changes.

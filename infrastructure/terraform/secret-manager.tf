@@ -8,10 +8,9 @@ resource "google_secret_manager_secret" "vertex_ai" {
     auto {}
   }
 
-  labels = {
+  labels = merge(local.cost_labels, {
     "burritbot-io_layer" = "foundation"
-    "burritbot-io_owner" = "burritbot"
-  }
+  })
 }
 
 # Grant the workload SA access to read this secret. The actual version is

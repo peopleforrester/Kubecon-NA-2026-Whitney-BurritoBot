@@ -190,13 +190,24 @@ so prefer live-check over stale map.
 | Secrets accidentally committed | Low | gitleaks pre-commit hook (port from kubeauto-ai-day), plus .gitignore exclusions |
 | Gemini model version drift between now and KubeCon | Medium | Pin `gemini-3-pro`; re-verify GA status and pricing in Phase 8 rehearsal week |
 
-## 9. Cost Envelope (from spec)
+## 9. Cost Envelope (re-priced 2026-10-16 for Gemini 3 Pro)
 
-- GKE Standard (~3×e2-standard-4): ~$0.30/hr
-- Vertex AI Gemini 2.5 Flash: ~$0.01–0.05/hr demo traffic
+List prices, checked 2026-10-16; estimates until the billing export
+measures a rehearsal (`docs/BILLING-EXPORT.md`).
+
+- GKE Standard nodes (~3×e2-standard-4, us-west1, ~$0.134/hr each): ~$0.40/hr
+- GKE cluster management fee (regional cluster; the free-tier credit
+  covers zonal and Autopilot only): $0.10/hr
+- Vertex AI Gemini 3 Pro ($2 per 1M input tokens, $12 per 1M output
+  tokens, prompts ≤200K tokens): under $0.01 per unguarded prompt at the
+  512-token output cap; ~$0.02–0.04 per guarded prompt, since NeMo makes
+  several model calls per prompt. Rehearsal traffic (~30 prompts/hr):
+  under $1/hr. Ceiling while the room prompts at the audience page's
+  10 prompts/min: ~$6–24/hr.
 - Cloud DNS: negligible
-- **Total:** ~$0.35–0.40/hr running
-- Demo day: ~$3; 40hr rehearsal over 2 months: ~$15
+- **Total:** ~$0.50/hr idle; ~$0.75–1.50/hr rehearsing
+- Demo day (Night Before provisioning to teardown, ~24 hours): ~$15–20;
+  40hr rehearsal: ~$30–60
 
 Rule: tear down between rehearsals. Terraform rebuild is ~15 min.
 

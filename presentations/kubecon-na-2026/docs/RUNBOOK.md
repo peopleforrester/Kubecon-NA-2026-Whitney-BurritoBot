@@ -15,9 +15,13 @@ Portland did this for the Watch It Burn workshop: its fleet peaked at
 close. See
 `PORTLAND-CARRY-FORWARD.md` for what carried over from that delivery.
 
-1. **Bring up the cluster** (Terraform rebuild is ~15 minutes):
+1. **Bring up the cluster** (Terraform rebuild is ~15 minutes). The
+   `delivery` slug labels every node, disk and secret so this delivery's
+   spend sums by label in the billing export. Detailed usage cost export
+   must already be on for the billing account (`docs/BILLING-EXPORT.md`,
+   one-time setup); usage before it is on is never exported.
    ```bash
-   terraform -chdir=infrastructure/terraform apply
+   terraform -chdir=infrastructure/terraform apply -var delivery=kubecon-na-2026
    ```
 
 2. **Bootstrap ArgoCD once** (the only `kubectl apply` the rules allow):
@@ -212,7 +216,7 @@ cells are unmeasured; do not backfill from memory.
 |---|---|---|---|
 | Real devices | Audience page on at least one iOS Safari and one Android Chrome phone, on venue Wi-Fi and on cellular: loads, no overlapping elements, prompt submits | — | — |
 | Room network | Venue Wi-Fi held for the whole slot (yes / no / when it dropped); count of `429` responses from the per-address rate limit | — | — |
-| Cost | Spend from provisioning start (Night Before) to teardown complete, GKE and Vertex AI separately, from billing export | — | — |
+| Cost | Spend from provisioning start (Night Before) to teardown complete, GKE and Vertex AI separately, from the billing export queries in `docs/BILLING-EXPORT.md` (read at least three days after teardown) | — | — |
 
 ---
 
