@@ -68,7 +68,7 @@ that lie.
 |--------------|-------|---------|--------|-------|
 | NeMo Guardrails | The Net | 0.11+ | RED | Four Colang rails |
 | LLM Guard | The Net | 0.3.17+ | RED | Input + output scanners |
-| Envoy AI Gateway | The Net | 0.2+ | RED | Gateway API v1.2 |
+| Envoy AI Gateway | The Net | 0.6+ | RED | Gateway API v1.2 |
 
 ### Phase 6 — Application
 
