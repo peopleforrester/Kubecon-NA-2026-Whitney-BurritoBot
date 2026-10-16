@@ -1,4 +1,4 @@
-# ABOUTME: Envoy AI Gateway 0.2+ manifest — Gateway, HTTPRoute, and AIGatewayRoute.
+# ABOUTME: Envoy AI Gateway manifest — Gateway, HTTPRoute, AIGatewayRoute, and the guardrails ExtProc policy.
 # ABOUTME: Lives in burritbot-net and is the single choke point for guarded BurritBot traffic.
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -24,8 +24,8 @@ spec:
     - name: http
       protocol: HTTP
       port: 8080
-      # Only routes in burritbot-net attach: the AIGatewayRoute's targetRef
-      # is local, so the HTTPRoute it guards must live here too. Application
+      # Only routes in burritbot-net attach: the audience HTTPRoute and the
+      # HTTPRoute generated from the AIGatewayRoute both live here. Application
       # namespaces reach the gateway as backends, never as route owners.
       allowedRoutes:
         namespaces:
@@ -55,7 +55,10 @@ spec:
           port: 8080
           weight: 100
 ---
-apiVersion: aigateway.envoyproxy.io/v1alpha1
+# The route attaches to the Gateway itself; the AI Gateway controller generates
+# an HTTPRoute of the same name and inserts its own ext_proc there. The upstream
+# CRD has no targetRefs, schema or filters (the client schema is always OpenAI).
+apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:
   name: burritbot-gemini-route
@@ -64,35 +67,51 @@ metadata:
     burritbot.io/layer: the-net
     app.kubernetes.io/part-of: burritbot
 spec:
-  schema:
-    name: OpenAI
-  targetRefs:
-    - name: burritbot-audience
-      kind: HTTPRoute
+  parentRefs:
+    - name: burritbot-ai-gateway
+      kind: Gateway
       group: gateway.networking.k8s.io
   rules:
     - matches:
         - headers:
+            # Set by the gateway from the request body's "model" field.
             - type: Exact
-              name: x-ai-model
+              name: x-ai-eg-model
               value: gemini-3-pro
       backendRefs:
         - name: vertex-ai-gemini
           weight: 100
-  filters:
-    - type: ExtProc
-      extProc:
-        backendRef:
-          name: nemo-guardrails
+---
+# The guardrails net: NeMo Guardrails, then LLM Guard, on every route attached
+# to the gateway (the audience HTTPRoute and the HTTPRoute generated from the
+# AIGatewayRoute above). Entries run in list order.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: burritbot-guardrails
+  namespace: burritbot-net
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: burritbot-ai-gateway
+  extProc:
+    - backendRefs:
+        - name: nemo-guardrails
           port: 8000
-        processingMode:
-          requestBody: BUFFERED
-          responseBody: BUFFERED
-    - type: ExtProc
-      extProc:
-        backendRef:
-          name: llm-guard
+      processingMode:
+        request:
+          body: Buffered
+        response:
+          body: Buffered
+    - backendRefs:
+        - name: llm-guard
           port: 8000
-        processingMode:
-          requestBody: BUFFERED
-          responseBody: BUFFERED
+      processingMode:
+        request:
+          body: Buffered
+        response:
+          body: Buffered

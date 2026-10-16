@@ -118,35 +118,39 @@ scanners cannot.
 
 `ai-gateway/envoy/` must contain at least one of: `Gateway`,
 `HTTPRoute`, or `AIGatewayRoute` (Phase 5 tests accept any of the
-three). Minimum route:
+three). Minimum route, in the shape the upstream v1beta1 CRD defines
+(`parentRefs` to a Gateway; there is no `targetRefs`, `schema` or
+`filters` field, and ServerSideApply rejects or strips them):
 
 ```yaml
-# ABOUTME: Envoy AI Gateway route — BurritBot guarded path.
-# ABOUTME: Fronts NeMo/LLM Guard and talks to Vertex AI upstream.
-apiVersion: gateway.envoyproxy.io/v1alpha1
+apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:
-  name: burritbot-guarded
+  name: burritbot-gemini-route
   namespace: burritbot-net
   labels:
     burritbot.io/layer: the-net
 spec:
-  targetRefs:
-    - name: burritbot-gateway
+  parentRefs:
+    - name: burritbot-ai-gateway
       kind: Gateway
       group: gateway.networking.k8s.io
-  schema:
-    name: OpenAI
   rules:
     - matches:
         - headers:
             - type: Exact
-              name: x-burritbot-path
-              value: guarded
+              name: x-ai-eg-model   # set by the gateway from the body's model
+              value: gemini-3-pro
       backendRefs:
-        - name: vertex-ai-backend
+        - name: vertex-ai-gemini   # an AIServiceBackend
           weight: 100
 ```
+
+NeMo Guardrails and LLM Guard are wired as ExtProc in an Envoy Gateway
+`EnvoyExtensionPolicy` (`gateway.envoyproxy.io/v1alpha1`) targeting the
+Gateway, one `extProc` entry each with `backendRefs` (plural) and
+`processingMode.request.body` / `response.body` set to `Buffered`.
+`tests/test_ai_gateway_route_schema.py` holds both to their CRDs.
 
 ## The burritbot-net Namespace Rule
 
@@ -162,8 +166,8 @@ under the gateway directory and fails if it finds the old name.
 2. **Leaving `output_scanners: []`.** Phase 5 test rejects this.
 3. **Not declaring both input and output scanners with at least one
    entry.** Same reason.
-4. **Using the wrong Envoy API group.** We are on `envoyproxy.io/v1alpha1`
-   for `AIGatewayRoute` or `gateway.networking.k8s.io/v1` for plain
-   HTTPRoute. Mixing the two causes a 404 admission error.
+4. **Using the wrong Envoy API group.** We are on
+   `aigateway.envoyproxy.io/v1beta1` for `AIGatewayRoute` or
+   `gateway.networking.k8s.io/v1` for plain HTTPRoute. Mixing the two causes a 404 admission error.
 5. **Putting the gateway in `kube-system` or `monitoring`.** It goes in
    `burritbot-net`, always.

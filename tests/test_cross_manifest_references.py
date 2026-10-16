@@ -47,6 +47,14 @@ AUDIENCE_PARENT_KEY = (
     "HTTPRoute burritbot-net/burritbot-audience parentRef -> "
     "gateway.networking.k8s.io/Gateway burritbot-net/burritbot-ai-gateway"
 )
+GEMINI_PARENT_KEY = (
+    "AIGatewayRoute burritbot-net/burritbot-gemini-route parentRef -> "
+    "gateway.networking.k8s.io/Gateway burritbot-net/burritbot-ai-gateway"
+)
+GUARDRAILS_TARGET_KEY = (
+    "EnvoyExtensionPolicy burritbot-net/burritbot-guardrails targetRef -> "
+    "gateway.networking.k8s.io/Gateway burritbot-net/burritbot-ai-gateway"
+)
 
 MANIFESTS = load_manifests(PROJECT_ROOT)
 
@@ -73,12 +81,16 @@ def _gemini_route(manifests: list[Manifest]) -> dict:
     return _find(manifests, "AIGatewayRoute", "burritbot-net", "burritbot-gemini-route")
 
 
+def _guardrails_policy(manifests: list[Manifest]) -> dict:
+    return _find(manifests, "EnvoyExtensionPolicy", "burritbot-net", "burritbot-guardrails")
+
+
 def _extproc(manifests: list[Manifest], backend: str) -> dict:
-    for flt in _gemini_route(manifests)["spec"]["filters"]:
-        ref = flt["extProc"]["backendRef"]
-        if ref["name"] == backend:
-            return ref
-    raise LookupError(f"no ExtProc filter for {backend}")
+    for ext in _guardrails_policy(manifests)["spec"]["extProc"]:
+        for ref in ext["backendRefs"]:
+            if ref["name"] == backend:
+                return ref
+    raise LookupError(f"no ExtProc entry for {backend}")
 
 
 # --- the contract over the real repo ------------------------------------
@@ -90,7 +102,7 @@ def test_references_are_collected() -> None:
     refs = collect_refs(MANIFESTS)
     extproc = {
         r.name for r in refs
-        if r.source.kind == "AIGatewayRoute" and r.field == "backendRef" and r.kind == "Service"
+        if r.source.kind == "EnvoyExtensionPolicy" and r.field == "backendRef" and r.kind == "Service"
     }
     assert extproc == EXPECTED_EXTPROC_BACKENDS, (
         f"ExtProc backendRefs collected {sorted(extproc)} != {sorted(EXPECTED_EXTPROC_BACKENDS)}"
@@ -99,12 +111,14 @@ def test_references_are_collected() -> None:
     for expected in [
         ("HTTPRoute", "parentRef"),
         ("HTTPRoute", "backendRef"),
-        ("AIGatewayRoute", "targetRef"),
+        ("AIGatewayRoute", "parentRef"),
         ("AIGatewayRoute", "backendRef"),
+        ("EnvoyExtensionPolicy", "targetRef"),
+        ("EnvoyExtensionPolicy", "backendRef"),
     ]:
         assert expected in fields, f"no {expected[0]} {expected[1]} collected from the manifests"
     keys = {r.key for r in refs}
-    for key in (VERTEX_BACKEND_KEY, AUDIENCE_BACKEND_KEY, AUDIENCE_PARENT_KEY):
+    for key in (VERTEX_BACKEND_KEY, AUDIENCE_BACKEND_KEY, AUDIENCE_PARENT_KEY, GEMINI_PARENT_KEY, GUARDRAILS_TARGET_KEY):
         assert key in keys, f"reference {key!r} not collected; the mutation tests below would be vacuous"
     services = [m for m in MANIFESTS if m.kind == "Service"]
     assert len(services) >= 5, f"only {len(services)} Services loaded; manifest roots moved?"
@@ -123,7 +137,7 @@ def test_no_violations(check: str) -> None:
 @pytest.mark.static
 @pytest.mark.parametrize("backend,port", [("nemo-guardrails", 9000), ("llm-guard", 9100)])
 def test_mutation_extproc_port_drift_is_caught(backend: str, port: int) -> None:
-    """#23 as shipped: ExtProc filters on 9000/9100, Services on 8000."""
+    """#23 as shipped: ExtProc backends on 9000/9100, Services on 8000."""
     manifests = _mutated(lambda ms: _extproc(ms, backend).update(port=port))
     found = port_mismatches(manifests)
     assert any(f"Service burritbot-net/{backend}:{port}" in k for k in found), found
@@ -144,6 +158,20 @@ def test_mutation_undefined_ai_service_backend_is_caught() -> None:
     """#24 as shipped: the AIGatewayRoute names an AIServiceBackend defined nowhere."""
     manifests = _mutated(lambda ms: _remove(ms, "AIServiceBackend", "burritbot-net", "vertex-ai-gemini"))
     assert VERTEX_BACKEND_KEY in unresolved_refs(manifests)
+
+
+@pytest.mark.static
+def test_mutation_extproc_policy_to_undefined_gateway_is_caught() -> None:
+    manifests = _mutated(lambda ms: _guardrails_policy(ms)["spec"]["targetRefs"][0].update(name="burritbot-gateway"))
+    found = unresolved_refs(manifests)
+    assert any("Gateway burritbot-net/burritbot-gateway" in k for k in found), found
+
+
+@pytest.mark.static
+def test_mutation_ai_route_parent_to_undefined_gateway_is_caught() -> None:
+    manifests = _mutated(lambda ms: _gemini_route(ms)["spec"]["parentRefs"][0].update(name="burritbot-gateway"))
+    found = unresolved_refs(manifests)
+    assert any("Gateway burritbot-net/burritbot-gateway" in k for k in found), found
 
 
 @pytest.mark.static
@@ -224,7 +252,7 @@ def test_mutation_listener_refusing_route_namespace_is_caught() -> None:
             "selector": {"matchLabels": {"burritbot.io/layer": "application"}},
         }
 
-    assert unattachable_routes(_mutated(mutate)).keys() == {AUDIENCE_PARENT_KEY}
+    assert unattachable_routes(_mutated(mutate)).keys() == {AUDIENCE_PARENT_KEY, GEMINI_PARENT_KEY}
 
 
 @pytest.mark.static
@@ -241,5 +269,6 @@ def test_mutation_selector_admitting_route_namespace_passes() -> None:
 
 @pytest.mark.static
 def test_mutation_route_kind_not_admitted_is_caught() -> None:
+    """The AIGatewayRoute attaches as the HTTPRoute it generates, so it is refused too."""
     manifests = _mutated(lambda ms: _listener(ms)["allowedRoutes"].update(kinds=[{"kind": "GRPCRoute"}]))
-    assert unattachable_routes(manifests).keys() == {AUDIENCE_PARENT_KEY}
+    assert unattachable_routes(manifests).keys() == {AUDIENCE_PARENT_KEY, GEMINI_PARENT_KEY}
