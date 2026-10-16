@@ -57,6 +57,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #62 ruff gate widened to BLE, S110, S112, PLW1510, PERF102 and TRY401; research.py catches only Playwright errors and logs them; live fixtures and terraform checks fail instead of skipping; 349 static green
 - 2026-10-16 · #51 ReferenceGrant already in burritbot-guarded via deploy/burritbot; new static check proves every ReferenceGrant is rendered by an ArgoCD-synced Kustomization, with a mutation test that drops it from the kustomization; 353 static green
 - 2026-10-16 · #57 exposure path decided: phones reach the audience frontend through a GKE Gateway (global external ALB); the 10/minute limit keys on the client entry that load balancer writes into X-Forwarded-For, trusted only from Google's LB ranges; venue Wi-Fi NAT still shares one budget (follow-up); 365 static green
+- 2026-10-16 · #65 question 133: ship skill and state-persistence rule (llm-coding-workflow 0c68e17) already send promote-time decision entries to decisions.md; the 2026-10-15 stray predates this repo's decisions.md; closed as satisfied, no writer change; 365 static green
 
 ---
 

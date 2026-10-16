@@ -546,3 +546,39 @@ Not done here:
   certificate and enabling the Gateway API on the cluster are facts
   and deploy configuration for Michael, raised as a follow-up. Until
   then, `client_address()` keys port-forwarded rehearsals on the peer.
+
+## 2026-10-16T16:05:49Z · decision · question 133: the promote step already appends decision entries to decisions.md (issue #65)
+
+Question 133 asked how to close #65. The promote step that wrote
+`cd5dd0f` lives outside this repo, and `decisions.md` did not exist
+here when that commit landed.
+
+Answer: check the ship skill and state-persistence.md. If their
+decision-entry append already goes to a root `decisions.md` when one
+exists, close #65 as already satisfied. If not, change the target to
+`decisions.md` (append-only, repo root) and close #65.
+
+Decided by hecaton under Michael's standing rules, not by Michael.
+
+Checked in `peopleforrester/llm-coding-workflow` at `0c68e17`
+(2026-10-13 17:42 -0400, before `cd5dd0f`), in the read-only runner
+checkout:
+
+- `claude-config/skills/ship/SKILL.md`, step 4 "Update state", appends
+  the phase transition to `PROJECT_STATE.md` and, "for a conditional
+  skip or a bypass", adds an entry to `decisions.md` per
+  state-persistence. A fast-forward of main with known failures is a
+  bypass, so its entry goes to `decisions.md`.
+- `claude-config/rules/state-persistence.md` defines `decisions.md` as
+  the append-only audit log and `PROJECT_STATE.md` as the overwritable
+  dashboard. It has no fallback to `PROJECT_STATE.md`.
+- `scripts/ship.sh` writes neither file.
+- `claude-config/skills/init-state/SKILL.md` step 3b creates
+  `decisions.md` when a repo lacks one.
+
+What it changes: nothing in the writer, which already targets
+`decisions.md`. The 2026-10-15 entry fell back to `PROJECT_STATE.md`
+only because this repo had no `decisions.md` until init-state created
+it in `aeb91f8` on 2026-10-16. #65 closes as already satisfied. The
+#47 rule in AGENTS.md and `tests/test_decision_entries_location.py`
+still catch a stray entry.
