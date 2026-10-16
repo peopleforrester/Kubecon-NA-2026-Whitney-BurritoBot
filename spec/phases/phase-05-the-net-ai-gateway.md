@@ -21,6 +21,9 @@ sidecar naming convention.
   and `output_scanners` (non-empty)
 - `ai-gateway/envoy/` — at least one of `Gateway`, `HTTPRoute`, or
   `AIGatewayRoute`
+- `ai-gateway/extproc/` — the `burritbot-extproc` gRPC ext_proc adapter.
+  NeMo Guardrails and LLM Guard serve REST, so the ExtProc entries name
+  this sidecar in each scanner pod, not the scanner (#66)
 - `gitops/apps/nemo-guardrails.yaml`, `gitops/apps/llm-guard.yaml`,
   `gitops/apps/envoy-ai-gateway.yaml`
 

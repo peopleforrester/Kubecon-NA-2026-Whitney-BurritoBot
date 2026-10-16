@@ -1,4 +1,4 @@
-# ABOUTME: NeMo Guardrails microservice — Deployment + Service in burritbot-net.
+# ABOUTME: NeMo Guardrails microservice — Deployment + Service in burritbot-net, with the burritbot-extproc sidecar.
 # ABOUTME: Consumes config.yaml + rails/ via two ConfigMaps mounted under /config/.
 ---
 apiVersion: apps/v1
@@ -91,6 +91,51 @@ spec:
               mountPath: /tmp
             - name: cache
               mountPath: /home/nemo/.cache
+        # ext_proc adapter: Envoy speaks gRPC ext_proc, the scanner speaks REST.
+        # It turns each buffered body into a call to the scanner on localhost.
+        - name: burritbot-extproc
+          image: us-west1-docker.pkg.dev/kk-community-projects/burritbot/burritbot-extproc:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: extproc
+              containerPort: 50051
+          env:
+            - name: SCANNER
+              value: nemo-guardrails
+            - name: SCANNER_URL
+              value: http://127.0.0.1:8000
+            # Under the policy's messageTimeout (10s), so a slow scanner gets
+            # this adapter's explicit 503, not Envoy's 500.
+            - name: SCANNER_TIMEOUT_SECONDS
+              value: "8"
+            - name: EXTPROC_PORT
+              value: "50051"
+            - name: NEMO_GUARDRAILS_MODEL
+              value: gemini-3-pro
+            - name: NEMO_GUARDRAILS_CONFIG_ID
+              value: burritbot
+          readinessProbe:
+            tcpSocket:
+              port: extproc
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: extproc
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: nemo-config
           configMap:
@@ -120,4 +165,8 @@ spec:
     - name: http
       port: 8000
       targetPort: http
+      protocol: TCP
+    - name: extproc
+      port: 50051
+      targetPort: extproc
       protocol: TCP

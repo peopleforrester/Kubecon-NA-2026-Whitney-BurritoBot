@@ -132,7 +132,10 @@ def test_memory_request_at_least_4gi() -> None:
     The demo demands at least 4Gi to load even the smallest scanner set.
     """
     deployment = next(d for d in _all_docs(DEPLOYMENT) if d["kind"] == "Deployment")
-    for c in deployment["spec"]["template"]["spec"]["containers"]:
+    # The models load in the scanner container; the burritbot-extproc sidecar only relays (#66).
+    scanners = [c for c in deployment["spec"]["template"]["spec"]["containers"] if c["name"] == "llm-guard"]
+    assert len(scanners) == 1, "expected one llm-guard scanner container"
+    for c in scanners:
         req_mem = c["resources"]["requests"].get("memory", "")
         # very rough — strings like "4Gi" or "4096Mi"
         assert ("Gi" in req_mem or "Mi" in req_mem), (
