@@ -10,6 +10,7 @@ import pytest
 
 from conftest import PROJECT_ROOT
 from helpers.manifest_graph import (
+    GATEWAY_API,
     Manifest,
     collect_refs,
     load_manifests,
@@ -265,6 +266,62 @@ def test_mutation_selector_admitting_route_namespace_passes() -> None:
         }
 
     assert unattachable_routes(_mutated(mutate)) == {}
+
+
+# --- the listener's other half: application namespaces stay off it ------
+#
+# decisions.md (#26, #52): the gateway is the single choke point, so
+# application namespaces reach it only as backends. unattachable_routes
+# proves the routes that exist are admitted; these probes prove a route
+# an application namespace might add is refused, so a fix that widens the
+# listener (from: All, the old application selector) cannot pass.
+
+APPLICATION_NAMESPACES = {"burritbot-unguarded", "burritbot-guarded", "audience"}
+
+
+def _probe_route(namespace: str) -> Manifest:
+    return Manifest("probe", {
+        "apiVersion": f"{GATEWAY_API}/v1",
+        "kind": "HTTPRoute",
+        "metadata": {"name": "probe", "namespace": namespace},
+        "spec": {"parentRefs": [{"name": "burritbot-ai-gateway", "namespace": "burritbot-net"}]},
+    })
+
+
+def _probe_key(namespace: str) -> str:
+    return f"HTTPRoute {namespace}/probe parentRef -> {GATEWAY_API}/Gateway burritbot-net/burritbot-ai-gateway"
+
+
+def _application_namespaces(manifests: list[Manifest]) -> set[str]:
+    return {
+        m.name for m in manifests
+        if m.kind == "Namespace" and m.doc["metadata"].get("labels", {}).get("burritbot.io/layer") == "application"
+    }
+
+
+def _application_routes_admitted(manifests: list[Manifest]) -> set[str]:
+    """Application namespaces from which a new route would attach to the gateway."""
+    namespaces = _application_namespaces(manifests)
+    refused = unattachable_routes(manifests + [_probe_route(ns) for ns in namespaces])
+    return {ns for ns in namespaces if _probe_key(ns) not in refused}
+
+
+@pytest.mark.static
+def test_application_namespaces_cannot_attach_routes() -> None:
+    assert _application_namespaces(MANIFESTS) == APPLICATION_NAMESPACES, "namespace labels moved; probes would be vacuous"
+    assert _application_routes_admitted(MANIFESTS) == set()
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("namespaces", [
+    {"from": "All"},
+    {"from": "Selector", "selector": {"matchLabels": {"burritbot.io/layer": "application"}}},
+    {"from": "Selector", "selector": {"matchLabels": {"app.kubernetes.io/part-of": "burritbot"}}},
+])
+def test_mutation_listener_admitting_application_routes_is_caught(namespaces: dict) -> None:
+    """Widening the listener lets every application namespace claim the choke point."""
+    manifests = _mutated(lambda ms: _listener(ms)["allowedRoutes"].update(namespaces=namespaces))
+    assert _application_routes_admitted(manifests) == APPLICATION_NAMESPACES
 
 
 @pytest.mark.static
