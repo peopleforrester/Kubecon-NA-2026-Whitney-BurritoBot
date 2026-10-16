@@ -926,3 +926,29 @@ It fails if a Gateway API object turns up whose apiVersion and kind are
 not recorded. A live test checks each object against the CRDs installed
 on the cluster. The skill's Envoy AI Gateway line, left at 0.2+ by #53,
 now says 0.6+ and is part of the #53 doc-floor test.
+
+## 2026-10-16T17:37:09Z · amendment · The platform is checked against the accepted abstract, not the CFP draft (issue #75)
+
+talks-knowledge#12 asked for readiness against the accepted text,
+Sessionize session 1249553 (talks-knowledge
+`abstracts/recovered/sessionize-public-profile.md`, section 5), using the
+nine-point checklist in talks-knowledge
+`talks/2026-10-16_hard-dated-commitments.md`. Two things follow:
+
+- `presentations/kubecon-na-2026/docs/CFP-SUBMISSION.md` is an earlier
+  draft. Its header now says so and points at the accepted session. The
+  #25 entry above calls it "the accepted CFP"; that entry stands as
+  written, and this one corrects it.
+- The record is `presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md`.
+  The run had no read access to talks-knowledge, so the points are taken
+  as issue #75 names them. Where a point reads two ways ("mid-inference"
+  as in the inference path or during generation), the row rates both.
+  Verdict: not ready. 2 READY-STATIC, 4 PARTIAL, 3 MISSING.
+
+Three points in the accepted text conflict with scope this repo set
+before the acceptance was read: the MCP server (ruled out in
+`PORTLAND-CARRY-FORWARD.md`), the full IDP (Backstage excluded in
+`docs/KUBEAUTO-REUSE-MAP.md`) and live audience hacking (AGENTS.md keeps
+attacks presenter-driven). They are open questions for Michael and
+Whitney; nothing here changes those rules. `tests/test_abstract_readiness.py`
+holds the record to nine rated rows and to paths that exist.

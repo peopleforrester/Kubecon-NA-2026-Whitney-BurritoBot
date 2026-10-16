@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 467 passed, 41 deselected after the
-  #74 Gateway API floor
+  (ruff check, then static suite) 471 passed, 41 deselected after the
+  #75 readiness record
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -66,6 +66,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #66 the guardrails ExtProc reaches a gRPC ext_proc server: a `burritbot-extproc` sidecar (ai-gateway/extproc/adapter.py) in each scanner pod turns buffered bodies into NeMo `/v1/guardrail/checks` and LLM Guard `/analyze/*` calls, blocks with a 403, applies LLM Guard sanitization, and fails closed (503 scanner down, 400 unreadable body); the policy names port 50051 with a 10s messageTimeout; 456 static green
 - 2026-10-16 · #73 duplicate of #66: the burritbot-extproc gRPC adapter already sits in front of both scanners; llm-guard-api 0.3.9 confirmed REST (FastAPI/uvicorn, no gRPC) from its image, NeMo Guardrails microservice 25.07 REST from NVIDIA's docs; scanner config defects found on the way are raised as follow-ups; recorded in decisions.md, no manifest change; 456 static green
 - 2026-10-16 · #74 Gateway API floor v1.2 → v1.4+: BackendTLSPolicy `gateway.networking.k8s.io/v1` (vertex-ai-backend.yaml) first ships in v1.4.0, v1.2/v1.3 serve only v1alpha3 (experimental), confirmed from the release CRDs; phase-05 spec, spec scorecard and the AI gateway skill say v1.4+ (the skill's AI Gateway line 0.2+ → 0.6+ too); `tests/test_gateway_api_floor.py` derives the floor from the manifests, holds the docs to it and checks the installed CRDs live; 467 static green
+- 2026-10-16 · #75 readiness against the accepted abstract (Sessionize 1249553, talks-knowledge#12): `presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md` rates the nine checklist points, 2 READY-STATIC, 4 PARTIAL, 3 MISSING (MCP server, GenAI observability, recorded fallback); not ready; CFP-SUBMISSION.md header says it is a draft; 471 static green
 
 ---
 
@@ -319,7 +320,7 @@ commit.
   refuses unreadable ones; a real in-process gRPC round trip refuses a
   prompt with a 503 when the scanner is down and a 400 when the body is
   unreadable
-- **Total: 467 static tests green. Live tests fail loudly when
+- **Total: 471 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
