@@ -5,6 +5,44 @@ chatbot two ways at once — completely unguarded in one namespace, and
 locked behind a layered guardrails stack in another — so the difference
 in behavior is observable in real time on a single Grafana dashboard.
 
+## The Talk
+
+- **Title:** *"BurritoBot Said Let's Dance, the Platform Said No."*
+- **Speakers:** Whitney Lee and Michael Forrester.
+- **What it argues:** platform-level governance, not per-developer
+  discipline. The same chatbot, same model and same system prompt runs
+  unguarded and guarded side by side; the platform's guardrails, not
+  the app developer, make the difference, and the audience watches it
+  happen on Grafana.
+- **Event:** KubeCon + CloudNativeCon North America 2026, Salt Lake
+  City, November 2026. Exact dates, the session slot and acceptance
+  live in conference-knowledge (see "Where things live").
+- **Status:** the platform is built and tested offline (Phases 1–8 and
+  the critical fixes; the static suite is green), but nothing has run
+  on a cluster yet. Live bring-up starts with replacing the lost GCP
+  identity (#17). See `PROJECT_STATE.md` for the current phase and
+  what is verified-static vs verified-live.
+- **Also on the slate:** a BurritoBot tutorial submitted by Whitney is
+  on the KubeCon EU 2027 slate. It is built on the
+  `Unleash_an_Agent_Watch_It_Burn` workshop, not on this platform
+  (`decisions.md`, issue #37); its submission state lives in
+  conference-knowledge and its abstract in talks-knowledge.
+- **Built from:** [kubeauto-ai-day](https://github.com/peopleforrester/kubeauto-ai-day)
+  (the EKS platform this one was ported from to GKE, see "Ancestry")
+  and Whitney's
+  [spinybacked-orbweaver](https://github.com/wiggitywhitney/spinybacked-orbweaver)
+  (the auto-instrumentation agent behind The Eyes).
+
+## Where things live
+
+- **The talk** (the register entry, abstracts, talk scripts, research
+  index): `peopleforrester/talks-knowledge`, with the register at
+  `talks/register.md`. That repo is the source of truth for the talks.
+- **Event state** (dates, CFPs, submissions and acceptances, travel):
+  `peopleforrester/conference-knowledge`. This repo keeps no copy.
+- **The platform and the demo:** this repo. Talk-specific delivery
+  artifacts sit under `presentations/<event>/`.
+
 ## The Name
 
 **burritbot** is the ogre-faced spider. Unlike most spiders that build a
@@ -49,11 +87,6 @@ Two acts, one burrito shop.
 
 The point: **platform-level governance, not per-developer discipline.**
 The platform does the guardrailing. The developer writes a normal app.
-
-## Repo Status
-
-The platform is in active development. See `PROJECT_STATE.md` for the
-current phase and what's verified-static vs verified-live.
 
 ## Talks Using This Platform
 

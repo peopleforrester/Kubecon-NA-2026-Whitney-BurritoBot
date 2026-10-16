@@ -59,7 +59,11 @@ for the per-file copy/adapt/extend/ignore map.
   `events/cfp_pipeline.yaml`, `speaking/`, `travel/`). Read it there and
   keep no copy here. To change it, file an `agent-task` issue on that
   repo; never write into its checkout from this one.
-- The talk itself (content, argument, abstracts, research): talks-knowledge.
+- The talk itself (the register entry, content, argument, abstracts,
+  talk scripts, research index): `peopleforrester/talks-knowledge`
+  (`talks/register.md` is the register). It is the source of truth for
+  the talks; this repo is the platform and demo behind one of them.
+  Read it there, and file changes there as issues.
 
 ## How To Work
 1. Read this file completely before writing any code.

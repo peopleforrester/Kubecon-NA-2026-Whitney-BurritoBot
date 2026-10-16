@@ -136,3 +136,30 @@ Consequences for this repo:
 Reopen if Michael and Whitney decide the 2027 tutorial runs on this
 platform. That reopens #25 too, and amends CLAUDE.md (narrative,
 non-negotiable architecture) before any port starts.
+
+## 2026-10-16T22:00:00Z · amendment · The repo states who it is and points at talks-knowledge (issue #40)
+
+Per the fleet standard for talk repos (requested from talks-knowledge
+on Michael's ask, 2026-10-14), `peopleforrester/talks-knowledge` is
+the source of truth for the talks: the register (`talks/register.md`),
+the research index, and the abstracts and talk scripts. The README
+gains "The Talk" (title, speakers, argument, event, status, sources)
+and "Where things live"; AGENTS.md's "Where things live" names
+talks-knowledge by its full name and points at the register.
+`tests/test_talk_identity.py` keeps all of it in place.
+
+Two calls made to fit the standard to the entries above:
+
+- The standard asks for the event date; the #36 entry keeps event
+  state out of this repo. The README gives the month (November 2026)
+  next to the event name and city, enough to identify the delivery,
+  and leaves exact dates and the slot to conference-knowledge.
+- The issue asks the status to say BurritoBot is on the Europe 2027
+  slate, submitted by Whitney. The README says so and, per the #37
+  entry, that the submission is built on the workshop rather than on
+  this platform. The submission's state stays in conference-knowledge
+  and its abstract in talks-knowledge; nothing of either is copied.
+
+`decisions.md` already existed when this landed (created by the
+2026-10-16 lifecycle migration), so the audit's "no decisions.md"
+needed no new file.
