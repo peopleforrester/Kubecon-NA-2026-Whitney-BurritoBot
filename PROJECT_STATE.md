@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 268 passed, 16 deselected after the
-  #47 decision-entry move
+  (ruff check, then static suite) 273 passed, 16 deselected after the
+  #39 advisory guard
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -47,6 +47,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #44 lint gate: ruff 0.17.1 pinned in the dev group with an explicit rule set; Test command runs `ruff check .` before the static suite; first-run findings fixed; 264 static green
 - 2026-10-16 · #46 pre-lifecycle body refreshed: pause replaced by Open Work, stale counts and duplicate Branch & Test Status removed, resolved known gaps marked; 265 static green
 - 2026-10-16 · #47 the 2026-10-15 promote entry moves from the foot of this file to decisions.md; AGENTS.md sends every decision entry, promote-time ones included, to decisions.md; 268 static green
+- 2026-10-16 · #39 advisory guard: static test holds uv.lock at or above the patched anyio, urllib3, oauthlib, fsspec and multidict releases; 273 static green
 
 ---
 
@@ -236,7 +237,10 @@ commit.
 - Decision entries (3), #47: PROJECT_STATE.md holds no decision-entry
   headings, the 2026-10-15 promote entry sits in decisions.md, and
   AGENTS.md sends promote-time entries there
-- **Total: 268 static tests green. Live tests skip cleanly when
+- Dependency advisories (5), #39: uv.lock holds anyio, urllib3,
+  oauthlib, fsspec and multidict at or above each advisory's first
+  patched release
+- **Total: 273 static tests green. Live tests skip cleanly when
   kubeconfig is absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
