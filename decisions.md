@@ -845,3 +845,54 @@ Not verified here: nothing has run on a cluster (#18). The image
 access. The adapter targets the REST contracts as documented, and the
 scanner Deployments themselves have unverified gaps, which are raised as
 follow-ups.
+
+## 2026-10-16T17:19:39Z · decision · #73 is already satisfied by #66; scanner protocol confirmed off-cluster (issue #73)
+
+#73 asks to check whether the `burritbot-guardrails` ExtProc backends
+speak Envoy ext_proc gRPC and, if they do not, to put an ext_proc
+adapter in front of each scanner. #66 (`e59ad98`, merged to staging in
+`be59dba`) already did that. Each ExtProc entry names port 50051 of a
+`burritbot-extproc` sidecar (`ai-gateway/extproc/adapter.py`) in the
+scanner's pod, never the scanner's port 8000, and `failOpen` stays
+unset. `tests/test_guardrails_extproc.py` holds that wiring (456 static
+cases pass). Nothing changes in the manifests.
+
+There is no cluster (#18), so the protocol check ran against what each
+image publishes:
+
+- **LLM Guard (`laiyer/llm-guard-api:0.3.9`)**: REST, confirmed from the
+  image. The amd64 image config is `CMD ["llm_guard_api",
+  "/home/user/app/config/scanners.yml"]` with `EXPOSE 8000/tcp`. The app
+  layer is FastAPI 0.109.2 on uvicorn 0.27.0, with no gRPC dependency.
+  It serves `GET /`, `/healthz`, `/readyz`, `/metrics` and `POST
+  /analyze/prompt` and `/analyze/output`. Its `schemas.py` matches the
+  adapter's contract field for field: `{prompt}` returns
+  `{sanitized_prompt, is_valid, scanners}`, and `{prompt, output}`
+  returns `{sanitized_output, is_valid, scanners}`.
+- **NeMo Guardrails (`nvcr.io/nvidia/nemo-microservices/guardrails:25.07`)**:
+  REST, from NVIDIA's 25.07 documentation. NGC refuses anonymous pulls,
+  so the image itself was not read. The microservice serves
+  `/v1/guardrail/chat/completions`, `/v1/guardrail/checks` and
+  `/v1/health`, which matches the adapter's `/v1/guardrail/checks` call.
+
+So the issue's premise holds, and #66's adapter is the fix it asks for.
+The same reading found that neither scanner container, as deployed,
+would answer the adapter. These are scanner configuration defects, not
+ext_proc protocol defects, so they are raised as follow-ups instead of
+being fixed here:
+
+- llm-guard-api takes its config path only from that positional
+  argument. It ignores `LLM_GUARD_CONFIG`, so the mounted
+  `/config/config.yaml` is never read. The image's built-in
+  `scanners.yml` turns on `auth: http_bearer` with an empty
+  `${AUTH_TOKEN:}`, so every `/analyze/*` call without a bearer token
+  is refused, which the adapter turns into a 503. The ConfigMap also
+  uses flat scanner keys, while the API expects `type` plus `params`.
+- The NeMo microservice listens on `GUARDRAILS_PORT`, which defaults to
+  7331, not 8000. It reads configurations from `CONFIG_STORE_PATH`
+  (default `/app/services/guardrails/config-store`, one directory per
+  config id), not from `NEMO_GUARDRAILS_CONFIG_PATH`. `/v1/rails/configs`
+  belongs to the open-source `nemoguardrails` server, not the
+  microservice, so the probes would never pass.
+
+As with #66, live confirmation rides on #18.
