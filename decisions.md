@@ -441,3 +441,45 @@ this lands for Michael's review before it is applied.
 
 Not verified here: no `terraform` binary on the build host, so
 `terraform validate` / `plan` did not run against these changes.
+
+## 2026-10-16T15:20:34Z · decision · The ruff gate widens to blind-except and silent-swallow checks (issue #62)
+
+Issue #62 asked whether to widen the #44 rule set. Decided yes: the
+rules catch exactly the silent fallbacks the "no fallbacks" rule
+forbids, and all 21 findings had a fix that did not need a `noqa`
+except one.
+
+What it changes:
+
+- `[tool.ruff.lint].select` adds `BLE`, `S110`, `S112`, `PLW1510`,
+  `PERF102` and `TRY401` as explicit codes, not whole families, so a
+  ruff upgrade still cannot widen the gate on its own. The other S, PLW,
+  PERF and TRY rules are not selected; adding them is a separate,
+  deliberate edit. `tests/test_lint_gate.py` fails if BLE, S110, S112
+  or PLW1510 drop out.
+- `chatbot-research/research.py` catches only Playwright's `Error`
+  (its `TimeoutError` subclasses it) and logs each caught error instead
+  of passing or continuing silently: selector probes at debug, the
+  send-button fallback at info, a failed error screenshot at warning.
+  Anything else now stops the run. Playwright is imported at module top,
+  so the old "playwright is not installed" exit path is gone; it is in
+  the dev group.
+- `tests/conftest.py` no longer turns any exception into a skip. The
+  kubeconfig fixtures catch only `kubernetes.config.ConfigException`
+  and the GCP client fixtures only `DefaultCredentialsError`, and both
+  call `pytest.fail` with the missing prerequisite named. The unused
+  `kubeconfig_loaded` fixture is removed. Live tests on a host without
+  a cluster or ADC now fail instead of skipping, as the Tests rule asks.
+- The two terraform live tests fail when terraform is not on PATH, and
+  `test_all_shell_scripts_start_with_aboutme` asserts `scripts/` exists
+  instead of skipping, and the Colang parse test imports nemoguardrails
+  (a dev dependency) directly instead of `pytest.importorskip`. These
+  were the remaining skip paths in tests/.
+- `subprocess.run` calls whose return code the test asserts carry
+  `check=False` explicitly.
+- `test_colang_v1_rail_parses` keeps `except Exception` with
+  `# noqa: BLE001`: nemoguardrails' `ColangParser` raises bare
+  `Exception`, so there is nothing narrower to catch, and the handler
+  fails the test with the rail's name rather than swallowing.
+- The audience backend's `logger.exception` drops the redundant
+  exception argument (TRY401); the traceback already carries it.

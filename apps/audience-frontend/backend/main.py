@@ -206,7 +206,7 @@ def create_app() -> FastAPI:
                     json={"prompt": payload.prompt},
                 )
             except httpx.HTTPError as exc:
-                logger.exception("Upstream call failed: %s", exc)
+                logger.exception("Upstream call failed")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=f"BurritBot unreachable: {exc}",

@@ -26,8 +26,14 @@ markers = [
 
 [tool.ruff.lint]
 # Explicit set so a ruff upgrade does not silently widen the gate:
-# pycodestyle errors, pyflakes, import order, pyupgrade.
-select = ["E4", "E7", "E9", "F", "I", "UP"]
+# pycodestyle errors, pyflakes, import order, pyupgrade, plus the
+# blind-except and silent-swallow checks behind the 'no fallbacks' rule
+# (issue #62): blind except, try-except-pass/continue, subprocess.run
+# without check=, and the two small findings that came with them.
+select = [
+    "E4", "E7", "E9", "F", "I", "UP",
+    "BLE", "S110", "S112", "PLW1510", "PERF102", "TRY401",
+]
 
 [tool.ruff.lint.isort]
 # tests/ is on pytest's pythonpath, so conftest and helpers are local.

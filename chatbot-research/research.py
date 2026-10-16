@@ -34,6 +34,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import async_playwright
 
 
 logger = logging.getLogger("chatbot-research")
@@ -211,7 +213,8 @@ async def try_selectors(page, selectors: list[str], *, timeout: int = 3000, labe
                     continue
                 logger.info("[%s] selector matched: %s", label, sel)
                 return locator
-        except Exception:
+        except PlaywrightError as exc:
+            logger.debug("[%s] selector %r failed: %s", label, sel, exc)
             continue
     return None
 
@@ -310,7 +313,8 @@ async def test_chatbot(
                         dismissed = True
                         logger.info("[%s] dismissed banner with %r", name, consent_sel)
                         break
-                except Exception:
+                except PlaywrightError as exc:
+                    logger.debug("[%s] banner selector %r failed: %s", name, consent_sel, exc)
                     continue
             if not dismissed:
                 break
@@ -406,8 +410,8 @@ async def test_chatbot(
                 if not is_disabled:
                     await send_btn.click()
                     sent = True
-            except Exception:
-                pass
+            except PlaywrightError as exc:
+                logger.info("[%s] send button unusable, pressing Enter: %s", name, exc)
         if not sent:
             # Fallback: press Enter.
             await input_field.press("Enter")
@@ -429,13 +433,13 @@ async def test_chatbot(
             result["notes"] = (result["notes"] or "") + " | Could not extract response text"
             logger.warning("[%s] could not extract response text", name)
 
-    except Exception as exc:
+    except PlaywrightError as exc:
         result["notes"] = (result["notes"] or "") + f" | Error: {exc}"
         logger.error("[%s] error: %s", name, exc)
         try:
             await page.screenshot(path=str(ss_error), full_page=False)
-        except Exception:
-            pass
+        except PlaywrightError as shot_exc:
+            logger.warning("[%s] error screenshot failed: %s", name, shot_exc)
 
     _save_result(result, name, timestamp)
     return result
@@ -468,7 +472,8 @@ async def _extract_response(context) -> str | None:
                 text = await el.inner_text(timeout=2000)
                 if text and len(text.strip()) > 10:
                     return text.strip()
-        except Exception:
+        except PlaywrightError as exc:
+            logger.debug("response selector %r failed: %s", sel, exc)
             continue
     return None
 
@@ -555,15 +560,6 @@ async def run(
     headless: bool = False,
 ) -> list[dict]:
     """Run the research against a list of targets."""
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        logger.error(
-            "playwright is not installed. Run: uv add --dev playwright && "
-            "uv run playwright install chromium"
-        )
-        sys.exit(1)
-
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 

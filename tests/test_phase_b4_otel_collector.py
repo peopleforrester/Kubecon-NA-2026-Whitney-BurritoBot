@@ -97,7 +97,7 @@ def test_genai_semconv_processor_present() -> None:
     # The GenAI processor is typically named `attributes` or `attributes/genai`.
     # Look for any processor that contains an action keyed on gen_ai.*.
     found = False
-    for proc_name, proc_cfg in processors.items():
+    for proc_cfg in processors.values():
         actions = (proc_cfg or {}).get("actions", []) or []
         for action in actions:
             if action.get("key", "").startswith("gen_ai."):
