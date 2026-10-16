@@ -499,3 +499,50 @@ What it changes:
   this composite as the default; it is taken. A repo-showcase render
   can replace the file at the same path later without a README change.
 - The GitHub social preview card is a repo setting and stays manual.
+
+## 2026-10-16T15:44:16Z · decision · Phones reach the audience frontend through a GKE Gateway; the 10/minute limit keys on the load balancer's client entry (issue #57)
+
+The audience limit was keyed on `get_remote_address`, the connecting
+address. Whatever sat in front of the pod, the room shared one budget.
+
+- **Exposure path: a GKE Gateway** with GatewayClass
+  `gke-l7-global-external-managed` (the global external Application Load
+  Balancer), routed by an HTTPRoute to the `audience-frontend` Service.
+  This is the Gateway API swap that `docs/KUBEAUTO-REUSE-MAP.md` and
+  `docs/PHASE-B-EKS-ADAPT-PLAN.md` already set for the kubeauto ALB
+  ingress, and "Gateway API" is in the Web layer in `CLAUDE.md`. The
+  regional class was not chosen: its proxies send from the proxy-only
+  subnet, a range that differs per VPC, so the frontend could not name
+  its trusted proxy without deploy configuration.
+- **The limit stays per source address, 10/minute** (spec Phase 7, which
+  also names the `X-Forwarded-For` fix as the known risk). A room-sized
+  global limit was not chosen. It would drop the per-phone fairness the
+  spec asks for, and one keen phone could take the whole room's budget.
+- **`client_address()` replaces `get_remote_address`.** A peer in
+  Google's documented load-balancer source ranges (`35.191.0.0/16`,
+  `130.211.0.0/22`, `2600:2d00:1:1::/64`) is keyed on the
+  second-from-last `X-Forwarded-For` entry. The load balancer appends
+  `<client-ip>,<load-balancer-ip>`, so anything further left came from
+  the phone and is ignored. A load-balancer request without a valid
+  client entry gets a `400` and is never keyed on the proxy. Any other
+  peer (a port-forward, an in-cluster caller) is keyed on itself and its
+  header is ignored. Source:
+  https://docs.cloud.google.com/load-balancing/docs/https (firewall
+  rules; X-Forwarded-For), read 2026-10-16.
+- **uvicorn's `--proxy-headers` is not used.** It walks
+  `X-Forwarded-For` from the right and stops at the first untrusted
+  address, which is the load balancer's own forwarding-rule IP. That IP
+  is not known until the Gateway exists, so it would key the room on
+  the load balancer again.
+
+Not done here:
+
+- The venue NAT is still a shared address. Phones on one venue Wi-Fi
+  leave through the same public IP and share its 10 prompts a minute.
+  Only phones on cellular get a budget each. Whether to raise the
+  per-address limit, key on something per browser, or accept it is a
+  talk decision. It is raised as a follow-up.
+- No Gateway or HTTPRoute manifest is added. The hostname, the
+  certificate and enabling the Gateway API on the cluster are facts
+  and deploy configuration for Michael, raised as a follow-up. Until
+  then, `client_address()` keys port-forwarded rehearsals on the peer.

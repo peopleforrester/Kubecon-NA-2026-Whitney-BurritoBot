@@ -1,9 +1,10 @@
-# ABOUTME: Audience frontend — the phone page, its QR landing, and a 10/minute per-IP /chat proxy.
+# ABOUTME: Audience frontend — the phone page, its QR landing, and a 10/minute per-phone /chat proxy.
 # ABOUTME: Routes to burritbot-unguarded (Act 1) or burritbot-guarded via the gateway (Act 2).
 
 from __future__ import annotations
 
 import html
+import ipaddress
 import logging
 import os
 from pathlib import Path
@@ -18,7 +19,6 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 
 logger = logging.getLogger("audience-frontend")
@@ -38,6 +38,18 @@ BURRITBOT_GUARDED_URL: str = os.environ.get(
 )
 
 RATE_LIMIT = "10/minute"
+
+# Phones reach the pod through a GKE Gateway (global external Application
+# Load Balancer, NEG backends), so every request arrives from a Google Front
+# End in these ranges. The load balancer appends "<client-ip>,<lb-ip>" to
+# X-Forwarded-For; anything left of that came from the phone and is not
+# trusted. Source:
+# https://docs.cloud.google.com/load-balancing/docs/https (firewall rules,
+# X-Forwarded-For header).
+GOOGLE_LB_RANGES = tuple(
+    ipaddress.ip_network(cidr)
+    for cidr in ("35.191.0.0/16", "130.211.0.0/22", "2600:2d00:1:1::/64")
+)
 
 # The page lives in apps/audience-frontend/static/, beside backend/. The
 # image keeps the same layout (/app/backend/main.py, /app/static/).
@@ -115,7 +127,41 @@ class ChatResponse(BaseModel):
     target: str
 
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT])
+def client_address(request: Request) -> str:
+    """Return the phone's address: the load balancer's client entry, or the direct peer.
+
+    A request from Google's load-balancer ranges is keyed on the client the
+    load balancer saw. Keying it on the proxy would put the whole room in one
+    budget, so one without that entry gets a 400. Any other peer (a
+    port-forward, an in-cluster caller) is keyed on itself and its
+    X-Forwarded-For is ignored.
+    """
+    peer = request.client.host if request.client else ""
+    try:
+        from_load_balancer = any(
+            ipaddress.ip_address(peer) in network for network in GOOGLE_LB_RANGES
+        )
+    except ValueError:
+        from_load_balancer = False
+    if not from_load_balancer:
+        return peer
+
+    entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",")]
+    if len(entries) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="load balancer request has no client entry in X-Forwarded-For",
+        )
+    try:
+        return str(ipaddress.ip_address(entries[-2]))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"X-Forwarded-For client entry is not an IP address: {entries[-2]!r}",
+        ) from exc
+
+
+limiter = Limiter(key_func=client_address, default_limits=[RATE_LIMIT])
 
 
 def create_app() -> FastAPI:
