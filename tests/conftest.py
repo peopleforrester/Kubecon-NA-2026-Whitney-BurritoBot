@@ -111,6 +111,15 @@ def k8s_rbac_v1():
     return client.RbacAuthorizationV1Api()
 
 
+@pytest.fixture(scope="session")
+def k8s_apiextensions_v1():
+    """ApiextensionsV1Api client for reading installed CRD schemas."""
+    _load_kubeconfig()
+    from kubernetes import client  # type: ignore
+
+    return client.ApiextensionsV1Api()
+
+
 # --- GCP client fixtures ------------------------------------------------
 
 

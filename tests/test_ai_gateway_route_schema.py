@@ -320,12 +320,9 @@ def openapi_violations(obj: object, schema: dict, path: str = "") -> list[str]:
     return out
 
 
-def _installed_schema(crd_name: str, version: str) -> dict:
-    """The served openAPIV3Schema of an installed CRD. Needs a kubeconfig and the cluster."""
-    from kubernetes import client, config  # type: ignore
-
-    config.load_kube_config()
-    resp = client.ApiextensionsV1Api().read_custom_resource_definition(crd_name, _preload_content=False)
+def _installed_schema(apiext, crd_name: str, version: str) -> dict:
+    """The served openAPIV3Schema of an installed CRD, read through the live cluster client."""
+    resp = apiext.read_custom_resource_definition(crd_name, _preload_content=False)
     crd = json.loads(resp.data)
     served = {v["name"]: v for v in crd["spec"]["versions"] if v.get("served")}
     assert version in served, f"installed CRD {crd_name} serves {sorted(served)}, not {version}"
@@ -340,17 +337,17 @@ LIVE_OBJECTS = [
 
 @pytest.mark.live
 @pytest.mark.parametrize("crd_name,version,pick", LIVE_OBJECTS, ids=[c for c, _, _ in LIVE_OBJECTS])
-def test_installed_crd_accepts_gateway_yaml(crd_name: str, version: str, pick) -> None:
-    schema = _installed_schema(crd_name, version)
+def test_installed_crd_accepts_gateway_yaml(k8s_apiextensions_v1, crd_name: str, version: str, pick) -> None:
+    schema = _installed_schema(k8s_apiextensions_v1, crd_name, version)
     obj = pick(_docs())
     violations = openapi_violations(obj, schema)
     assert not violations, f"installed {crd_name} {version} would refuse or strip {obj['metadata']['name']}: {violations}"
 
 
 @pytest.mark.live
-def test_installed_route_crd_refuses_the_pre_49_shape() -> None:
+def test_installed_route_crd_refuses_the_pre_49_shape(k8s_apiextensions_v1) -> None:
     """The walker is not vacuous: the old targetRefs/schema/filters are unknown to the installed CRD."""
-    schema = _installed_schema("aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
+    schema = _installed_schema(k8s_apiextensions_v1, "aigatewayroutes.aigateway.envoyproxy.io", "v1beta1")
     route = copy.deepcopy(_route(_docs()))
     route["spec"]["targetRefs"] = [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "burritbot-audience"}]
     route["spec"]["schema"] = {"name": "OpenAI"}
