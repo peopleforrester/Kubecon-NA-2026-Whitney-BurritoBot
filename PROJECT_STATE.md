@@ -32,7 +32,7 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 356 passed, 20 deselected after the
+  (ruff check, then static suite) 355 passed, 20 deselected after the
   #63 live-fixture checks
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
@@ -54,7 +54,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-16 · #55 fastapi / google-genai / OpenTelemetry pins held at 0.135.3 / 1.71.0 / 1.41.0 + 0.62b0 through the November 2026 delivery (decisions.md); static test keeps the pins equal across both requirements files, pyproject.toml, uv.lock, AGENTS.md and the phase-06 spec; 315 static green
 - 2026-10-16 · #56 audience phone page: `/` (index.html + app.js + styles.css, Feedback button) and the `/qr` projector landing, served by the backend; `FEEDBACK_URL` and `AUDIENCE_PUBLIC_URL` fail the page with a 503 when unset; image context moves to apps/audience-frontend; 339 static green
 - 2026-10-16 · #59 costable delivery: GKE cluster and Secret Manager secret carry `burritbot-io_delivery` (required `var.delivery`), GKE cost allocation on, out-of-band detailed billing export playbook and Cost row queries in docs/BILLING-EXPORT.md, cost envelope re-priced for Gemini 3 Pro; 348 static green
-- 2026-10-16 · #63 live fixtures in tests/conftest.py fail with the kubeconfig or ADC error and the command that fixes it instead of skipping; unused `kubeconfig_loaded` fixture removed; 356 static green
+- 2026-10-16 · #63 live fixtures in tests/conftest.py fail with the kubeconfig or ADC error and the command that fixes it instead of passing quietly; unused `kubeconfig_loaded` fixture removed; 355 static green
 
 ---
 
@@ -277,12 +277,12 @@ commit.
   module teardown destroys; the runbook applies with a delivery slug and
   reads the Cost row from docs/BILLING-EXPORT.md; both cost envelopes
   price Gemini 3 Pro
-- Live fixtures fail loudly (8), #63: each cluster and GCP client
-  fixture errors in a probe run with no kubeconfig and no ADC, and
-  conftest.py carries no skip call
-- **Total: 356 static tests green. Live tests fail loudly, naming the
+- Live fixtures fail loudly (7), #63: each cluster and GCP client
+  fixture errors in a probe run with no kubeconfig and no ADC, and the
+  probe exits non-zero
+- **Total: 355 static tests green. Live tests fail loudly, naming the
   missing kubeconfig or GCP credentials, when the cluster or ADC is
-  absent — no skips, no mocks, no fallbacks.** Drift in this
+  absent — no mocks, no fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
   Phase A6 test.
 

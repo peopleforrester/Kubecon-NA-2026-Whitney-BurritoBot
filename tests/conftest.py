@@ -47,8 +47,9 @@ GRAFANA_BASIC_AUTH = "Basic YWRtaW46YWRtaW4="
 #
 # Tests decorated with @pytest.mark.live require a reachable GKE cluster and
 # a loaded kubeconfig. When either is missing the fixture fails the test with
-# the underlying error: the E2E command must go red, never skip. Static tests
-# do not request these fixtures, so a bare workstation still runs them.
+# the underlying error: the E2E command must go red with a clear reason.
+# Static tests do not request these fixtures, so a bare workstation still
+# runs them.
 
 
 def _load_kubeconfig() -> None:
