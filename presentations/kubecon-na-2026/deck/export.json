@@ -1,0 +1,11 @@
+{
+  "source": "slides.html",
+  "source_sha256": "ddbef1eb68f17a700390d9a3282ad34cfaa4f8ffc7c30c3bdbd94bc5288b9352",
+  "pdf": "burritobot-said-lets-dance.pdf",
+  "pdf_sha256": "81a1f6a1a2054ad610b68b220c17c9d633be5254ed4c2ed834d4ce5d603cb542",
+  "pages": 22,
+  "page_size_pt": [
+    1440,
+    810
+  ]
+}
