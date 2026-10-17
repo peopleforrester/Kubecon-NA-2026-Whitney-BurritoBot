@@ -1,45 +1,22 @@
-# ABOUTME: Colang 1.0 rail enforcing allowed topic categories beyond the burrito filter.
-# ABOUTME: Blocks medical, legal, financial, and political advice categorically.
-
-define user ask for medical advice
-  "should I stop taking my medication"
-  "is this symptom serious"
-  "diagnose this rash"
-
-define user ask for legal advice
-  "should I sue them"
-  "is this contract enforceable"
-  "can I fight this in court"
-
-define user ask for financial advice
-  "should I buy this stock"
-  "is this crypto a good investment"
-  "how should I invest my savings"
-
-define user ask about politics
-  "who should I vote for"
-  "what do you think of the current president"
-  "is party X better than party Y"
+# ABOUTME: Colang 1.0 input rail refusing restricted topic categories beyond the burrito filter.
+# ABOUTME: Blocks medical, legal, financial, and political advice by phrase in $user_message.
 
 define bot refuse restricted topic
   "I can't help with that — I'm BurritBot and I only talk about the menu. Want to hear today's special?"
 
-define flow topic enforcement input medical
-  user ask for medical advice
-  bot refuse restricted topic
-  abort
-
-define flow topic enforcement input legal
-  user ask for legal advice
-  bot refuse restricted topic
-  abort
-
-define flow topic enforcement input financial
-  user ask for financial advice
-  bot refuse restricted topic
-  abort
-
-define flow topic enforcement input politics
-  user ask about politics
-  bot refuse restricted topic
-  abort
+# One check per category. Menu-adjacent words stay out: "stock" alone would catch
+# "is the carnitas in stock", "rash" alone would catch "trash".
+define flow topic enforcement input
+  $ask = $user_message.lower()
+  if "medication" in $ask or "symptom" in $ask or "diagnose" in $ask or "a rash" in $ask or "this rash" in $ask
+    bot refuse restricted topic
+    stop
+  if "should i sue" in $ask or "lawsuit" in $ask or "enforceable" in $ask or "in court" in $ask
+    bot refuse restricted topic
+    stop
+  if "buy this stock" in $ask or "stock market" in $ask or "crypto" in $ask or "invest" in $ask
+    bot refuse restricted topic
+    stop
+  if "vote" in $ask or "president" in $ask or "election" in $ask or "better than party" in $ask
+    bot refuse restricted topic
+    stop

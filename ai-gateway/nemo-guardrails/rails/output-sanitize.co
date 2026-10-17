@@ -1,26 +1,16 @@
 # ABOUTME: Colang 1.0 output rail that blocks unsafe model replies before they hit the audience.
-# ABOUTME: Complements LLM Guard output scanners — NeMo handles intent, LLM Guard handles content.
-
-define bot attempt system prompt leak
-  "my system prompt is"
-  "my instructions are"
-  "I was told to"
-  "as an ai language model, I"
-
-define bot attempt instruction override
-  "ignore the previous"
-  "new instructions:"
-  "updated rules"
+# ABOUTME: Complements LLM Guard output scanners — NeMo matches leak phrases, LLM Guard handles content.
 
 define bot refuse to leak
   "I can't share that — here's what I can help with instead: the menu, hours, and locations."
 
-define flow output sanitize system prompt
-  bot attempt system prompt leak
-  bot refuse to leak
-  abort
-
-define flow output sanitize instruction override
-  bot attempt instruction override
-  bot refuse to leak
-  abort
+# Output rails see the generated reply as $bot_message. Two checks: the reply
+# reveals its system prompt, or it repeats injected instructions.
+define flow output sanitize
+  $reply = $bot_message.lower()
+  if "my system prompt is" in $reply or "my instructions are" in $reply or "i was told to" in $reply or "as an ai language model, i" in $reply
+    bot refuse to leak
+    stop
+  if "ignore the previous" in $reply or "new instructions:" in $reply or "updated rules" in $reply
+    bot refuse to leak
+    stop

@@ -1851,3 +1851,65 @@ option. The choice also touches the #73 labels overlay and its tests.
 This run adds no static test for it, because one would fail on the
 current config. This is deploy configuration, and as with #90 it waits
 for Michael's review before any cluster syncs it.
+
+## 2026-10-17T04:41:47Z · decision · question 170: the NeMo input and output rails decide by phrase checks on the raw text (issue #102)
+
+Question 170 asked how the NeMo rails should decide, now that they
+cannot match intents. `config.yaml` enabled `burrito only input`,
+`topic enforcement input`, `jailbreak detect input` and `output
+sanitize`. The `.co` files defined only suffixed names, so
+nemoguardrails 0.24.1's `LLMRails` refused the config ("input rail flow
+`burrito only input` does not exist"). Renaming the config entries to
+the suffixed names would not have helped either. Colang 1.0 input rails
+run as subflows before any user intent exists, and output rails see only
+`$bot_message`. Run 1688 drove the real runtime with a renamed config:
+an input rail that opened with `user ask off topic` waited at
+`StartInputRail` and the run stopped at `Listen` with no `UserMessage`.
+The adapter's `/v1/guardrail/checks` runs only input and output rails,
+so the flows could not become dialog rails.
+
+Answer: B, phrase checks. Keep the four named rails, have each test
+`$user_message` / `$bot_message` (lower-cased) against phrase lists made
+from the current examples, then refuse and `stop`. No LLM is called, the
+result is the same every time, it works however #100 lands, and it can be
+checked statically with the real NeMo runtime. Audience paraphrases
+outside the lists get past NeMo and fall to LLM Guard's BanTopics, and
+menu words such as "salsa" are not triggers.
+
+Decided by hecaton's research under Michael's standing rules, not by
+Michael.
+
+What it changes:
+
+- The four `.co` files under `ai-gateway/nemo-guardrails/rails/` now
+  define exactly the flows `config.yaml` enables, so `config.yaml` is
+  unchanged. Each flow lower-cases the text into `$ask` or `$reply`, then
+  runs `if "<phrase>" in $ask or ...` checks that refuse with the rail's
+  existing bot message and `stop`. The `define user` intent lists, the
+  suffixed flows and `abort` are gone. `configmap-rails.yaml` carries the
+  new files.
+- Phrases come from the old examples. Where a short word hides inside a
+  menu ask, a longer phrase is used instead: "disco routine", not
+  "disco" (discount); "a rash" and "this rash", not "rash" (trash);
+  "buy this stock" and "stock market", not "stock" (in stock). "party"
+  and "salsa" are not triggers.
+- "what are your hours" is an on-topic ask (fcab044), matching the
+  refusal that offers the menu, hours and locations.
+- `tests/test_nemo_rail_flows.py` (replacing `test_burrito_only_rail.py`)
+  checks that every enabled flow is defined in a `.co` file. It builds
+  the config the Deployment mounts from the two ConfigMaps and constructs
+  real `LLMRails`, which validates every enabled flow. A mutation case
+  shows that the pre-#102 name `output sanitize system prompt` is
+  rejected. Through `LLMRails.check_async` it checks that each rail blocks
+  its 28 original input asks, plus the 7 leak replies for the output rail,
+  under the rail's own name. Twelve menu asks and two menu replies must
+  pass, including "do you have mild salsa", "is there a student discount"
+  and "is the carnitas in stock". Both ConfigMaps must mirror their
+  source files. The test drops the config's `models` section, because no
+  rail calls a model and `ChatVertexAI` cannot be built without GCP auth
+  (#100 questions the engine anyway).
+
+Not verified here: nothing has run in the 25.07 microservice container
+(#18), whose bundled nemoguardrails version is unknown. The rails use
+only `$var.lower()`, `in`, `or`, `if` and `stop`, which Colang 1.0 has
+supported since before 0.11.
