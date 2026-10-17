@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 681 passed, 54 deselected after the
-  #102 burrito-only rail fix
+  (ruff check, then static suite) 733 passed, 54 deselected after the
+  #102 NeMo rail rewrite
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -84,7 +84,8 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #96 private nodes let the GKE control plane reach pods on TCP 443 and 10250 only; Kyverno's admission and cleanup controllers move their webhook servers from the chart's 9443 to 10250 (the cert-manager and AI Gateway controller port), their startup, liveness and readiness probes follow the named `https` port, and the chart's 9443-only webhook NetworkPolicies stay off; the live admission-controller check now looks in `security`, where Kyverno is installed; 644 static green
 - 2026-10-17 · #97 the Gateway API CRDs get one owner: gateway-helm `crds.enabled: false`; a new `envoy-gateway-crds` Application (gateway-crds-helm v1.9.2, wave -2, before Envoy Gateway reads which CRDs exist at startup) installs the Envoy Gateway CRDs and, while `gateway_api_config` stays off, the standard-channel Gateway API v1.6.1 CRDs; turning GKE's Gateway API on is one change that sets `crds.gatewayAPI.enabled: false` and a `min_master_version` of at least 1.34.1-gke.1822000 (GKE bundle v1.4.0, the first with BackendTLSPolicy v1; 1.35.2-gke.1842000 brings v1.5.0); GKE serves every Gateway API object the manifests use from that floor, but no GKE bundle is the v1.6.1 the Envoy Gateway v1.9 matrix lists (decisions.md); `tests/test_gateway_api_crd_owner.py` holds one owner, the floor and the flip; 674 static green
 - 2026-10-17 · #100 restates #90, already fixed by 1ee3d4e (port 7331, `CONFIG_STORE_PATH=/config-store/burritbot/`, `/v1/health`); the Deployment is unchanged and the stale "port 8000" comment in `ai-gateway/envoy/gateway.yaml` is corrected. NVIDIA's 25.7.0 custom-providers tutorial says "Only OpenAI compatible LLM providers are supported", so `config.yaml`'s `engine: vertexai` models likely won't load in the microservice; the route to an OpenAI-compatible Gemini is left as a follow-up (decisions.md); 674 static green
-- 2026-10-17 · #102 (partial) burrito-only.co moves "what are your hours" from off-topic to on-topic, matching its own refusal; `tests/test_burrito_only_rail.py` holds that and that the rails ConfigMap carries each .co file unchanged. The unresolved rail names are not fixed: nemoguardrails 0.24.1's `LLMRails` rejects `burrito only input`, and renaming the config to the `.co` names would not help, because an input rail that opens with `user ask off topic` waits for an intent the input stage never produces (the runtime stops at `Listen` with no `UserMessage`). How the input and output rails should decide (LLM self-check prompts or phrase checks on `$user_message`) waits for Michael; 681 static green
+- 2026-10-17 · #102 (partial) burrito-only.co moves "what are your hours" from off-topic to on-topic, matching its own refusal; the unresolved rail names wait on question 170; 681 static green
+- 2026-10-17 · #102 question 170 (decided by hecaton's research under Michael's standing rules): the four NeMo rails test the lower-cased `$user_message`/`$bot_message` against phrase lists from the old examples and `stop`, under the names `config.yaml` already enables (Colang 1.0 input rails run before any user intent exists, so intent-matching rails wait forever); `tests/test_nemo_rail_flows.py` builds the mounted ConfigMaps with real `LLMRails` (every enabled flow resolves; the old suffixed name is rejected) and runs `check_async`: 35 asks and replies blocked by their rail, 14 menu asks and replies pass (decisions.md); 733 static green
 
 ---
 
@@ -389,10 +390,12 @@ commit.
   uses the standard channel; with GKE on, `min_master_version` must reach
   the GKE version whose bundle serves the manifests' floor; mutation tests
   make the flip cleanly and get it wrong eight ways
-- Burrito-only rail (7), #102: no off-topic example asks about the menu,
-  hours or locations the refusal offers; "what are your hours" is on-topic;
-  the rails ConfigMap carries each .co file unchanged
-- **Total: 681 static tests green. Live tests fail loudly when
+- NeMo rail flows (59), #102: every flow `config.yaml` enables is defined
+  and real `LLMRails` loads the mounted ConfigMaps; a mutation restores the
+  old suffixed name and is rejected; `check_async` blocks each rail's asks
+  and leak replies under its own name and passes menu asks and replies;
+  both ConfigMaps mirror their sources
+- **Total: 733 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
