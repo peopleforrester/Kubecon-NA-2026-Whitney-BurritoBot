@@ -53,6 +53,29 @@
     return { who: who, reply: reply };
   }
 
+  function labelMode(turn, target) {
+    const mode = MODE[target] || target;
+    turn.who.textContent = "BurritBot · " + mode;
+    turn.who.dataset.mode = mode;
+  }
+
+  // The guardrails refuse a prompt or reply with a 403 that names the scanner
+  // in blocked_by and says why in detail; main.py relays it with the target.
+  // Any other 403 is an error like the rest.
+  function refusalOf(body) {
+    if (body && typeof body.blocked_by === "string" && typeof body.detail === "string") {
+      return body;
+    }
+    return null;
+  }
+
+  // Act 2: a refusal is BurritBot sticking to burritos, so it reads as a reply.
+  function showRefusal(turn, refusal) {
+    labelMode(turn, refusal.target);
+    turn.reply.textContent = refusal.detail;
+    turn.reply.className = "reply refused";
+  }
+
   function failureText(status, limit) {
     if (status === 429 && limit === "network") {
       return "Whoa, this Wi-Fi network has sent a lot of prompts in the last minute. Give it a moment, or switch to cellular.";
@@ -90,22 +113,23 @@
         body: JSON.stringify({ prompt: prompt }),
       });
       if (!resp.ok) {
-        let limit = null;
-        if (resp.status === 429) {
-          limit = await resp.json().then(function (body) {
-            return body.limit;
-          }, function () {
+        let body = null;
+        if (resp.status === 429 || resp.status === 403) {
+          body = await resp.json().catch(function () {
             return null;
           });
         }
-        turn.reply.textContent = failureText(resp.status, limit);
+        const refusal = resp.status === 403 ? refusalOf(body) : null;
+        if (refusal) {
+          showRefusal(turn, refusal);
+          return;
+        }
+        turn.reply.textContent = failureText(resp.status, body && body.limit);
         turn.reply.className = "reply error";
         return;
       }
       const body = await resp.json();
-      const mode = MODE[body.target] || body.target;
-      turn.who.textContent = "BurritBot · " + mode;
-      turn.who.dataset.mode = mode;
+      labelMode(turn, body.target);
       turn.reply.textContent = body.reply;
       turn.reply.className = "reply";
     } catch (err) {

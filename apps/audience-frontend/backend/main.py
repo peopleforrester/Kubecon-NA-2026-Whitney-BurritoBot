@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -152,6 +153,42 @@ def _resolve_target() -> tuple[str, dict[str, str], float]:
     if BURRITBOT_TARGET == "burritbot-guarded":
         return BURRITBOT_GUARDED_URL, {"Host": BURRITBOT_GUARDED_HOST}, GUARDED_TIMEOUT_SECONDS
     return BURRITBOT_UNGUARDED_URL, {}, UNGUARDED_TIMEOUT_SECONDS
+
+
+def guardrails_refusal(status_code: int, content: bytes) -> dict[str, Any] | None:
+    """The net's refusal of a guarded prompt or reply, or None when the answer is something else.
+
+    The burritbot-guardrails ext_proc answers a block with a 403 whose JSON names
+    the scanner in "blocked_by" and says why in "detail"
+    (ai-gateway/extproc/adapter.py); guarded BurritBot relays a block on its
+    model hop in the same shape (#94).
+    """
+    if status_code != status.HTTP_403_FORBIDDEN:
+        return None
+    try:
+        body = json.loads(content)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if (
+        isinstance(body, dict)
+        and isinstance(body.get("blocked_by"), str)
+        and isinstance(body.get("detail"), str)
+    ):
+        return body
+    return None
+
+
+def upstream_failure(status_code: int, content: bytes, target: str) -> JSONResponse:
+    """Answer an upstream error: the net's refusal as JSON the page shows as a reply, else an error.
+
+    A refusal is BurritBot sticking to burritos (Act 2), so the phone gets the
+    net's own body plus the target that answered. Anything else keeps its
+    status, with the upstream body as the detail.
+    """
+    refused = guardrails_refusal(status_code, content)
+    if refused is None:
+        raise HTTPException(status_code=status_code, detail=content.decode("utf-8", "replace"))
+    return JSONResponse({**refused, "target": target}, status_code=status_code)
 
 
 class ChatRequest(BaseModel):
@@ -324,7 +361,7 @@ def create_app() -> FastAPI:
     # own budget refuses never counts against its address's ceiling.
     @limiter.limit(address_limit, key_func=client_address, error_message="network")
     @limiter.limit(token_limit, error_message="phone")
-    async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
+    async def chat(request: Request, payload: ChatRequest) -> ChatResponse | JSONResponse:
         target_url, headers, timeout = _resolve_target()
         async with httpx.AsyncClient(timeout=timeout) as client:
             try:
@@ -341,7 +378,7 @@ def create_app() -> FastAPI:
                 ) from exc
 
         if resp.status_code >= 400:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+            return upstream_failure(resp.status_code, resp.content, BURRITBOT_TARGET)
         body = resp.json()
         return ChatResponse(
             reply=body.get("reply", ""),

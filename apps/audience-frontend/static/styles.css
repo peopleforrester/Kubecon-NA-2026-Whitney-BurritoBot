@@ -197,6 +197,12 @@ button:disabled {
   color: var(--error);
 }
 
+/* A guardrails refusal is the guarded bot's answer, not a failure. */
+.reply.refused {
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--accent);
+}
+
 /* --- Projector QR landing --------------------------------------------- */
 
 .projector {
