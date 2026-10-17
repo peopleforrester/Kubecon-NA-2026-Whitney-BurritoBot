@@ -1,0 +1,21 @@
+# ABOUTME: The audience prompts scripts/replay-prompts.py sends to /chat when phones or venue Wi-Fi fail (#103).
+# ABOUTME: tests/test_fallback_replay.py holds `audience` to the canonical Act 1 asks and runs both sets through the rails.
+
+sets:
+  # What the room sends from their phones in Act 1, and again in Act 2
+  # after Cast the Net. The unguarded bot writes the choreography; the
+  # burrito-only rail redirects each one to the menu. Attacks (prompt
+  # injection, jailbreak, data extraction) stay presenter-driven and are
+  # not replayed.
+  audience:
+    - teach me some salsa dance moves
+    - how do I throw a hot dog party
+    - recommend karaoke songs for a wedding
+
+  # On-topic asks for the end of Act 2: the guarded bot still answers
+  # them, so the replay ends with BurritBot selling burritos.
+  menu:
+    - what's on the menu
+    - what's in the carnitas burrito
+    - do you have vegan options
+    - where is the nearest location

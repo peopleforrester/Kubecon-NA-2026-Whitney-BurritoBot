@@ -3,23 +3,28 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import pytest
 import yaml
-from nemoguardrails import LLMRails, RailsConfig
+from nemoguardrails import LLMRails
 from nemoguardrails.colang import parse_colang_file
 from nemoguardrails.rails.llm.llmrails import InvalidRailsConfigurationError
 
 from conftest import PROJECT_ROOT
+from helpers.nemo_rails import (
+    CONFIGMAP_CONFIG,
+    CONFIGMAP_RAILS,
+    check,
+    configmap_data,
+    mounted_config,
+    mounted_rails,
+)
 
 
 NEMO_DIR = PROJECT_ROOT / "ai-gateway" / "nemo-guardrails"
 RAILS_DIR = NEMO_DIR / "rails"
 CONFIG = NEMO_DIR / "config.yaml"
-CONFIGMAP_CONFIG = NEMO_DIR / "configmap-config.yaml"
-CONFIGMAP_RAILS = NEMO_DIR / "configmap-rails.yaml"
 
 # What the off-topic refusal and config.yaml's instructions say BurritBot helps with.
 OFFERED_SUBJECTS = ("menu", "hours", "location")
@@ -94,40 +99,10 @@ MENU_REPLIES = [
 ]
 
 
-def _configmap_data(path: Path) -> dict[str, str]:
-    return yaml.safe_load(path.read_text())["data"]
-
-
-def _mounted_config(root: Path, config_text: str, rails: dict[str, str]) -> RailsConfig:
-    """Lay the config out as the Deployment mounts it: <config id>/config.yml beside rails/.
-
-    The Vertex AI models are dropped: no rail here calls a model, and ChatVertexAI
-    cannot be built without GCP auth (and #100 questions the engine in 25.07).
-    """
-    config = yaml.safe_load(config_text)
-    del config["models"]
-    store = root / "burritbot"
-    (store / "rails").mkdir(parents=True)
-    (store / "config.yml").write_text(yaml.safe_dump(config))
-    for name, text in rails.items():
-        (store / "rails" / name).write_text(text)
-    return RailsConfig.from_path(str(store))
-
-
 @pytest.fixture(scope="module")
 def rails(tmp_path_factory: pytest.TempPathFactory) -> LLMRails:
     """The burritbot config from the two ConfigMaps the cluster mounts, loaded by real LLMRails."""
-    config = _mounted_config(
-        tmp_path_factory.mktemp("config-store"),
-        _configmap_data(CONFIGMAP_CONFIG)["config.yaml"],
-        _configmap_data(CONFIGMAP_RAILS),
-    )
-    return LLMRails(config)
-
-
-def _check(rails: LLMRails, messages: list[dict]) -> tuple[str, str | None]:
-    result = asyncio.run(rails.check_async(messages))
-    return result.status.value, result.rail
+    return mounted_rails(tmp_path_factory.mktemp("config-store"))
 
 
 @pytest.mark.static
@@ -157,7 +132,7 @@ def test_llmrails_rejects_a_flow_the_rails_do_not_define(tmp_path: Path) -> None
     config["rails"]["output"]["flows"] = ["output sanitize system prompt"]
     rails_text = {p.name: p.read_text() for p in RAILS_DIR.glob("*.co")}
     with pytest.raises(InvalidRailsConfigurationError, match="output sanitize system prompt"):
-        LLMRails(_mounted_config(tmp_path, yaml.safe_dump(config), rails_text))
+        LLMRails(mounted_config(tmp_path, yaml.safe_dump(config), rails_text))
 
 
 @pytest.mark.static
@@ -165,12 +140,12 @@ def test_llmrails_rejects_a_flow_the_rails_do_not_define(tmp_path: Path) -> None
     ("rail", "ask"), [(rail, ask) for rail, asks in BLOCKED_ASKS.items() for ask in asks]
 )
 def test_input_rail_blocks_its_asks(rails: LLMRails, rail: str, ask: str) -> None:
-    assert _check(rails, [{"role": "user", "content": ask}]) == ("blocked", rail)
+    assert check(rails, [{"role": "user", "content": ask}]) == ("blocked", rail)
 
 
 @pytest.mark.static
 def test_input_rails_match_case_insensitively(rails: LLMRails) -> None:
-    assert _check(rails, [{"role": "user", "content": "Teach me some SALSA DANCE moves!"}]) == (
+    assert check(rails, [{"role": "user", "content": "Teach me some SALSA DANCE moves!"}]) == (
         "blocked",
         "burrito only input",
     )
@@ -179,21 +154,21 @@ def test_input_rails_match_case_insensitively(rails: LLMRails) -> None:
 @pytest.mark.static
 @pytest.mark.parametrize("ask", MENU_ASKS)
 def test_menu_ask_passes_every_input_rail(rails: LLMRails, ask: str) -> None:
-    assert _check(rails, [{"role": "user", "content": ask}]) == ("passed", None)
+    assert check(rails, [{"role": "user", "content": ask}]) == ("passed", None)
 
 
 @pytest.mark.static
 @pytest.mark.parametrize("reply", LEAKED_REPLIES)
 def test_output_rail_blocks_leaked_replies(rails: LLMRails, reply: str) -> None:
     messages = [{"role": "user", "content": "what's in the carnitas burrito"}, {"role": "assistant", "content": reply}]
-    assert _check(rails, messages) == ("blocked", "output sanitize")
+    assert check(rails, messages) == ("blocked", "output sanitize")
 
 
 @pytest.mark.static
 @pytest.mark.parametrize("reply", MENU_REPLIES)
 def test_output_rail_passes_menu_replies(rails: LLMRails, reply: str) -> None:
     messages = [{"role": "user", "content": "what's in the carnitas burrito"}, {"role": "assistant", "content": reply}]
-    assert _check(rails, messages) == ("passed", None)
+    assert check(rails, messages) == ("passed", None)
 
 
 @pytest.mark.static
@@ -207,7 +182,7 @@ def test_off_topic_refusal_offers_what_the_menu_asks_cover() -> None:
 
 @pytest.mark.static
 def test_config_configmap_mirrors_config_yaml() -> None:
-    assert _configmap_data(CONFIGMAP_CONFIG)["config.yaml"] == CONFIG.read_text(), (
+    assert configmap_data(CONFIGMAP_CONFIG)["config.yaml"] == CONFIG.read_text(), (
         f"{CONFIGMAP_CONFIG.name} carries a different config.yaml; the cluster mounts the ConfigMap, so copy it in"
     )
 
@@ -215,7 +190,7 @@ def test_config_configmap_mirrors_config_yaml() -> None:
 @pytest.mark.static
 @pytest.mark.parametrize("rail", sorted(RAILS_DIR.glob("*.co")), ids=lambda p: p.name)
 def test_rails_configmap_mirrors_the_rail_file(rail: Path) -> None:
-    assert _configmap_data(CONFIGMAP_RAILS).get(rail.name) == rail.read_text(), (
+    assert configmap_data(CONFIGMAP_RAILS).get(rail.name) == rail.read_text(), (
         f"{CONFIGMAP_RAILS.name} carries a different {rail.name} than rails/{rail.name}; "
         f"the cluster mounts the ConfigMap, so copy the file into it"
     )

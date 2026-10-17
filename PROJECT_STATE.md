@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 733 passed, 54 deselected after the
-  #102 NeMo rail rewrite
+  (ruff check, then static suite) 752 passed, 55 deselected after the
+  #103 fallback prompt replay
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -86,6 +86,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #100 restates #90, already fixed by 1ee3d4e (port 7331, `CONFIG_STORE_PATH=/config-store/burritbot/`, `/v1/health`); the Deployment is unchanged and the stale "port 8000" comment in `ai-gateway/envoy/gateway.yaml` is corrected. NVIDIA's 25.7.0 custom-providers tutorial says "Only OpenAI compatible LLM providers are supported", so `config.yaml`'s `engine: vertexai` models likely won't load in the microservice; the route to an OpenAI-compatible Gemini is left as a follow-up (decisions.md); 674 static green
 - 2026-10-17 · #102 (partial) burrito-only.co moves "what are your hours" from off-topic to on-topic, matching its own refusal; the unresolved rail names wait on question 170; 681 static green
 - 2026-10-17 · #102 question 170 (decided by hecaton's research under Michael's standing rules): the four NeMo rails test the lower-cased `$user_message`/`$bot_message` against phrase lists from the old examples and `stop`, under the names `config.yaml` already enables (Colang 1.0 input rails run before any user intent exists, so intent-matching rails wait forever); `tests/test_nemo_rail_flows.py` builds the mounted ConfigMaps with real `LLMRails` (every enabled flow resolves; the old suffixed name is rejected) and runs `check_async`: 35 asks and replies blocked by their rail, 14 menu asks and replies pass (decisions.md); 733 static green
+- 2026-10-17 · #103 (partial) live-demo fallback: `presentations/kubecon-na-2026/fallback/prompts.yaml` (the three canonical Act 1 asks, plus menu asks for the end of Act 2) and `scripts/replay-prompts.py`, which sends a set to the frontend's `/chat` as one browser token paced under the limit `/config` reports and stops at the first failure; RUNBOOK Rollback step 5 replays it over the hotspot via a port-forward, step 6 points at the fallback folder instead of the missing `docs/fallback-deck/` and says no recording exists yet, and the Night Before step proves the replay once; the per-segment videos and the screenshots deck wait on the first full rehearsal after #18; `limits==5.8.0` declared in dev (decisions.md); 752 static green
 
 ---
 
@@ -395,7 +396,15 @@ commit.
   old suffixed name and is rejected; `check_async` blocks each rail's asks
   and leak replies under its own name and passes menu asks and replies;
   both ConfigMaps mirror their sources
-- **Total: 733 static tests green. Live tests fail loudly when
+- Live-demo fallback (19), #103: RUNBOOK Rollback names only paths that
+  exist (the old `docs/fallback-deck/` line fails the check) and replays
+  the prompt set through a port-forward; the fallback README says the
+  videos and deck wait on #18; the `audience` set is the canonical asks,
+  each redirected by `burrito only input`, and the `menu` set passes every
+  input rail; the replay paces one token under the overlay limit, waits
+  longer than the frontend's guarded timeout, and against the real
+  frontend with BurritBot down stops at the first 502
+- **Total: 752 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

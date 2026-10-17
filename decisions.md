@@ -1913,3 +1913,47 @@ Not verified here: nothing has run in the 25.07 microservice container
 (#18), whose bundled nemoguardrails version is unknown. The rails use
 only `$var.lower()`, `in`, `or`, `if` and `stop`, which Colang 1.0 has
 supported since before 0.11.
+
+## 2026-10-17T05:00:03Z · decision · The live-input fallback is a replayable prompt set sent by one paced browser token; recordings wait on #18 (issue #103)
+
+Issue #103 (from #75, `ABSTRACT-READINESS.md` row 9): no recorded
+fallback existed, and RUNBOOK Rollback step 5 pointed at
+`docs/fallback-deck/`, which was never in the repo. The issue asks for a
+replayable prompt set for the live input (statically buildable), then
+videos and a screenshots deck from the first full rehearsal after #18.
+
+Decided by the run from the issue and the repo rules, not by Michael:
+
+- The prompt set lives with the talk, in
+  `presentations/kubecon-na-2026/fallback/prompts.yaml`. Its `audience`
+  set is exactly the three canonical Act 1 asks. Attacks are not
+  replayed, because they are presenter-driven (AGENTS.md) and the
+  presenters can still type them on the laptop. A `menu` set closes
+  Act 2 with asks every input rail passes.
+- The replay script is platform code (`scripts/replay-prompts.py`) and
+  takes the prompt file as an argument. It acts as one browser: a single
+  `X-Audience-Token`, paced at the strictest limit `/config` reports
+  (`token_limit`) with 10% headroom, so 10/minute becomes one prompt
+  every 6.6s. It does not mint a token per prompt to look like a full
+  room, because that would sidestep the per-browser limit question 157
+  set. It stops at the first failed prompt and exits 1. It does not retry
+  or skip, under the no-fallbacks rule.
+- The way in that avoids the venue Wi-Fi is `kubectl port-forward` from
+  the presenter laptop on the cellular hotspot. The frontend keys a
+  port-forward peer on itself and its token (#57), so the replay never
+  spends the room's per-address ceiling.
+- RUNBOOK Rollback splits the old worst case in two: step 5 (phones or
+  Wi-Fi down, cluster up) runs the replay, and step 6 (cluster down)
+  points at the fallback folder and says no recording exists until the
+  rehearsal. The Night Before section runs the replay once.
+- Dependency: `limits==5.8.0` is added to the dev group (2026-10-17). The
+  script parses the frontend's limit string with the same library the
+  frontend uses (`parse_many`), so both read it the same way. 5.8.0 was
+  already locked through slowapi and is the version the
+  `image-audience-frontend` group pins. The `uv.lock` change is two
+  metadata lines.
+
+Still open on #103: the per-segment videos and the screenshots deck need
+a working cluster (#18) and a full rehearsal. Where the video files will
+live is decided when they exist. The live test
+(`test_replay_reaches_the_deployed_frontend`) has not run.

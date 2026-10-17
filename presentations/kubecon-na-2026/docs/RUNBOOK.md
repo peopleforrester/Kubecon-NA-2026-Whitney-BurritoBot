@@ -38,7 +38,9 @@ close. See
 3. **Send one canonical prompt down each path** from a phone on cellular
    data: *teach me some salsa dance moves*. Expect choreography from the
    unguarded path and a redirect to the menu from the guarded path. Note
-   the result in the **Measurements** record below.
+   the result in the **Measurements** record below. Then run the prompt
+   replay once from the presenter laptop over the hotspot (**Rollback**
+   step 5, `--rounds 1`), so the fallback is proven before it is needed.
 
 4. **Leave it running.** Do not tear down overnight. Write down the time
    provisioning started; the Cost row in **Measurements** needs it.
@@ -297,6 +299,28 @@ mid-demo. **Rollback is preferred over debugging live.**
 4. **Full reset:** rerun the Phase 2 bootstrap from a clean state — see
    `spec/phases/phase-02-gitops.md`. Only do this if the talk is not live.
 
-5. **Worst case:** swap to the static screenshots deck in
-   `docs/fallback-deck/`. The audience came for the story, not the
-   cluster.
+5. **Phones or venue Wi-Fi fail, cluster healthy:** the presenter laptop
+   stands in for the room. Join the cellular hotspot and replay the
+   recorded audience prompts:
+   ```bash
+   kubectl -n audience port-forward svc/audience-frontend 8080:80
+   uv run --managed-python --frozen python scripts/replay-prompts.py \
+     --url http://127.0.0.1:8080 \
+     --prompts presentations/kubecon-na-2026/fallback/prompts.yaml \
+     --set audience --rounds 10
+   ```
+   It sends the three canonical Act 1 asks as one browser, paced under
+   the frontend's per-browser limit (about one prompt every 6.6s at
+   `10/minute`), and prints each reply with the bot that answered. Leave
+   it running through **Cast the Net**: the same asks start coming back
+   as menu redirects and the dashboard sees the blocks. Close Act 2 with
+   `--set menu` to show the guarded bot still sells burritos. Ctrl-C
+   stops it. It stops by itself at the first failed prompt and prints
+   why; treat that as the next step, not something to debug live.
+
+6. **Worst case, the cluster is down:** play the recorded segments and
+   the screenshots deck from `presentations/kubecon-na-2026/fallback/`.
+   They are recorded at the first full rehearsal after #18 (see that
+   folder's `README.md`); until that rehearsal there is no recording,
+   and the worst case is the story without the demo. The audience came
+   for the story, not the cluster.
