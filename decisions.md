@@ -1913,3 +1913,35 @@ Not verified here: nothing has run in the 25.07 microservice container
 (#18), whose bundled nemoguardrails version is unknown. The rails use
 only `$var.lower()`, `in`, `or`, `if` and `stop`, which Colang 1.0 has
 supported since before 0.11.
+
+## 2026-10-17T05:30:00Z · amendment · The nine readiness points are checked against the accepted wording (issue #104)
+
+The #75 entry above records that the run had no read access to
+talks-knowledge, so the nine points in
+`presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md` were taken as
+issue #75 named them. talks-knowledge#29 has since compared them with
+the checklist (`talks/2026-10-16_hard-dated-commitments.md`) and the
+accepted Sessionize 1249553 text
+(`abstracts/recovered/sessionize-public-profile.md` section 5): each is
+the same point, in the same order. The #75 entry stands as written;
+this one corrects its caveat.
+
+What it changes:
+
+- The record's "Checked against" paragraph drops the caveat and cites
+  talks-knowledge#29. The ratings and the verdict do not change.
+- Row 4 quotes "It starts wide open, and we let the audience hack it
+  live", with "A user does not need to be malicious to embarrass an
+  enterprise, just a little bit weird" and "Bring your weirdest
+  off-topic question". Row 6 quotes "LLM-specific guardrails, like pre-
+  and mid-inference prompt analysis".
+- Rows 5 and 9 name the parts of the checklist's "Ready means" that #75
+  did not assess, to check once #18 is up: the Kubernetes layers shown
+  before the LLM layer, and the live audience input working over the
+  venue network beside the recorded fallback.
+- The scope calls (MCP server, full IDP, who hacks, what counts as
+  mid-inference) went to Michael and Whitney from talks-knowledge#29.
+  Nothing here decides them or changes the repo's rules.
+- `tests/test_abstract_readiness.py` holds the paragraph to the citation
+  without the caveat, rows 4 and 6 to the accepted wording, and rows 5
+  and 9 to their unassessed part and #18.

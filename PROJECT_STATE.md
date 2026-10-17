@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 733 passed, 54 deselected after the
-  #102 NeMo rail rewrite
+  (ruff check, then static suite) 736 passed, 54 deselected after the
+  #104 readiness wording check
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -86,6 +86,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #100 restates #90, already fixed by 1ee3d4e (port 7331, `CONFIG_STORE_PATH=/config-store/burritbot/`, `/v1/health`); the Deployment is unchanged and the stale "port 8000" comment in `ai-gateway/envoy/gateway.yaml` is corrected. NVIDIA's 25.7.0 custom-providers tutorial says "Only OpenAI compatible LLM providers are supported", so `config.yaml`'s `engine: vertexai` models likely won't load in the microservice; the route to an OpenAI-compatible Gemini is left as a follow-up (decisions.md); 674 static green
 - 2026-10-17 · #102 (partial) burrito-only.co moves "what are your hours" from off-topic to on-topic, matching its own refusal; the unresolved rail names wait on question 170; 681 static green
 - 2026-10-17 · #102 question 170 (decided by hecaton's research under Michael's standing rules): the four NeMo rails test the lower-cased `$user_message`/`$bot_message` against phrase lists from the old examples and `stop`, under the names `config.yaml` already enables (Colang 1.0 input rails run before any user intent exists, so intent-matching rails wait forever); `tests/test_nemo_rail_flows.py` builds the mounted ConfigMaps with real `LLMRails` (every enabled flow resolves; the old suffixed name is rejected) and runs `check_async`: 35 asks and replies blocked by their rail, 14 menu asks and replies pass (decisions.md); 733 static green
+- 2026-10-17 · #104 readiness points checked against the accepted wording (talks-knowledge#29): same nine points, same order; ABSTRACT-READINESS.md drops the unchecked caveat, rows 4 and 6 quote the accepted text, rows 5 and 9 name the "Ready means" parts left for #18 (Kubernetes layers before the LLM layer; live input over the venue network); scope calls are with Michael and Whitney; ratings unchanged; 736 static green
 
 ---
 
@@ -395,7 +396,7 @@ commit.
   old suffixed name and is rejected; `check_async` blocks each rail's asks
   and leak replies under its own name and passes menu asks and replies;
   both ConfigMaps mirror their sources
-- **Total: 733 static tests green. Live tests fail loudly when
+- **Total: 736 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
