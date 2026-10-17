@@ -1,0 +1,62 @@
+# ABOUTME: ArgoCD Application for Envoy Gateway's CRDs (gateway.envoyproxy.io) and, while GKE's Gateway API is off,
+# ABOUTME: the Gateway API CRDs — their only owner, synced before the Envoy Gateway controller starts.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway-crds
+  namespace: argocd
+  annotations:
+    # Before the envoy-gateway Application (wave -1). Envoy Gateway looks up
+    # which optional CRDs exist once, at startup, and skips the watch for any
+    # that are missing (BackendTLSPolicy among them) until it restarts.
+    argocd.argoproj.io/sync-wave: "-2"
+  labels:
+    burritbot.io/layer: the-net
+    app.kubernetes.io/part-of: burritbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # oci://docker.io/envoyproxy/gateway-crds-helm. Moves with gateway-helm in
+    # envoy-gateway.yaml, which installs no CRDs of its own.
+    repoURL: docker.io/envoyproxy
+    chart: gateway-crds-helm
+    targetRevision: v1.9.2
+    helm:
+      valuesObject:
+        crds:
+          # Backend, EnvoyProxy, EnvoyExtensionPolicy and the other
+          # gateway.envoyproxy.io CRDs. No provider installs these.
+          envoyGateway:
+            enabled: true
+          # Gateway API v1.6.1 (GatewayClass, Gateway, HTTPRoute,
+          # ReferenceGrant, BackendTLSPolicy) and its safe-upgrades
+          # ValidatingAdmissionPolicy. Turning on gateway_api_config in
+          # infrastructure/terraform/gke.tf hands these to GKE: set this false
+          # in the same change, with a min_master_version whose GKE bundle
+          # serves the manifests (tests/test_gateway_api_crd_owner.py).
+          gatewayAPI:
+            enabled: true
+            # The only channel GKE installs, so rehearsals run on what GKE
+            # would serve. Every Gateway API object here is standard.
+            channel: standard
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      # The Gateway API and EnvoyProxy CRDs are larger than the 256 KiB
+      # last-applied annotation that client-side apply writes.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -75,6 +75,13 @@ resource "google_container_cluster" "burritbot" {
     channel = "REGULAR"
   }
 
+  # No gateway_api_config: the envoy-gateway-crds ArgoCD Application owns the
+  # Gateway API CRDs. Turning it on (the #57 GKE Gateway) also needs, in the
+  # same change, crds.gatewayAPI.enabled false in
+  # gitops/apps/envoy-gateway-crds.yaml and min_master_version at or above
+  # 1.34.1-gke.1822000, the first GKE whose bundle (Gateway API v1.4.0)
+  # serves BackendTLSPolicy v1 (tests/test_gateway_api_crd_owner.py).
+
   # Private nodes: workers get no public IPs (egress via Cloud NAT in vpc.tf).
   # enable_private_endpoint = false leaves the control-plane API reachable
   # from the operator's allow-listed CIDRs via master_authorized_networks

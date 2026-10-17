@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 644 passed, 53 deselected after the
-  #96 Kyverno webhook port
+  (ruff check, then static suite) 674 passed, 54 deselected after the
+  #97 Gateway API CRD owner
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -82,6 +82,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #88 question 157 (decided by the coordinator under Michael's standing rules): the audience `/chat` limit is 10/minute per browser token (`X-Audience-Token`, random, kept in localStorage) under a 300/minute per-address ceiling; a tokenless phone is held to 10/minute on its address; both numbers are set by `presentations/kubecon-na-2026/deploy/audience`, which the ArgoCD `audience` Application now syncs, and the app refuses to start without them; Phase 7 spec, RUNBOOK step 8 and the Room network row updated; 624 static green
 - 2026-10-17 · #94 the guardrails ExtProc already reached the `burritbot-extproc` gRPC adapter (#66) and llm-guard-api is 0.3.16, the last release (#91); which hops each scanner scans: both scanners, both hops (the Gateway target, #49), prompt and reply. Checked against Envoy AI Gateway v0.6.0 and v1.2.0 source: on the model hop the gateway's own ext_proc runs ahead of the net, so the net saw Vertex's reply before translation and passed it unscanned, and a prompt rewrite there would be dropped. The adapter now scans Vertex `candidates`, refuses an encoded reply (502) and a model-hop prompt rewrite (403); guarded BurritBot asks the gateway for `Accept-Encoding: identity` and relays a refusal naming its scanner with the net's status and body; 641 static green
 - 2026-10-17 · #96 private nodes let the GKE control plane reach pods on TCP 443 and 10250 only; Kyverno's admission and cleanup controllers move their webhook servers from the chart's 9443 to 10250 (the cert-manager and AI Gateway controller port), their startup, liveness and readiness probes follow the named `https` port, and the chart's 9443-only webhook NetworkPolicies stay off; the live admission-controller check now looks in `security`, where Kyverno is installed; 644 static green
+- 2026-10-17 · #97 the Gateway API CRDs get one owner: gateway-helm `crds.enabled: false`; a new `envoy-gateway-crds` Application (gateway-crds-helm v1.9.2, wave -2, before Envoy Gateway reads which CRDs exist at startup) installs the Envoy Gateway CRDs and, while `gateway_api_config` stays off, the standard-channel Gateway API v1.6.1 CRDs; turning GKE's Gateway API on is one change that sets `crds.gatewayAPI.enabled: false` and a `min_master_version` of at least 1.34.1-gke.1822000 (GKE bundle v1.4.0, the first with BackendTLSPolicy v1; 1.35.2-gke.1842000 brings v1.5.0); GKE serves every Gateway API object the manifests use from that floor, but no GKE bundle is the v1.6.1 the Envoy Gateway v1.9 matrix lists (decisions.md); `tests/test_gateway_api_crd_owner.py` holds one owner, the floor and the flip; 674 static green
 
 ---
 
@@ -380,7 +381,13 @@ commit.
   above the ext_proc both ways plus the AIGatewayRoute's Vertex timeout;
   neither route is left on its default; mutation tests restore the old
   10s, drop each route timeout and shorten or swell each hop
-- **Total: 644 static tests green. Live tests fail loudly when
+- Gateway API CRD owner (27), #97: exactly one of gateway-helm,
+  gateway-crds-helm and GKE's `gateway_api_config` installs the Gateway
+  API CRDs; the CRD chart is Envoy Gateway's release, syncs before it and
+  uses the standard channel; with GKE on, `min_master_version` must reach
+  the GKE version whose bundle serves the manifests' floor; mutation tests
+  make the flip cleanly and get it wrong eight ways
+- **Total: 674 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

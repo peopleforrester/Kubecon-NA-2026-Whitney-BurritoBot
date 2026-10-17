@@ -1729,3 +1729,87 @@ Not verified here: nothing has run on a cluster (#18), and the chart was
 read, not rendered (no helm here). This is deploy configuration, and as
 with #66 and #68 it waits for Michael's review before any cluster syncs
 it.
+
+## 2026-10-17T03:36:51Z · decision · The Gateway API CRDs get one owner, envoy-gateway-crds, until GKE's Gateway API takes them in a single change (issue #97)
+
+#68 installed Envoy Gateway's gateway-helm v1.9.2 with its crds
+subchart. That subchart carries the Gateway API v1.6.1 CRDs on the
+**experimental** channel, the gateway.envoyproxy.io CRDs and Gateway
+API's `safe-upgrades` ValidatingAdmissionPolicy. The policy refuses
+Gateway API CRD writes with a bundle below v1.5. The #57 GKE Gateway
+needs `gateway_api_config`, and GKE then installs its own copy.
+
+What changes:
+
+- **gateway-helm `crds.enabled: false`**, as the issue asks.
+- **New `envoy-gateway-crds` Application**: gateway-crds-helm v1.9.2
+  (the same release as gateway-helm), `crds.envoyGateway.enabled: true`,
+  wave -2 (Envoy Gateway is -1), server-side apply.
+- **`crds.gatewayAPI.enabled` stays true for now**, not the false the
+  issue names. With `gateway_api_config` still off, false would leave
+  the cluster with no Gateway API CRDs at all. The Application is now
+  the only owner. Turning GKE's Gateway API on is one change: add
+  `gateway_api_config`, set this value false and set the version floor
+  below. `tests/test_gateway_api_crd_owner.py` holds every state to
+  exactly one owner. Its mutation tests make that flip cleanly, and
+  catch two owners, no owner and a missing or low floor.
+- **Channel `standard`** (the chart defaults to experimental, and
+  gateway-helm's subchart used experimental). GKE installs only the
+  standard channel, so rehearsals run on what GKE would serve. Every
+  Gateway API object in the repo validates against the standard v1.6.1
+  CRDs the chart renders. Envoy Gateway v1.9.2 watches no experimental
+  Gateway API kind.
+- **Wave -2.** Envoy Gateway checks once, at startup, which optional
+  CRDs exist (BackendTLSPolicy, ListenerSet, GRPCRoute, TLSRoute,
+  TCPRoute, UDPRoute). It skips the watch for any that are missing,
+  with only an info log, until the pod restarts
+  (`internal/provider/kubernetes/controller.go` at v1.9.2). Before this
+  change the CRDs came with the controller in a single sync.
+
+What GKE serves. Source: the "New clusters and cluster upgrades" table at
+https://docs.cloud.google.com/kubernetes-engine/docs/how-to/gatewayclass-capabilities,
+read 2026-10-17.
+
+| GKE | Gateway API |
+|---|---|
+| 1.35.2-gke.1842000+ | v1.5.0 |
+| 1.34.1-gke.1822000+ | v1.4.0 |
+| 1.33.2-gke.1335000+ | v1.3.0 |
+
+GKE installs the standard channel only.
+
+- **What the manifests use.** BackendTLSPolicy v1, Gateway
+  `infrastructure.parametersRef`, HTTPRoute, GatewayClass and
+  ReferenceGrant v1beta1. All validate against the v1.4.0 and v1.5.0
+  release `standard-install.yaml` (checked with
+  `tests/helpers/crd_schema.openapi_violations`). The AI Gateway
+  controller v1.2.0 uses only Gateway, HTTPRoute and ReferenceGrant
+  v1beta1. Envoy Gateway v1.9.2 watches GatewayClass, Gateway and
+  HTTPRoute unconditionally and finds the rest through discovery.
+- **The GKE floor is 1.34.1-gke.1822000.** Below it, GKE serves v1.3,
+  with no BackendTLSPolicy v1. Envoy Gateway would then skip
+  BackendTLSPolicy without an error, and the Vertex AI upstream would
+  lose its TLS policy. With `gateway_api_config` on, the tests require
+  `min_master_version` at or above this floor. A short version such as
+  `1.34` does not count, because GKE may pick any 1.34 patch.
+- **Against the compatibility matrix, the answer is no.** Envoy Gateway
+  v1.9 is listed against Gateway API v1.6.1
+  (https://gateway.envoyproxy.io/news/releases/matrix/, read
+  2026-10-17). GKE's newest bundle is v1.5.0, and the GKE release notes
+  name no v1.6 through 2026-10-17. v1.5.1 is listed for Envoy Gateway
+  v1.8, but Agent Router v1.2.0 builds against Envoy Gateway v1.9.2.
+  The gateway-crds-helm README asks for both the matrix and the
+  resources you use to fit. The resources fit from the floor; the
+  matrix does not. So `gateway_api_config` stays off here. Turning it
+  on off-matrix, or waiting for a GKE v1.6 bundle, is part of the #57
+  Gateway work. #57 already left that deploy configuration to Michael.
+
+Not verified here: nothing has run on a cluster (#18). The charts were
+read and their templates checked, not rendered (no helm here). On a
+cluster that has already synced, the flip is not a value edit.
+ArgoCD's prune would delete the Gateway API CRDs, and every Gateway
+and HTTPRoute with them, before or after GKE writes its own. On a live
+cluster the hand-over needs a step that keeps the CRDs, so it is
+cheapest before #18's first sync. This is deploy configuration, and as
+with #68 and #96 it waits for Michael's review before any cluster syncs
+it.
