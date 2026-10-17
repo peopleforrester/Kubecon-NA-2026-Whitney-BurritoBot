@@ -1,8 +1,13 @@
 {
   "title": "Cast the Net — Before / After Comparison",
   "uid": "burritbot-cast-net-comparison",
-  "description": "Side-by-side view of Act 1 (net recalled, unguarded BurritBot) vs Act 2 (net cast, guarded BurritBot). Surfaces jailbreak success rate, off-topic rate, and latency delta for the live demo.",
-  "tags": ["burritbot", "cast-net", "the-net", "demo"],
+  "description": "Side-by-side view of Act 1 (net recalled, unguarded BurritBot) vs Act 2 (net cast, guarded BurritBot): which BurritBot is answering, what the net blocked against what the unguarded bot answered unscanned, and the latency the net adds. Sources: BurritBot's gen_ai.client.operation.duration and the guardrails adapter's burritbot.guardrails.refusals.",
+  "tags": [
+    "burritbot",
+    "cast-net",
+    "the-net",
+    "demo"
+  ],
   "schemaVersion": 38,
   "version": 1,
   "refresh": "10s",
@@ -14,30 +19,45 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Current traffic target",
+      "title": "BurritBot answering (last minute)",
       "targets": [
         {
-          "expr": "max(burritbot_cast_net_current_target)",
+          "expr": "sum by (burritbot_guarded) (rate(burritbot_gen_ai_client_operation_duration_seconds_count[1m])) > 0",
+          "legendFormat": "guarded={{burritbot_guarded}}",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0}
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "description": "cast-net.sh switches the audience frontend's target; this shows which BurritBot is taking model calls."
     },
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Jailbreak attempts blocked (guarded) vs leaked (unguarded)",
+      "title": "Blocked by the net (guarded) vs answered unscanned (unguarded)",
       "targets": [
         {
-          "expr": "sum(rate(burritbot_llm_guard_block_total[1m])) by (scanner)",
+          "expr": "sum by (burritbot_scanner, burritbot_direction) (rate(burritbot_burritbot_guardrails_refusals_total{http_response_status_code=\"403\"}[1m]))",
+          "legendFormat": "{{burritbot_scanner}} blocked a {{burritbot_direction}}",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(burritbot_burritbot_unguarded_leak_total[1m]))",
+          "expr": "sum(rate(burritbot_gen_ai_client_operation_duration_seconds_count{burritbot_guarded=\"false\", error_type=\"\"}[1m]))",
+          "legendFormat": "unguarded answered, nothing scanned",
           "refId": "B"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "description": "A: prompts and replies a scanner refused with 403. B: unguarded model calls that returned an answer with no scanner in front of them."
     },
     {
       "id": 3,
@@ -45,13 +65,28 @@
       "title": "p95 latency delta (guarded − unguarded)",
       "targets": [
         {
-          "expr": "(histogram_quantile(0.95, sum(rate(burritbot_burritbot_guarded_request_duration_seconds_bucket[1m])) by (le))) - (histogram_quantile(0.95, sum(rate(burritbot_burritbot_unguarded_request_duration_seconds_bucket[1m])) by (le)))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(burritbot_gen_ai_client_operation_duration_seconds_bucket{burritbot_guarded=\"true\"}[1m]))) - histogram_quantile(0.95, sum by (le) (rate(burritbot_gen_ai_client_operation_duration_seconds_bucket{burritbot_guarded=\"false\"}[1m])))",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     }
   ],
-  "templating": {"list": []},
-  "annotations": {"list": []}
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
 }

@@ -33,6 +33,11 @@ from envoy_data_plane.envoy.service.ext_proc.v3 import (
 from envoy_data_plane.envoy.type.v3 import HttpStatus, StatusCode
 from grpclib.server import Server
 from grpclib.utils import graceful_exit
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.metrics import Meter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import Resource
 
 
 logger = logging.getLogger("burritbot-extproc")
@@ -42,6 +47,12 @@ Path = tuple[str | int, ...]
 
 NEMO = "nemo-guardrails"
 LLM_GUARD = "llm-guard"
+
+# Every exchange the net refuses, counted where the refusal is made. 403 is a
+# scanner's block (or a rewrite the gateway would drop); 400, 502 and 503 are
+# the net failing closed. Exported over OTLP/gRPC to the collector, which
+# remote-writes it to Prometheus for the cast-net dashboard.
+REFUSALS = "burritbot.guardrails.refusals"
 
 
 class UnreadableBody(ValueError):
@@ -322,8 +333,24 @@ def content_encoding(headers: HttpHeaders) -> str:
 class GuardrailsProcessor(ExternalProcessorBase):
     """One ext_proc stream per HTTP exchange: scan the prompt, then the reply to it."""
 
-    def __init__(self, scanner: Scanner) -> None:
+    def __init__(self, scanner: Scanner, meter: Meter) -> None:
         self.scanner = scanner
+        self._refusals = meter.create_counter(
+            REFUSALS, unit="{refusal}", description="Exchanges the guardrails refused, by scanner, direction and status."
+        )
+
+    def _counted(self, response: ProcessingResponse, direction: str) -> ProcessingResponse:
+        """response, with a refusal counted against this scanner."""
+        if response.immediate_response is not None:
+            self._refusals.add(
+                1,
+                {
+                    "burritbot.scanner": self.scanner.name,
+                    "burritbot.direction": direction,
+                    "http.response.status_code": int(response.immediate_response.status.code),
+                },
+            )
+        return response
 
     async def check_request(self, body: bytes) -> tuple[ProcessingResponse, str]:
         """The response to a buffered request body, and the prompt kept for the output check."""
@@ -389,12 +416,12 @@ class GuardrailsProcessor(ExternalProcessorBase):
                 yield ProcessingResponse(request_headers=HeadersResponse())
             elif req.request_body is not None:
                 response, prompt = await self.check_request(req.request_body.body)
-                yield response
+                yield self._counted(response, "prompt")
             elif req.response_headers is not None:
                 encoding = content_encoding(req.response_headers)
                 yield ProcessingResponse(response_headers=HeadersResponse())
             elif req.response_body is not None:
-                yield await self.check_response(req.response_body.body, prompt, encoding)
+                yield self._counted(await self.check_response(req.response_body.body, prompt, encoding), "reply")
             elif req.request_trailers is not None:
                 yield ProcessingResponse(request_trailers=TrailersResponse())
             elif req.response_trailers is not None:
@@ -424,6 +451,9 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
+        # Read by the OTLP exporter and the Resource; unset, the refusals would go nowhere.
+        _require_env("OTEL_EXPORTER_OTLP_ENDPOINT")
+        _require_env("OTEL_SERVICE_NAME")
         scanner = _require_env("SCANNER")
         if scanner not in (NEMO, LLM_GUARD):
             raise RuntimeError(f"SCANNER must be {NEMO} or {LLM_GUARD}, got {scanner!r}")
@@ -446,13 +476,28 @@ class Config:
         return httpx.AsyncClient(base_url=self.scanner_url, timeout=self.timeout_seconds)
 
 
+def meter_provider() -> MeterProvider:
+    """OTLP/gRPC metric export to OTEL_EXPORTER_OTLP_ENDPOINT, as OTEL_SERVICE_NAME."""
+    return MeterProvider(
+        resource=Resource.create(),
+        metric_readers=[PeriodicExportingMetricReader(OTLPMetricExporter())],
+        shutdown_on_exit=False,
+    )
+
+
 async def serve(config: Config, host: str = "0.0.0.0") -> None:
-    async with config.http_client() as client:
-        server = Server([GuardrailsProcessor(config.scanner_for(client))])
-        with graceful_exit([server]):
-            await server.start(host, config.port)
-            logger.info("ext_proc adapter for %s at %s listening on %d", config.scanner, config.scanner_url, config.port)
-            await server.wait_closed()
+    provider = meter_provider()
+    try:
+        async with config.http_client() as client:
+            server = Server([GuardrailsProcessor(config.scanner_for(client), provider.get_meter("burritbot-extproc"))])
+            with graceful_exit([server]):
+                await server.start(host, config.port)
+                logger.info(
+                    "ext_proc adapter for %s at %s listening on %d", config.scanner, config.scanner_url, config.port
+                )
+                await server.wait_closed()
+    finally:
+        provider.shutdown()  # export the refusals counted since the last interval
 
 
 def main() -> None:

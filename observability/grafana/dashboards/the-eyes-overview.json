@@ -1,8 +1,12 @@
 {
   "title": "The Eyes — Overview",
   "uid": "burritbot-the-eyes-overview",
-  "description": "Top-level health dashboard for the burritbot observability layer. Shows OTel Collector ingest rate, gen_ai.* attribute coverage, and spinybacked-orbweaver conformance score.",
-  "tags": ["burritbot", "the-eyes", "overview"],
+  "description": "Top-level health dashboard for the burritbot observability layer: OTel Collector ingest rate, gen_ai.* coverage and the orbweaver-weighted conformance score of the GenAI spans the collector receives (its count/genai connector).",
+  "tags": [
+    "burritbot",
+    "the-eyes",
+    "overview"
+  ],
   "schemaVersion": 38,
   "version": 1,
   "refresh": "15s",
@@ -17,11 +21,16 @@
       "title": "OTel Collector — spans/sec",
       "targets": [
         {
-          "expr": "sum(rate(burritbot_otelcol_receiver_accepted_spans[1m]))",
+          "expr": "sum(rate(burritbot_otelcol_receiver_accepted_spans_total[1m]))",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "id": 2,
@@ -29,25 +38,67 @@
       "title": "gen_ai.* coverage (%)",
       "targets": [
         {
-          "expr": "avg(burritbot_genai_attribute_coverage_ratio) * 100",
+          "expr": "100 * sum(rate(burritbot_burritbot_genai_spans_conformant_total[5m])) / sum(rate(burritbot_burritbot_genai_spans_total[5m]))",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0}
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "description": "Answered GenAI spans carrying every required Weaver registry attribute, conforming.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 3,
       "type": "gauge",
-      "title": "Orbweaver conformance score",
+      "title": "gen_ai.* conformance score (orbweaver weights)",
       "targets": [
         {
-          "expr": "burritbot_orbweaver_conformance_score",
+          "expr": "(1 * (sum(rate(burritbot_burritbot_genai_spans_conforming_gen_ai_provider_name_total[5m])) or vector(0)) + 1 * (sum(rate(burritbot_burritbot_genai_spans_conforming_gen_ai_request_model_total[5m])) or vector(0)) + 0.8 * (sum(rate(burritbot_burritbot_genai_spans_conforming_gen_ai_usage_input_tokens_total[5m])) or vector(0)) + 0.8 * (sum(rate(burritbot_burritbot_genai_spans_conforming_gen_ai_usage_output_tokens_total[5m])) or vector(0)) + 0.5 * (sum(rate(burritbot_burritbot_genai_spans_conforming_burritbot_layer_total[5m])) or vector(0)) + 0.5 * (sum(rate(burritbot_burritbot_genai_spans_conforming_burritbot_guarded_total[5m])) or vector(0))) / (4.6 * sum(rate(burritbot_burritbot_genai_spans_total[5m])))",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0}
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "description": "spinybacked-orbweaver's attribute weights over the conforming-span counts; 1.0 when every weighted attribute conforms. Its score_threshold is 0.85.",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.85
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     }
   ],
-  "templating": {"list": []},
-  "annotations": {"list": []}
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
 }

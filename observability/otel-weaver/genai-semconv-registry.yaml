@@ -7,6 +7,13 @@ groups:
     brief: "Generative AI call semantic conventions used by BurritBot + burritbot."
     prefix: gen_ai
     attributes:
+      # Required on every GenAI span; the collector's count/genai connector
+      # scores only spans that carry it (gitops/apps/otel-collector.yaml).
+      - id: gen_ai.operation.name
+        type: string
+        requirement_level: required
+        brief: "Name of the operation being performed (BurritBot: chat)."
+
       # Renamed in OTel semconv v1.37.0 — was `gen_ai.system` with value
       # `vertex_ai`; the canonical attribute is now `gen_ai.provider.name`
       # with Google Cloud values prefixed `gcp.*`.

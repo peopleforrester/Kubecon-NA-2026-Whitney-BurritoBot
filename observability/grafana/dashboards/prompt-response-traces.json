@@ -1,8 +1,12 @@
 {
   "title": "BurritBot Prompt / Response Traces",
   "uid": "burritbot-prompt-response-traces",
-  "description": "Trace table joining audience prompts to BurritBot responses with gen_ai.* attributes, latency, and guardrail verdicts.",
-  "tags": ["burritbot", "burritbot", "traces", "gen_ai"],
+  "description": "BurritBot's model-call spans (gen_ai.* attributes, latency, the net's refusals as error.type guardrails_refused) and p95 model-call latency per path.",
+  "tags": [
+    "burritbot",
+    "traces",
+    "gen_ai"
+  ],
   "schemaVersion": 38,
   "version": 1,
   "refresh": "30s",
@@ -14,16 +18,24 @@
     {
       "id": 1,
       "type": "table",
-      "title": "Recent prompt/response spans",
-      "datasource": {"type": "tempo", "uid": "tempo"},
+      "title": "Recent model-call spans",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
       "targets": [
         {
           "queryType": "traceql",
-          "query": "{ name =~ \"burritbot.*chat\" }",
+          "query": "{ resource.service.name =~ \"burritbot-(guarded|unguarded)\" && span.gen_ai.operation.name = \"chat\" }",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0}
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "id": 2,
@@ -31,13 +43,29 @@
       "title": "p95 latency by path (guarded vs unguarded)",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(burritbot_burritbot_request_duration_seconds_bucket[5m])) by (le, guarded))",
+          "expr": "histogram_quantile(0.95, sum by (le, burritbot_guarded) (rate(burritbot_gen_ai_client_operation_duration_seconds_bucket[5m])))",
+          "legendFormat": "guarded={{burritbot_guarded}}",
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 10}
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     }
   ],
-  "templating": {"list": []},
-  "annotations": {"list": []}
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
 }

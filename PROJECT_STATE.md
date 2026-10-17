@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 794 passed, 54 deselected after the
-  #110 guardrails refusal on the phone page
+  (ruff check, then static suite) 829 passed, 55 deselected after the
+  #101 GenAI telemetry export
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -90,6 +90,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #106 synced-manifest check widened to Directory sources: `synced_paths` (tests/helpers/manifest_graph.py) takes every Application source by ArgoCD's type (explicit block, else kustomization → Kustomize, Chart.yaml → Helm, else Directory) and walks Directory sources as the reposerver does (recurse, manifest extensions, include/exclude as gobwas globs with no separators, skip-file-rendering marker); the ReferenceGrant, dashboard ConfigMap and GatewayClass sync tests use it; new `tests/test_synced_paths.py` holds every cluster manifest in the repo to some Application, the hand-applied root `gitops/bootstrap/app-of-apps.yaml` the one exception, with mutation cases dropping cert-manager-issuers and the root; no manifest was unsynced; 773 static green
 - 2026-10-17 · #109 GKE load-balancer timeout: `tests/test_guarded_timeout_budget.py` now holds any GKE Gateway (`gke-l7-*` GatewayClass) route to `audience/audience-frontend` to a GCPBackendPolicy on that Service with `spec.default.timeoutSec` above the frontend's `GUARDED_TIMEOUT_SECONDS` (125s; the load balancer's default is 30s), and any `timeouts.request` on that route above it too; mutation cases cover no policy, the 30s default, a timeout equal to the frontend's and a short route timeout. No Gateway or GCPBackendPolicy manifest is added: the #57 Gateway, its hostname, certificate and `gateway_api_config` wait for Michael, and without GKE's Gateway controller the GCPBackendPolicy CRD does not exist, so the audience sync would fail (decisions.md); 780 static green
 - 2026-10-17 · #110 guardrails refusal on the phone page: the audience backend's `upstream_failure` relays a 403 whose JSON names a scanner in `blocked_by` and says why in `detail` (the net's block on either hop, and guarded BurritBot's relay of one since #94) as that JSON plus `target`, where it used to quote it inside an HTTPException detail; every other upstream error keeps its status. `app.js` reads a 403's body and, when `refusalOf` finds the net's refusal, `showRefusal` shows its detail as a `BurritBot · guarded` reply styled `reply refused`, not "Something went wrong (HTTP 403)"; a net 502/503 still reads as unreachable. New `tests/test_phase_07_guardrails_refusal.py`; 794 static green
+- 2026-10-17 · #101 The Eyes see: BurritBot exports OTLP/gRPC through its own SDK providers (refuses to start without `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_SERVICE_NAME`) and wraps each model call in a `chat <model>` CLIENT span with `gen_ai.*` attributes plus `gen_ai.client.operation.duration`/`token.usage`; the extproc adapter counts refusals as `burritbot.guardrails.refusals`; the collector Service was really `otel-collector-opentelemetry-collector` (chart render) and is now `otel-collector`, remote write is `burritbot_`-namespaced without target_info (out-of-order drops), self-scrape restored, a `count/genai` connector scores spans against the Weaver registry with orbweaver weights, the unscoped `gen_ai.provider.name` insert is scoped to legacy spans; guarded egress admits the collector; every dashboard query reads an emitted series (checked against otelcol-contrib 0.145.0, Prometheus 3.7.3, Tempo 2.9.0, decisions.md); 829 static green
 
 ---
 
@@ -412,7 +413,17 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 794 static tests green. Live tests fail loudly when
+- GenAI telemetry (35), #101: a real BurritBot `/chat` sends its
+  `gen_ai.*` CLIENT span (a child of `POST /chat`) and its
+  `gen_ai.client.operation.duration` point to an in-process OTLP/gRPC
+  receiver, and the app refuses to start without its OTLP env; an
+  adapter refusal reaches the receiver as `burritbot.guardrails.refusals`;
+  every OTLP endpoint is the collector Service the chart renders; the
+  count connector's conditions follow the registry; no unscoped gen_ai
+  constant; guarded egress admits the collector; every dashboard metric
+  and label is one the code and collector emit, and the seven queries
+  #101 found are refused
+- **Total: 829 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

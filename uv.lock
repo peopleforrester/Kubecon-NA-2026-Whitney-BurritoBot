@@ -251,6 +251,7 @@ dev = [
     { name = "kubernetes" },
     { name = "nemoguardrails" },
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-sdk" },
     { name = "pillow" },
@@ -288,6 +289,8 @@ image-extproc = [
     { name = "envoy-data-plane" },
     { name = "grpclib" },
     { name = "httpx" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-sdk" },
 ]
 
 [package.metadata]
@@ -306,6 +309,7 @@ dev = [
     { name = "kubernetes", specifier = ">=35.0.0" },
     { name = "nemoguardrails", specifier = ">=0.22.0" },
     { name = "opentelemetry-api", specifier = "==1.41.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = "==1.41.0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = "==0.62b0" },
     { name = "opentelemetry-sdk", specifier = "==1.41.0" },
     { name = "pillow", specifier = ">=12.3.0" },
@@ -343,6 +347,8 @@ image-extproc = [
     { name = "envoy-data-plane", specifier = "==2.2.0" },
     { name = "grpclib", specifier = "==0.4.9" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "==1.41.0" },
+    { name = "opentelemetry-sdk", specifier = "==1.41.0" },
 ]
 
 [[package]]

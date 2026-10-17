@@ -7,6 +7,10 @@ import json
 import logging
 import os
 import re
+import time
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -15,7 +19,16 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from google import genai
 from google.genai import types
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.metrics import Histogram
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import SpanKind, Status, StatusCode, Tracer
 from pydantic import BaseModel, Field
 
 
@@ -51,6 +64,34 @@ GATEWAY_HEADERS = {"Accept-Encoding": "identity"}
 # one Terraform applied with; a GCP label value, like var.delivery.
 DELIVERY_ENV = "BURRITBOT_DELIVERY"
 DELIVERY_LABEL_VALUE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+
+# Both paths ask the model for the same sampling, so the two acts differ only by the net.
+TEMPERATURE = 0.3
+MAX_OUTPUT_TOKENS = 512
+
+# Telemetry leaves the pod over OTLP/gRPC to the collector the Deployment names.
+# Unset, BurritBot refuses to start: the dashboards would sit empty with no error.
+OTEL_REQUIRED_ENV = ("OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_SERVICE_NAME")
+
+# OTel GenAI semantic conventions (v1.37.0): the model call is a CLIENT span
+# named "{gen_ai.operation.name} {gen_ai.request.model}" carrying these
+# attributes, and the two client metrics below. Guarded BurritBot reaches the
+# same Vertex model through the AI gateway, so both paths name one provider.
+# observability/otel-weaver/genai-semconv-registry.yaml is the contract.
+GENAI_OPERATION = "chat"
+GENAI_PROVIDER = "gcp.vertex_ai"
+OPERATION_DURATION = "gen_ai.client.operation.duration"
+TOKEN_USAGE = "gen_ai.client.token.usage"
+# The bucket boundaries the conventions advise for each metric.
+OPERATION_DURATION_BUCKETS = (0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28, 2.56, 5.12, 10.24, 20.48, 40.96, 81.92)
+TOKEN_USAGE_BUCKETS = (
+    1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216, 67108864,
+)
+# error.type of a model call the net refused on the gateway; other failures carry the exception's class.
+GUARDRAILS_REFUSED = "guardrails_refused"
+# Which burritbot layer emitted the span (registry group burritbot): BurritBot's
+# own instrumentation is the Eyes; the net's verdicts are counted by the adapter.
+LAYER = "the-eyes"
 
 SYSTEM_PROMPT = (
     "You are BurritBot, the friendly face of a Chipotle-inspired chatbot demo. "
@@ -96,8 +137,8 @@ def gateway_request_body(prompt: str) -> dict[str, Any]:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.3,
-        "max_completion_tokens": 512,
+        "temperature": TEMPERATURE,
+        "max_completion_tokens": MAX_OUTPUT_TOKENS,
     }
 
 
@@ -193,8 +234,8 @@ def vertex_config() -> types.GenerateContentConfig:
     """Request config for the unguarded call; Vertex bills it under its labels."""
     return types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
-        temperature=0.3,
-        max_output_tokens=512,
+        temperature=TEMPERATURE,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
         labels=request_labels(),
     )
 
@@ -213,17 +254,141 @@ def _ask_vertex(prompt: str) -> tuple[str, int, int]:
     return response.text, input_tokens, output_tokens
 
 
+@dataclass(frozen=True)
+class Telemetry:
+    """The SDK providers BurritBot exports its spans and metrics through."""
+
+    tracer_provider: TracerProvider
+    meter_provider: MeterProvider
+
+    def force_flush(self) -> bool:
+        """Export everything recorded so far; True when both exports went through."""
+        spans = self.tracer_provider.force_flush()
+        metrics = self.meter_provider.force_flush()
+        return spans and metrics
+
+    def shutdown(self) -> None:
+        self.tracer_provider.shutdown()
+        self.meter_provider.shutdown()
+
+
+def telemetry_from_env() -> Telemetry:
+    """OTLP/gRPC span and metric export to OTEL_EXPORTER_OTLP_ENDPOINT, as OTEL_SERVICE_NAME.
+
+    The exporters and Resource read the rest of the OTEL_* variables themselves.
+    The providers stay local to the app rather than global, and are shut down
+    (flushing what is left) when the app stops.
+    """
+    missing = [name for name in OTEL_REQUIRED_ENV if not os.environ.get(name, "").strip()]
+    if missing:
+        raise RuntimeError(
+            f"{' and '.join(missing)} not set; BurritBot's spans and metrics would go nowhere "
+            "(each Deployment points them at the OTel collector)"
+        )
+    resource = Resource.create()
+    tracer_provider = TracerProvider(resource=resource, shutdown_on_exit=False)
+    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    meter_provider = MeterProvider(
+        resource=resource,
+        metric_readers=[PeriodicExportingMetricReader(OTLPMetricExporter())],
+        shutdown_on_exit=False,
+    )
+    return Telemetry(tracer_provider, meter_provider)
+
+
+def model_call_attributes() -> dict[str, Any]:
+    """The attributes every model-call span and metric point carries."""
+    return {
+        "gen_ai.operation.name": GENAI_OPERATION,
+        "gen_ai.provider.name": GENAI_PROVIDER,
+        "gen_ai.request.model": MODEL_NAME,
+        "burritbot.guarded": GUARDED,
+    }
+
+
+def model_call_error_type(exc: Exception) -> str:
+    """The error.type of a failed model call."""
+    if isinstance(exc, GuardrailsRefused):
+        return GUARDRAILS_REFUSED
+    return type(exc).__qualname__
+
+
+Ask = Callable[[str], tuple[str, int, int]]
+
+
+def observed(ask: Ask, tracer: Tracer, duration: Histogram, tokens: Histogram) -> Ask:
+    """ask, wrapped in the GenAI client span and metrics for one model call."""
+    span_name = f"{GENAI_OPERATION} {MODEL_NAME}"
+
+    def call(prompt: str) -> tuple[str, int, int]:
+        attributes = model_call_attributes()
+        span_attributes = {
+            **attributes,
+            "gen_ai.request.temperature": TEMPERATURE,
+            "gen_ai.request.max_tokens": MAX_OUTPUT_TOKENS,
+            "burritbot.layer": LAYER,
+        }
+        start = time.perf_counter()
+        with tracer.start_as_current_span(
+            span_name, kind=SpanKind.CLIENT, attributes=span_attributes, set_status_on_exception=False
+        ) as span:
+            try:
+                reply, input_tokens, output_tokens = ask(prompt)
+            except Exception as exc:
+                attributes["error.type"] = model_call_error_type(exc)
+                span.set_attribute("error.type", attributes["error.type"])
+                if isinstance(exc, GuardrailsRefused):
+                    span.set_attribute("burritbot.blocked_by", exc.body["blocked_by"])
+                span.set_status(Status(StatusCode.ERROR, str(exc)))
+                duration.record(time.perf_counter() - start, attributes)
+                raise
+            span.set_attributes(
+                {"gen_ai.usage.input_tokens": input_tokens, "gen_ai.usage.output_tokens": output_tokens}
+            )
+        duration.record(time.perf_counter() - start, attributes)
+        tokens.record(input_tokens, {**attributes, "gen_ai.token.type": "input"})
+        tokens.record(output_tokens, {**attributes, "gen_ai.token.type": "output"})
+        return reply, input_tokens, output_tokens
+
+    return call
+
+
 def create_app() -> FastAPI:
     """FastAPI factory for BurritBot."""
     if GUARDED:
         _gateway_url()  # a guarded pod without a gateway fails at startup
-    ask = _ask_gateway if GUARDED else _ask_vertex
+    telemetry = telemetry_from_env()
+    tracer = telemetry.tracer_provider.get_tracer("burritbot")
+    meter = telemetry.meter_provider.get_meter("burritbot")
+    ask = observed(
+        _ask_gateway if GUARDED else _ask_vertex,
+        tracer,
+        meter.create_histogram(
+            OPERATION_DURATION,
+            unit="s",
+            description="GenAI operation duration.",
+            explicit_bucket_boundaries_advisory=OPERATION_DURATION_BUCKETS,
+        ),
+        meter.create_histogram(
+            TOKEN_USAGE,
+            unit="{token}",
+            description="Number of input and output tokens used.",
+            explicit_bucket_boundaries_advisory=TOKEN_USAGE_BUCKETS,
+        ),
+    )
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        telemetry.shutdown()  # uvicorn stopping on SIGTERM: export what is still batched
 
     app = FastAPI(
         title="BurritBot",
         description="Chipotle-inspired chatbot powered by Vertex AI.",
         version="0.1.0",
+        lifespan=lifespan,
     )
+    app.state.telemetry = telemetry
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
@@ -253,10 +418,12 @@ def create_app() -> FastAPI:
             output_tokens=output_tokens,
         )
 
-    # Auto-instrument the FastAPI app so HTTP spans flow to the OTel collector.
-    # Endpoint, sampling, and resource attributes are read from OTEL_* env vars
-    # set on each Deployment (see deployment-{guarded,unguarded}.yaml).
-    FastAPIInstrumentor.instrument_app(app)
+    # HTTP server spans and metrics through the same providers; the model-call
+    # span above is a child of the POST /chat span. Endpoint and service name
+    # come from the OTEL_* env each Deployment sets.
+    FastAPIInstrumentor.instrument_app(
+        app, tracer_provider=telemetry.tracer_provider, meter_provider=telemetry.meter_provider
+    )
 
     return app
 

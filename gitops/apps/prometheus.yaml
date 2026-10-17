@@ -58,6 +58,8 @@ spec:
           additionalDataSources:
             - name: Tempo
               type: tempo
+              # The traces dashboard's panels name this uid.
+              uid: tempo
               url: http://tempo.monitoring:3100
               access: proxy
               isDefault: false
