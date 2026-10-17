@@ -23,7 +23,6 @@ data:
       "give me a disco routine for four people"
       "help me plan a birthday party"
       "what's the weather like today"
-      "what are your hours"
 
     define user ask on topic
       "what's in the carnitas burrito"
@@ -31,6 +30,7 @@ data:
       "where is the nearest location"
       "how much is a chicken bowl"
       "is the barbacoa gluten free"
+      "what are your hours"
 
     define bot refuse off topic
       "I'm BurritBot — I can only help with the menu, hours, and locations. But if you want something seasonal, ask me about the carne asada bowl."
