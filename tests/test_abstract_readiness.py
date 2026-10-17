@@ -19,7 +19,8 @@ CFP = PRESENTATION_DOCS / "CFP-SUBMISSION.md"
 ACCEPTED_SESSION = "1249553"
 
 # The nine points of the checklist in talks-knowledge
-# talks/2026-10-16_hard-dated-commitments.md, as issue #75 names them.
+# talks/2026-10-16_hard-dated-commitments.md. talks-knowledge#29 (issue #104)
+# confirmed each is the same point as the accepted text, in the same order.
 CHECKLIST = (
     "Burrito-chain bot",
     "Under-protected MCP server",
@@ -32,6 +33,26 @@ CHECKLIST = (
     "Recorded fallback for the live input",
 )
 STATUSES = ("READY-STATIC", "PARTIAL", "MISSING")
+
+# The accepted wording for the rows that turn on how a point reads,
+# quoted from section 5 by talks-knowledge#29 (issue #104).
+ACCEPTED_WORDING = {
+    "Starts wide open with live audience hacking": (
+        "It starts wide open, and we let the audience hack it live",
+        "A user does not need to be malicious to embarrass an enterprise, just a little bit weird",
+        "Bring your weirdest off-topic question",
+    ),
+    "Pre- and mid-inference guardrails": (
+        "LLM-specific guardrails, like pre- and mid-inference prompt analysis",
+    ),
+}
+
+# Parts of the checklist's "Ready means" that #75 did not assess; each row
+# names what is left to check once the live bring-up (#18) is up.
+UNASSESSED = {
+    "Kubernetes layers": "before the LLM layer",
+    "Recorded fallback for the live input": "venue network",
+}
 REPO_DIRS = (
     "ai-gateway",
     "apps",
@@ -77,6 +98,46 @@ def test_readiness_names_the_accepted_text_and_the_draft() -> None:
     text = READINESS.read_text(encoding="utf-8")
     assert ACCEPTED_SESSION in text, "readiness record does not name Sessionize session 1249553"
     assert "CFP-SUBMISSION.md" in text, "readiness record does not mention the draft"
+
+
+def _checked_against() -> str:
+    """The record's 'Checked against' paragraph."""
+    text = READINESS.read_text(encoding="utf-8")
+    start = text.index("**Checked against.**")
+    return text[start:text.index("\n\n", start)]
+
+
+@pytest.mark.static
+def test_points_are_checked_against_the_accepted_wording() -> None:
+    """The paragraph cites the check (talks-knowledge#29) and no longer says the points are unchecked."""
+    paragraph = " ".join(_checked_against().split())
+    assert "talks-knowledge#29" in paragraph, "'Checked against' does not cite talks-knowledge#29"
+    for caveat in ("no read access", "not checked", "as issue #75 names them"):
+        assert caveat not in paragraph, f"'Checked against' still carries the caveat {caveat!r}"
+
+
+@pytest.mark.static
+def test_open_rows_quote_the_accepted_wording() -> None:
+    """Rows 4 and 6 quote the accepted text they are rated against."""
+    rows = _checklist_rows()
+    unquoted = [
+        (point, quote)
+        for point, quotes in ACCEPTED_WORDING.items()
+        for quote in quotes
+        if quote not in rows[point]
+    ]
+    assert not unquoted, f"rows missing the accepted wording: {unquoted}"
+
+
+@pytest.mark.static
+def test_unassessed_ready_means_parts_wait_on_the_live_bring_up() -> None:
+    """Rows 5 and 9 name the part not yet assessed and that it waits on #18."""
+    rows = _checklist_rows()
+    gaps = [
+        point for point, part in UNASSESSED.items()
+        if part not in rows[point] or "#18" not in rows[point]
+    ]
+    assert not gaps, f"rows that do not name their unassessed part and #18: {gaps}"
 
 
 @pytest.mark.static
