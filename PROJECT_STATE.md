@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 780 passed, 54 deselected after the
-  #109 GKE load-balancer timeout check
+  (ruff check, then static suite) 794 passed, 54 deselected after the
+  #110 guardrails refusal on the phone page
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -89,6 +89,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #104 readiness points checked against the accepted wording (talks-knowledge#29): same nine points, same order; ABSTRACT-READINESS.md drops the unchecked caveat, rows 4 and 6 quote the accepted text, rows 5 and 9 name the "Ready means" parts left for #18 (Kubernetes layers before the LLM layer; live input over the venue network); scope calls are with Michael and Whitney; ratings unchanged; 736 static green
 - 2026-10-17 · #106 synced-manifest check widened to Directory sources: `synced_paths` (tests/helpers/manifest_graph.py) takes every Application source by ArgoCD's type (explicit block, else kustomization → Kustomize, Chart.yaml → Helm, else Directory) and walks Directory sources as the reposerver does (recurse, manifest extensions, include/exclude as gobwas globs with no separators, skip-file-rendering marker); the ReferenceGrant, dashboard ConfigMap and GatewayClass sync tests use it; new `tests/test_synced_paths.py` holds every cluster manifest in the repo to some Application, the hand-applied root `gitops/bootstrap/app-of-apps.yaml` the one exception, with mutation cases dropping cert-manager-issuers and the root; no manifest was unsynced; 773 static green
 - 2026-10-17 · #109 GKE load-balancer timeout: `tests/test_guarded_timeout_budget.py` now holds any GKE Gateway (`gke-l7-*` GatewayClass) route to `audience/audience-frontend` to a GCPBackendPolicy on that Service with `spec.default.timeoutSec` above the frontend's `GUARDED_TIMEOUT_SECONDS` (125s; the load balancer's default is 30s), and any `timeouts.request` on that route above it too; mutation cases cover no policy, the 30s default, a timeout equal to the frontend's and a short route timeout. No Gateway or GCPBackendPolicy manifest is added: the #57 Gateway, its hostname, certificate and `gateway_api_config` wait for Michael, and without GKE's Gateway controller the GCPBackendPolicy CRD does not exist, so the audience sync would fail (decisions.md); 780 static green
+- 2026-10-17 · #110 guardrails refusal on the phone page: the audience backend's `upstream_failure` relays a 403 whose JSON names a scanner in `blocked_by` and says why in `detail` (the net's block on either hop, and guarded BurritBot's relay of one since #94) as that JSON plus `target`, where it used to quote it inside an HTTPException detail; every other upstream error keeps its status. `app.js` reads a 403's body and, when `refusalOf` finds the net's refusal, `showRefusal` shows its detail as a `BurritBot · guarded` reply styled `reply refused`, not "Something went wrong (HTTP 403)"; a net 502/503 still reads as unreachable. New `tests/test_phase_07_guardrails_refusal.py`; 794 static green
 
 ---
 
@@ -339,6 +340,13 @@ commit.
   `AUDIENCE_ADDRESS_LIMIT`; the page keeps and sends the token; the
   delivery overlay sets 10/minute and 300/minute and the `audience`
   Application syncs it; the base sets neither
+- Audience guardrails refusal (14), #110: a 403 naming its scanner and
+  its reason reaches the phone as the net's JSON plus the target, for a
+  prompt or reply block and the model-hop rewrite refusal; a net 502 or
+  503, a 403 without `blocked_by` or `detail`, and non-JSON keep their
+  status as errors; `/chat` answers upstream errors through
+  `upstream_failure`; the page shows the refusal's detail as a guarded
+  reply styled `.reply.refused`, never as an error
 - Guarded gateway path (22), #67, #94: the frontend's guarded URL and the
   guarded `AI_GATEWAY_URL` are the Service the EnvoyProxy names; the
   frontend's guarded Host is a `burritbot-audience` hostname; the
@@ -404,7 +412,7 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 780 static tests green. Live tests fail loudly when
+- **Total: 794 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
