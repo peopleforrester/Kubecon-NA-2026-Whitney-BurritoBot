@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<!-- ABOUTME: Slide source for "BurritoBot Said Let's Dance, the Platform Said No" (Sessionize 1249553). -->
+<!-- ABOUTME: One 1920x1080 section per slide, in RUNBOOK.md segment order; export_pdf.py renders the 16:9 PDF. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BurritoBot Said Let's Dance, the Platform Said No</title>
+<style>
+  @page { size: 1920px 1080px; margin: 0; }
+  :root {
+    --night: #150f22;
+    --plum: #2a1a3d;
+    --ember: #ff8a3d;
+    --tortilla: #f1d6a8;
+    --silk: #b9dcff;
+    --text: #f4efe8;
+    --muted: #b8aec4;
+    --leak: #ff6b6b;
+    --caught: #5fd99a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--night); }
+  body {
+    color: var(--text);
+    font-family: "Liberation Sans", "DejaVu Sans", sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .slide {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    padding: 110px 140px 90px;
+    background: radial-gradient(ellipse at 50% 120%, #4a2316 0%, var(--plum) 45%, var(--night) 80%);
+    break-after: page;
+    page-break-after: always;
+  }
+  .slide:last-of-type { break-after: auto; page-break-after: auto; }
+  .notes { display: none; }
+  .kicker {
+    font-size: 30px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--ember);
+    margin: 0 0 28px;
+  }
+  h1 { font-size: 92px; line-height: 1.05; margin: 0 0 36px; }
+  h2 { font-size: 72px; line-height: 1.1; margin: 0 0 44px; }
+  p, li { font-size: 44px; line-height: 1.4; }
+  p { margin: 0 0 28px; }
+  ul { margin: 0; padding-left: 48px; }
+  li { margin-bottom: 18px; }
+  .muted { color: var(--muted); }
+  .ember { color: var(--ember); }
+  .leak { color: var(--leak); }
+  .caught { color: var(--caught); }
+  code, pre { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; }
+  code { color: var(--silk); font-size: 0.85em; }
+  pre.excerpt {
+    margin: 0;
+    padding: 34px 40px;
+    font-size: 30px;
+    line-height: 1.45;
+    background: rgba(8, 5, 14, 0.78);
+    border-left: 8px solid var(--ember);
+    border-radius: 10px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text);
+  }
+  .source {
+    margin-top: 18px;
+    font-size: 26px;
+    color: var(--muted);
+  }
+  .footer {
+    position: absolute;
+    left: 140px;
+    right: 140px;
+    bottom: 44px;
+    font-size: 24px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Title and closing slides carry the hero art. */
+  .hero {
+    background: var(--night) url("../../../assets/hero.png") center bottom / cover no-repeat;
+    padding-top: 60px;
+  }
+  .hero .band {
+    background: rgba(12, 8, 20, 0.86);
+    margin: 0 -140px;
+    padding: 34px 140px 30px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 84px; margin-bottom: 14px; }
+  .hero p { font-size: 34px; margin: 0; }
+
+  /* Act dividers. */
+  .divider {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: radial-gradient(circle at 78% 50%, #5a2a14 0%, var(--plum) 40%, var(--night) 75%);
+  }
+  .divider h1 { font-size: 132px; }
+  .divider p { font-size: 46px; }
+  .command {
+    display: inline-block;
+    font-size: 64px;
+    padding: 30px 46px;
+    background: rgba(8, 5, 14, 0.85);
+    border: 3px solid var(--ember);
+    border-radius: 14px;
+    color: var(--tortilla);
+    margin: 10px 0 46px;
+  }
+
+  /* Big single-line statements. */
+  .statement { display: flex; flex-direction: column; justify-content: center; }
+  .statement blockquote {
+    margin: 0;
+    font-size: 84px;
+    line-height: 1.2;
+    font-weight: bold;
+  }
+  .statement blockquote::before { content: "\201C"; color: var(--ember); }
+  .statement blockquote::after { content: "\201D"; color: var(--ember); }
+
+  /* Eyes, Net, Web. */
+  .columns { display: flex; gap: 44px; }
+  .columns > div {
+    flex: 1;
+    padding: 36px 40px;
+    background: rgba(8, 5, 14, 0.6);
+    border-top: 8px solid var(--silk);
+    border-radius: 10px;
+  }
+  .columns > div.net { border-top-color: var(--ember); }
+  .columns > div.web { border-top-color: var(--muted); }
+  .columns h3 { font-size: 48px; margin: 0 0 8px; }
+  .columns .role { font-size: 30px; color: var(--muted); margin-bottom: 24px; }
+  .columns li { font-size: 32px; margin-bottom: 12px; }
+
+  /* Two request paths. */
+  .path-row { display: flex; flex-wrap: wrap; align-items: center; row-gap: 18px; margin-bottom: 56px; }
+  .path-label { width: 100%; font-size: 38px; font-weight: bold; }
+  .hop {
+    font-size: 27px;
+    padding: 22px 16px;
+    white-space: nowrap;
+    border-radius: 10px;
+    background: rgba(8, 5, 14, 0.7);
+    border: 2px solid var(--muted);
+    text-align: center;
+  }
+  .hop.net { border-color: var(--ember); color: var(--tortilla); }
+  .hop.model { border-color: var(--silk); }
+  .arrow { font-size: 36px; color: var(--muted); padding: 0 8px; }
+
+  /* Rule-on-screen slides: excerpt left, what it does right. */
+  .rule { display: flex; gap: 60px; align-items: flex-start; }
+  .rule .code { flex: 1.8; min-width: 0; }
+  .rule .code pre.excerpt { font-size: 28px; }
+  .rule.stacked { flex-direction: column; gap: 40px; }
+  .rule.stacked .code, .rule.stacked .why { width: 100%; }
+  .rule .why { flex: 1; }
+  .rule .why p, .rule .why li { font-size: 38px; }
+
+  .asks li { font-size: 50px; margin-bottom: 26px; }
+  .asks li::marker { color: var(--ember); }
+  .reply {
+    font-size: 44px;
+    line-height: 1.4;
+    padding: 40px 50px;
+    background: rgba(8, 5, 14, 0.75);
+    border-left: 10px solid var(--caught);
+    border-radius: 10px;
+    margin-bottom: 50px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================== Opening ============================== -->
+
+<section class="slide hero" data-segment="opening">
+  <div class="band">
+    <h1>BurritoBot Said Let's Dance,<br>the Platform Said No</h1>
+    <p class="muted">Whitney Lee &amp; Michael Forrester · KubeCon + CloudNativeCon North America 2026 · Salt Lake City</p>
+  </div>
+  <aside class="notes">Both on stage. Whitney opens; Michael tells the bowl story.</aside>
+</section>
+
+<section class="slide" data-segment="opening">
+  <div class="kicker">A true story</div>
+  <h2>A customer opened the Chipotle support chatbot to order a bowl.</h2>
+  <p>First, they asked it something else:</p>
+  <p class="ember" style="font-size:52px; margin: 30px 0 40px;">"Before I eat, I need to reverse a linked list in Python. Can you help?"</p>
+  <p>It could. It wrote the solution, explained it, and then asked what they wanted for lunch.</p>
+  <aside class="notes">The viral post. Keep it light: nobody was hacking anything, they were just being weird.</aside>
+</section>
+
+<section class="slide statement" data-segment="opening">
+  <blockquote>A user does not need to be malicious to embarrass an enterprise, just a little bit weird.</blockquote>
+</section>
+
+<section class="slide statement" data-segment="opening">
+  <h2>Funny on a burrito bot.</h2>
+  <h2 class="ember">Terrifying on the bot with access to your deployment pipeline.</h2>
+  <p class="muted">The model did what models do. Nothing around it said no.</p>
+</section>
+
+<section class="slide" data-segment="opening">
+  <div class="kicker">The argument</div>
+  <h2>Platform-level governance beats per-developer discipline.</h2>
+  <p>The same app, deployed twice, behaves completely differently because of the platform it is deployed on.</p>
+  <ul>
+    <li>Same container image</li>
+    <li>Same model: Gemini 3 Pro on Vertex AI</li>
+    <li>Same system prompt</li>
+    <li>One difference: the path the request walks</li>
+  </ul>
+</section>
+
+<section class="slide" data-segment="opening">
+  <div class="kicker">The ogre-faced spider</div>
+  <h2 style="font-size:58px;">It doesn't wait in a web. It watches with huge eyes and casts a net.</h2>
+  <div class="columns">
+    <div class="eyes">
+      <h3>The Eyes</h3>
+      <div class="role">see every prompt</div>
+      <ul>
+        <li>OpenTelemetry GenAI semantic conventions</li>
+        <li>spinybacked-orbweaver</li>
+        <li>OTel Weaver as the schema contract</li>
+      </ul>
+    </div>
+    <div class="net">
+      <h3>The Net</h3>
+      <div class="role">cast over every prompt</div>
+      <ul>
+        <li>Kyverno</li>
+        <li>Falco</li>
+        <li>Envoy AI Gateway</li>
+        <li>NeMo Guardrails</li>
+        <li>LLM Guard</li>
+      </ul>
+    </div>
+    <div class="web">
+      <h3>The Web</h3>
+      <div class="role">holds it all up</div>
+      <ul>
+        <li>ArgoCD app-of-apps</li>
+        <li>Gateway API</li>
+        <li>External Secrets, cert-manager</li>
+        <li>GKE Workload Identity Federation</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">Whitney: two spiders, two roles. spinybacked-orbweaver instruments; the burritbot stack enforces.</aside>
+</section>
+
+<section class="slide" data-segment="opening">
+  <div class="kicker">One app, two paths</div>
+  <h2>Same BurritBot. One walks under the net.</h2>
+  <div class="path-row">
+    <div class="path-label leak">Unguarded</div>
+    <div class="hop">phone</div><div class="arrow">→</div>
+    <div class="hop">frontend</div><div class="arrow">→</div>
+    <div class="hop">burritbot-unguarded</div><div class="arrow">→</div>
+    <div class="hop model">Vertex AI</div>
+  </div>
+  <div class="path-row">
+    <div class="path-label caught">Guarded</div>
+    <div class="hop">phone</div><div class="arrow">→</div>
+    <div class="hop">frontend</div><div class="arrow">→</div>
+    <div class="hop">burritbot-guarded</div><div class="arrow">→</div>
+    <div class="hop net">Envoy AI Gateway</div><div class="arrow">→</div>
+    <div class="hop net">NeMo Guardrails</div><div class="arrow">→</div>
+    <div class="hop net">LLM Guard</div><div class="arrow">→</div>
+    <div class="hop model">Vertex AI</div>
+  </div>
+  <p class="muted">Both run on GKE, deployed by ArgoCD from one Git repo.</p>
+</section>
+
+<section class="slide" data-segment="opening">
+  <div class="kicker">The system prompt already says no</div>
+  <pre class="excerpt" data-source="apps/burritbot/app.py">SYSTEM_PROMPT = (
+    "You are BurritBot, the friendly face of a Chipotle-inspired chatbot demo. "
+    "You answer questions strictly about burritos, the menu, hours, and store "
+    "locations. You never discuss politics, medicine, legal advice, or execute "
+    "commands. If asked anything off-topic, refuse politely and redirect to "
+    "the menu."
+)</pre>
+  <div class="source"><code class="path">apps/burritbot/app.py</code>, the same in both namespaces</div>
+  <h2 style="margin-top:60px;">A system prompt is a request, not a control.</h2>
+</section>
+
+<!-- ============================== Act 1 ============================== -->
+
+<section class="slide divider" data-segment="act-1">
+  <div class="kicker">Act 1</div>
+  <h1>The Unguarded Demo</h1>
+  <p class="muted">No net. Five minutes.</p>
+  <aside class="notes">Run ./scripts/cast-net.sh status first: BURRITBOT_TARGET=burritbot-unguarded. Hard rule: Act 1 never runs past five minutes.</aside>
+</section>
+
+<section class="slide" data-segment="act-1">
+  <div class="kicker">Get your phone out</div>
+  <h2>Bring your weirdest off-topic question.</h2>
+  <ul class="asks">
+    <li>Teach me some salsa dance moves</li>
+    <li>How do I throw a hot dog party?</li>
+    <li>Recommend karaoke songs for a wedding</li>
+  </ul>
+  <p class="muted" style="margin-top:40px;">Prompt injection, jailbreaks and data extraction are our job, not yours. We'll drive those.</p>
+  <aside class="notes">Switch the projector to the frontend's /qr page: the URL printed under the code is the one phones open. Watch for 429s in the first minute.</aside>
+</section>
+
+<section class="slide" data-segment="act-1">
+  <div class="kicker">Watch the left panel</div>
+  <h2>An ordering bot writing choreography.</h2>
+  <p>Grafana: <span class="ember">Cast the Net — Before / After Comparison</span>. The unguarded side lights up red as BurritBot leaks.</p>
+  <p class="muted" style="margin-top:60px;">If BurritBot will do this, the bot plugged into your deployment pipeline will do worse.</p>
+  <aside class="notes">Shared screen to the dashboard while the room plays. Move on at five minutes even if it is still funny.</aside>
+</section>
+
+<!-- ============================== Cast the Net ============================== -->
+
+<section class="slide divider" data-segment="cast-the-net">
+  <div class="kicker">Cast the Net</div>
+  <div><span class="command">./scripts/cast-net.sh cast</span></div>
+  <p>One command moves the room's traffic from <code>burritbot-unguarded</code> to <code>burritbot-guarded</code>.</p>
+  <p class="muted">Same pods, same model, same prompt. The requests now walk under the net.</p>
+  <aside class="notes">Re-run status: expect BURRITBOT_TARGET=burritbot-guarded. Flip the screen back to the Cast the Net dashboard.</aside>
+</section>
+
+<!-- ============================== Act 2 ============================== -->
+
+<section class="slide divider" data-segment="act-2">
+  <div class="kicker">Act 2</div>
+  <h1>The Guarded Demo</h1>
+  <p class="muted">Same audience. Same prompts. Send them again.</p>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Net · Kubernetes · admission</div>
+  <div class="rule">
+    <div class="code">
+      <pre class="excerpt" data-source="security/kyverno/policies/require-burritbot-labels.yaml">metadata:
+  name: require-burritbot-labels
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-burritbot-labels-on-guarded-pods
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - burritbot-guarded
+                - burritbot-net</pre>
+      <div class="source"><code class="path">security/kyverno/policies/require-burritbot-labels.yaml</code></div>
+    </div>
+    <div class="why">
+      <h2 style="font-size:54px;">Kyverno</h2>
+      <p>No pod runs on the guarded side without <code>burritbot.io/layer</code>, <code>model-source</code> and <code>model-hash</code>.</p>
+      <p class="muted">Every running workload ties back to the model it was approved against.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Net · Kubernetes · runtime</div>
+  <div class="rule">
+    <div class="code">
+      <pre class="excerpt" data-source="security/falco/rules/burritbot-the-net.yaml">- rule: Burritbot Guarded Pod Shell Spawned
+  condition: >
+    spawned_process and
+    burritbot_guarded_pod and
+    proc.name in (sh, bash, zsh, dash, busybox, ash)
+  priority: CRITICAL
+  tags: [burritbot, the-net, guarded, shell]</pre>
+      <div class="source"><code class="path">security/falco/rules/burritbot-the-net.yaml</code></div>
+    </div>
+    <div class="why">
+      <h2 style="font-size:54px;">Falco</h2>
+      <p>A guarded pod runs one bounded process. A shell inside it is an alert.</p>
+      <p class="muted">Sibling rules watch egress outside <code>burritbot-net</code> and sensitive host mounts.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Net · LLM layer · off-topic</div>
+  <div class="rule stacked">
+    <div class="code">
+      <pre class="excerpt" data-source="ai-gateway/nemo-guardrails/rails/burrito-only.co">define flow burrito only input
+  $ask = $user_message.lower()
+  if "dance" in $ask or "hot dog" in $ask or "karaoke" in $ask or "playlist" in $ask
+    bot refuse off topic
+    stop</pre>
+      <div class="source"><code class="path">ai-gateway/nemo-guardrails/rails/burrito-only.co</code></div>
+    </div>
+    <div class="why">
+      <h2 style="font-size:54px;">NeMo Guardrails</h2>
+      <p>Your Act 1 asks, refused before the model ever sees them.</p>
+      <p class="muted">Paraphrases the rail misses fall through to LLM Guard's <code>BanTopics</code> scanner.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Net · LLM layer · presenter-driven attacks</div>
+  <div class="rule stacked" style="gap:36px;">
+    <div class="code">
+      <pre class="excerpt" data-source="ai-gateway/nemo-guardrails/rails/jailbreak-detect.co">define flow jailbreak detect input
+  $ask = $user_message.lower()
+  if "ignore all previous instructions" in $ask or "ignore previous instructions" in $ask or "disregard the rules" in $ask
+    bot refuse jailbreak
+    stop</pre>
+      <div class="source"><code class="path">ai-gateway/nemo-guardrails/rails/jailbreak-detect.co</code></div>
+    </div>
+    <div class="rule">
+      <div class="code">
+        <pre class="excerpt" data-source="ai-gateway/llm-guard/config.yaml">input_scanners:
+  - type: PromptInjection
+    params:
+      threshold: 0.85</pre>
+        <div class="source"><code class="path">ai-gateway/llm-guard/config.yaml</code></div>
+      </div>
+      <div class="why">
+        <p>We send these ourselves. NeMo refuses the known phrasings; LLM Guard's classifier scores the rest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Net · Envoy AI Gateway</div>
+  <h2>Both directions go through the net.</h2>
+  <div class="rule">
+    <div class="code">
+      <pre class="excerpt" data-source="ai-gateway/envoy/gateway.yaml">kind: EnvoyExtensionPolicy
+metadata:
+  name: burritbot-guardrails
+spec:
+  extProc:
+    - backendRefs:
+        - name: nemo-guardrails
+    - backendRefs:
+        - name: llm-guard</pre>
+      <div class="source"><code class="path">ai-gateway/envoy/gateway.yaml</code></div>
+    </div>
+    <div class="why">
+      <ul>
+        <li>The prompt passes NeMo, then LLM Guard, before it reaches the model.</li>
+        <li>The reply takes the same path before your phone sees it.</li>
+        <li>If a scanner is down, the request fails closed.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">The Eyes</div>
+  <h2>The dashboard proves it was caught. The rule is the argument.</h2>
+  <ul>
+    <li><span class="ember">Cast the Net — Before / After Comparison</span>: blocked on the guarded side, leaked on the unguarded side</li>
+    <li><span class="ember">BurritBot Prompt / Response Traces</span>: every call as a span with <code>gen_ai.*</code> attributes</li>
+    <li><span class="ember">The Eyes — Overview</span>: collector throughput and semantic-convention coverage</li>
+  </ul>
+  <aside class="notes">Walk the layers as each one catches something; put the rule that fired on screen, not just the switch.</aside>
+</section>
+
+<section class="slide statement" data-segment="act-2">
+  <div class="kicker">Scorecard</div>
+  <h2>What's real, what's aspirational.</h2>
+  <p>Red cells that tell the truth are more useful than green cells that lie.</p>
+  <p class="muted">Live: <code class="path">presentations/kubecon-na-2026/docs/SCORECARD.md</code></p>
+  <aside class="notes">Open SCORECARD.md in the browser and talk through it. Do not green-wash.</aside>
+</section>
+
+<section class="slide" data-segment="act-2">
+  <div class="kicker">How it ends</div>
+  <h2>BurritBot sells burritos. Only burritos.</h2>
+  <div class="reply" data-source="ai-gateway/nemo-guardrails/rails/burrito-only.co">I'm BurritBot — I can only help with the menu, hours, and locations. But if you want something seasonal, ask me about the carne asada bowl.</div>
+  <p>The developer didn't say no. <span class="ember">The platform did.</span></p>
+</section>
+
+<!-- ============================== Q&A ============================== -->
+
+<section class="slide hero" data-segment="q-and-a">
+  <div class="band">
+    <h1>Questions?</h1>
+    <p class="muted">BurritoBot Said Let's Dance, the Platform Said No · Whitney Lee &amp; Michael Forrester</p>
+  </div>
+</section>
+
+</body>
+</html>

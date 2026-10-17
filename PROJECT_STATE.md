@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 816 passed, 54 deselected after the
-  #122 guarded SA ABOUTME, labels and token automount tests
+  (ruff check, then static suite) 826 passed, 56 deselected after the
+  #120 talk deck and its 16:9 PDF
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -97,6 +97,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #95 question 163 (decided by hecaton's research under Michael's standing rules), first child #116: the guarded BurritBot KSA (`burritbot-guarded/burritbot`) drops its `iam.gke.io/gcp-service-account` annotation, since guarded BurritBot reaches Vertex only through the AI gateway's GSA (#67); `tests/test_critical_fix_a2_service_accounts.py::test_burritbot_guarded_sa_has_no_wif_annotation` replaces the old has-annotation test; removing `workload_wif_binding` from iam.tf and the readiness record are the next two children (decisions.md); 802 static green
 - 2026-10-17 · #119 (partial) the #109 GKE load-balancer rule now reads what ArgoCD syncs: `synced_manifests` (tests/helpers/manifest_graph.py) parses every file an Application syncs, delivery overlays under `presentations/` included, with the Application's destination namespace on objects that set none, so a #57 Gateway or GCPBackendPolicy in `presentations/<event>/deploy/audience` is checked (it was invisible to `load_manifests`); `frontend_exposure_violations` fails on any way to `audience/audience-frontend` that rule cannot see (a non-ClusterIP Service, an overlay patch to one, a JSON 6902 patch on it, an Ingress, a route through a non-GKE Gateway); `synced_patches` reads the overlays' patches. The repo still sets no backend timeout: the GCPBackendPolicy goes in with the #57 Gateway, which waits for Michael (decisions.md); 814 static green
 - 2026-10-17 · #122 test for #116's untested criterion: `tests/test_critical_fix_a2_service_accounts.py` gains `test_burritbot_guarded_sa_aboutme_does_not_claim_wif_binding` (two ABOUTME lines, none saying "bound via WIF", "workload GSA" or "GSA email") and `test_burritbot_guarded_sa_labels_and_token_automount_unchanged` (the four app.kubernetes.io and burritbot.io labels exactly, `automountServiceAccountToken: true`); the pre-#116 manifest, a changed label and a false automount each fail them; 816 static green
+- 2026-10-17 · #120 spec 001 M5 deck: `presentations/kubecon-na-2026/deck/slides.html` in RUNBOOK segment order, exported by `export_pdf.py` (Playwright Chromium) to the 16:9 `burritobot-said-lets-dance.pdf` (22 pages, 1440x810pt) with `export.json` holding source and PDF sha256; `tests/test_talk_deck.py` holds the PDF to the source, the rules on screen to their files, and cut or unbuilt points off the slides; the Sessionize upload is the presenters' (decisions.md); 826 static green
 
 ---
 
@@ -434,7 +435,12 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 816 static tests green. Live tests fail loudly when
+- Talk deck (10), #120: the 16:9 PDF matches its source by sha256, the
+  slides follow the RUNBOOK segments, every rule on screen is quoted
+  from its file, Act 1 keeps attacks with the presenters, and cut or
+  unbuilt points stay off the slides (mutation: row 2 marked CUT); two
+  live tests render it in Chromium and check the layout
+- **Total: 826 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

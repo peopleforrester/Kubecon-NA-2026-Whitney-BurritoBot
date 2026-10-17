@@ -2133,3 +2133,39 @@ What changes:
 Not done here: the repo still sets no backend timeout above 125s. The
 GCPBackendPolicy goes in beside the #57 Gateway, and the rule fails
 until it does. That waits for Michael.
+
+## 2026-10-17T13:00:00Z · decision · The talk deck is an HTML source exported to PDF by Playwright's Chromium, held to its source by sha256, and names no cut or unbuilt point (issue #120)
+
+Spec 001 M5 asks for the deck and a 16:9 PDF for Sessionize by
+2026-11-04. No deck existed. The repo has no slide tooling; Playwright
+(already a dev dependency, 1.64.0 in uv.lock) and its Chromium are, so
+no new package is added.
+
+What it decides:
+
+- `presentations/kubecon-na-2026/deck/slides.html` is the source: one
+  1920x1080 section per slide, in `RUNBOOK.md` segment order (opening,
+  Act 1, Cast the Net, Act 2, Q&A). `export_pdf.py` renders it to
+  `burritobot-said-lets-dance.pdf` (1440x810pt pages, 16:9) and writes
+  `export.json` with the sha256 of the source, `assets/hero.png` and the
+  PDF. It fails when any element spills off a slide or a request path
+  wraps.
+- `tests/test_talk_deck.py` holds the PDF to the current source, the
+  segments to the runbook, every rule on screen to the file it quotes,
+  and every runbook Act 2 rule file to an excerpt. Act 1 keeps attacks
+  with the presenters (readiness row 4 under this repo's rule). Its live
+  tests render the source in Chromium and check the layout, with a
+  mutation case.
+- Cut points: none of the nine readiness rows is CUT yet. The test maps
+  each row to the terms its point would put on a slide and fails if a
+  CUT row's terms remain; a mutation case marks row 2 CUT.
+- The deck names nothing the repo lacks: no MCP server, developer
+  portal, SPIFFE/SPIRE or token-based rate limiting. The PDF carries no
+  readiness status; the scorecard slide sends the room to
+  `SCORECARD.md` live, as the runbook's Act 2 does.
+
+Not done here: the Sessionize upload is the presenters'. The deck is a
+draft for Michael and Whitney to review, since it is public prose. If
+talks-knowledge#29 cuts a point or keeps an unbuilt one, the deck
+changes before the upload. No slide links the repo, which M8 makes
+public after the talk.
