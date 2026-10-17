@@ -1,5 +1,5 @@
 # ABOUTME: Phase A2 test — every serviceAccountName referenced in a Deployment must
-# ABOUTME: have a matching ServiceAccount manifest, with WIF annotation on the guarded SA.
+# ABOUTME: have a matching ServiceAccount manifest; the guarded SA has no WIF annotation.
 
 from __future__ import annotations
 
@@ -68,13 +68,15 @@ def test_referenced_service_account_exists(
 
 
 @pytest.mark.static
-def test_burritbot_guarded_sa_has_wif_annotation() -> None:
-    """The guarded BurritBot SA must carry the WIF annotation matching iam.tf."""
+def test_burritbot_guarded_sa_has_no_wif_annotation() -> None:
+    """Guarded BurritBot reaches Vertex only through the AI gateway (#67), so
+    its SA must not impersonate a GSA (question 163)."""
     sa = _find_sa_manifest("burritbot", "burritbot-guarded")
     assert sa is not None, "burritbot SA in burritbot-guarded missing"
 
     annotations = sa.get("metadata", {}).get("annotations", {}) or {}
-    assert WIF_ANNOTATION_KEY in annotations, (
-        f"burritbot SA in burritbot-guarded must carry {WIF_ANNOTATION_KEY} "
-        f"annotation matching the iam.tf workloadIdentityUser binding"
+    assert WIF_ANNOTATION_KEY not in annotations, (
+        f"burritbot SA in burritbot-guarded carries {WIF_ANNOTATION_KEY}="
+        f"{annotations.get(WIF_ANNOTATION_KEY)!r}; only the gateway proxy's GSA "
+        f"may reach Vertex"
     )

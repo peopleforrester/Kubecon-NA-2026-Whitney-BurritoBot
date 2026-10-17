@@ -2047,3 +2047,45 @@ What it decides:
   M1 waits on #17, #83 and #18, and every later milestone waits on M1 or
   a date. Milestones without an issue here (M5 deck, M6 run-throughs) are
   raised as follow-ups, as is M1's credential block for gcp-management.
+
+## 2026-10-17T09:49:55Z · decision · question 163: the guarded BurritBot KSA loses its WIF annotation and its iam.tf binding (issue #95)
+
+Question 163 asked how the guarded BurritBot KSA
+(`burritbot-guarded/burritbot`) should lose its Vertex access. Since #67,
+guarded BurritBot makes its model call only through the AI gateway. The
+gateway proxy runs as the `burritbot-ai-gateway` GSA
+(`ai_gateway_wif_binding` in iam.tf), and ESO reads Secret Manager as
+`eso-controller`. The guarded KSA still carried
+`iam.gke.io/gcp-service-account`, pointing at the `burritbot-workload`
+GSA, which holds `roles/aiplatform.user` and
+`roles/secretmanager.secretAccessor`, so the guarded pod could reach
+Vertex around the net.
+
+Answer: A. Drop the annotation from the guarded KSA and remove
+`workload_wif_binding` from iam.tf. Invert the A2 test to assert the
+guarded KSA has no WIF annotation and that iam.tf binds no GSA to
+`burritbot-guarded/burritbot`. The workload GSA is left with no
+federated member.
+
+Decided by hecaton's research under Michael's standing rules, not by Michael.
+
+What it changes, in three children of #95:
+
+- This child (#116): `apps/burritbot/k8s/serviceaccount-burritbot-guarded.yaml`
+  drops the `iam.gke.io/gcp-service-account` annotation; its name,
+  namespace, labels and `automountServiceAccountToken` stay.
+  `tests/test_critical_fix_a2_service_accounts.py` replaces
+  `test_burritbot_guarded_sa_has_wif_annotation` with
+  `test_burritbot_guarded_sa_has_no_wif_annotation`, which fails while
+  the guarded SA carries the annotation.
+- The next child: `workload_wif_binding` is removed from iam.tf, and the
+  A2 test gains the assertion that iam.tf binds no GSA to
+  `burritbot-guarded/burritbot`.
+- The `burritbot-workload` GSA keeps its roles
+  (`roles/aiplatform.user`, `roles/secretmanager.secretAccessor`) with
+  no federated member; no KSA can act as it.
+- The third child brings the readiness record up to date.
+
+Not applied to a cluster: there is none yet (#17, #18); ArgoCD syncs the
+manifest once there is one. `docs/CRITICAL-FIXES-PLAN.md` is a dated plan
+and stays as written.
