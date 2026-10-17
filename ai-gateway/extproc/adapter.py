@@ -24,6 +24,7 @@ from envoy_data_plane.envoy.service.ext_proc.v3 import (
     ExternalProcessorBase,
     HeaderMutation,
     HeadersResponse,
+    HttpHeaders,
     ImmediateResponse,
     ProcessingRequest,
     ProcessingResponse,
@@ -100,10 +101,24 @@ def prompt_texts(body: bytes) -> list[tuple[Path, str]]:
     return found
 
 
-def output_texts(body: bytes) -> list[tuple[Path, str]]:
-    """The model text in a response body: BurritBot's {"reply"} or OpenAI {"choices"}.
+def _texts_in_candidate(candidate: object, path: Path) -> list[tuple[Path, str]]:
+    """Text in a Vertex generateContent candidate: the text of each content part."""
+    if not (isinstance(candidate, dict) and isinstance(candidate.get("content"), dict)):
+        return []
+    return [
+        (path + ("content", "parts", j, "text"), part["text"])
+        for j, part in enumerate(candidate["content"].get("parts") or [])
+        if isinstance(part, dict) and isinstance(part.get("text"), str)
+    ]
 
-    Empty for bodies that carry no model output (health checks, error details).
+
+def output_texts(body: bytes) -> list[tuple[Path, str]]:
+    """The model text in a response body: BurritBot's {"reply"}, Vertex's {"candidates"} or OpenAI {"choices"}.
+
+    On the model hop the net sees Vertex's own reply: the AI Gateway's ext_proc
+    translates it to OpenAI only after this one (see lost_rewrites). Empty for
+    bodies that carry no model output (health checks, error details, a refusal
+    BurritBot relays).
     """
     try:
         doc = json.loads(body)
@@ -113,10 +128,23 @@ def output_texts(body: bytes) -> list[tuple[Path, str]]:
     if isinstance(doc, dict):
         if isinstance(doc.get("reply"), str):
             found.append((("reply",), doc["reply"]))
+        for i, candidate in enumerate(doc.get("candidates") or []):
+            found += _texts_in_candidate(candidate, ("candidates", i))
         for i, choice in enumerate(doc.get("choices") or []):
             if isinstance(choice, dict) and isinstance(choice.get("message"), dict):
                 found += _texts_in_content(choice["message"].get("content"), ("choices", i, "message", "content"))
     return found
+
+
+def lost_rewrites(replacements: list[tuple[Path, str]]) -> list[Path]:
+    """Request rewrites that would never reach the model: those inside an OpenAI chat body.
+
+    That body is guarded BurritBot's model call. The AI Gateway inserts its own
+    ext_proc ahead of every other one on the listener and translates for Vertex
+    the request body it read there, not the body this adapter hands back
+    (insertAIGatewayExtProcFilter and originalRequestBodyRaw, v0.6.0 to v1.2.0).
+    """
+    return [path for path, _ in replacements if path[0] == "messages"]
 
 
 def replace_texts(body: bytes, replacements: list[tuple[Path, str]]) -> bytes:
@@ -262,6 +290,32 @@ def body_passes(request: bool, new_body: bytes | None = None) -> ProcessingRespo
     return ProcessingResponse(response_body=BodyResponse(response=common))
 
 
+def scanned_body(scanner: str, request: bool, body: bytes, replacements: list[tuple[Path, str]]) -> ProcessingResponse:
+    """The body a scanner allowed: as it came, rewritten, or refused when the rewrite would be dropped."""
+    if not replacements:
+        return body_passes(request)
+    if request and lost_rewrites(replacements):
+        logger.warning("%s sanitized a model-hop prompt the gateway would send unsanitized; refusing", scanner)
+        return refusal(
+            StatusCode.Forbidden,
+            "BurritBot's guardrails had to change this prompt, and the AI gateway would send it to the model "
+            "unchanged; nothing was let through.",
+            blocked_by=scanner,
+            direction="prompt",
+        )
+    logger.info("%s sanitized %d field(s) of the %s", scanner, len(replacements), "prompt" if request else "reply")
+    return body_passes(request, replace_texts(body, replacements))
+
+
+def content_encoding(headers: HttpHeaders) -> str:
+    """The content-encoding a header block declares, lower-cased; empty when it declares none."""
+    for header in headers.headers.headers if headers.headers else []:
+        if header.key.lower() == "content-encoding":
+            value = header.raw_value.decode("utf-8", "replace") if header.raw_value else header.value
+            return value.strip().lower()
+    return ""
+
+
 # --- the processor ---------------------------------------------------------
 
 
@@ -280,7 +334,16 @@ class GuardrailsProcessor(ExternalProcessorBase):
             return refusal(StatusCode.BadRequest, f"BurritBot's guardrails could not read this request: {exc}"), ""
         return await self._judge(texts, body, request=True, prompt="\n".join(t for _, t in texts))
 
-    async def check_response(self, body: bytes, prompt: str) -> ProcessingResponse:
+    async def check_response(self, body: bytes, prompt: str, encoding: str = "") -> ProcessingResponse:
+        if body and encoding not in ("", "identity"):
+            # Guarded BurritBot asks the gateway for identity, so only a reply nobody
+            # asked for arrives compressed. Its text cannot be read, so it is refused.
+            logger.error("%s cannot read a %s-encoded reply; refusing", self.scanner.name, encoding)
+            return refusal(
+                StatusCode.BadGateway,
+                f"BurritBot's guardrails could not read a {encoding}-encoded reply; nothing was let through.",
+                blocked_by=self.scanner.name,
+            )
         texts = output_texts(body)
         if not texts:
             return body_passes(request=False)
@@ -316,13 +379,11 @@ class GuardrailsProcessor(ExternalProcessorBase):
                 ), prompt
             if verdict.text != text:
                 replacements.append((path, verdict.text))
-        if replacements:
-            logger.info("%s sanitized %d field(s) of the %s", self.scanner.name, len(replacements), direction)
-            return body_passes(request, replace_texts(body, replacements)), prompt
-        return body_passes(request), prompt
+        return scanned_body(self.scanner.name, request, body, replacements), prompt
 
     async def process(self, messages: AsyncIterator[ProcessingRequest]) -> AsyncIterator[ProcessingResponse]:
         prompt = ""
+        encoding = ""
         async for req in messages:
             if req.request_headers is not None:
                 yield ProcessingResponse(request_headers=HeadersResponse())
@@ -330,9 +391,10 @@ class GuardrailsProcessor(ExternalProcessorBase):
                 response, prompt = await self.check_request(req.request_body.body)
                 yield response
             elif req.response_headers is not None:
+                encoding = content_encoding(req.response_headers)
                 yield ProcessingResponse(response_headers=HeadersResponse())
             elif req.response_body is not None:
-                yield await self.check_response(req.response_body.body, prompt)
+                yield await self.check_response(req.response_body.body, prompt, encoding)
             elif req.request_trailers is not None:
                 yield ProcessingResponse(request_trailers=TrailersResponse())
             elif req.response_trailers is not None:

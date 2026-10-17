@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import gzip
 import json
 import re
 import shutil
@@ -477,6 +478,119 @@ def test_round_trip_reply_without_model_text_passes() -> None:
     assert responses[0].response_headers is not None
     passed = responses[1].response_body
     assert passed is not None and passed.response.body_mutation is None
+
+
+# --- the model hop (#94) ------------------------------------------------------
+#
+# The policy targets the Gateway, so the net also runs on guarded BurritBot's
+# model call. There the AI Gateway's own ext_proc sits ahead of the net
+# (insertAIGatewayExtProcFilter, v0.6.0 to v1.2.0). It reads the OpenAI request
+# before the net does and translates that copy for Vertex, and it translates
+# Vertex's reply to OpenAI only after the net has seen it.
+
+VERTEX_REPLY = {
+    "candidates": [
+        {
+            "content": {"role": "model", "parts": [{"text": "Step left, then right."}, {"thoughtSignature": "c2ln"}]},
+            "finishReason": "STOP",
+        }
+    ],
+    "usageMetadata": {"promptTokenCount": 40, "candidatesTokenCount": 6},
+}
+
+
+@pytest.mark.static
+def test_output_texts_reads_the_vertex_reply_on_the_model_hop() -> None:
+    assert adapter.output_texts(json.dumps(VERTEX_REPLY).encode()) == [
+        (("candidates", 0, "content", "parts", 0, "text"), "Step left, then right.")
+    ]
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("scanner", ["llm-guard", "nemo-guardrails"])
+def test_round_trip_vertex_reply_is_scanned(scanner: str) -> None:
+    """Vertex's reply reaches the scanner: with the scanner down it is refused, never passed unscanned."""
+    from envoy_data_plane.envoy.service.ext_proc.v3 import ProcessingRequest
+
+    responses = _round_trip(
+        [
+            ProcessingRequest(response_headers=_headers()),
+            ProcessingRequest(response_body=_body(json.dumps(VERTEX_REPLY).encode())),
+        ],
+        scanner=scanner,
+    )
+    refused = responses[1].immediate_response
+    assert refused is not None, f"Vertex's reply passed unscanned: {responses[1]!r}"
+    assert refused.status.code == 503
+    assert json.loads(refused.body)["blocked_by"] == scanner
+
+
+def _encoded_headers(encoding: str):
+    from envoy_data_plane.envoy.config.core.v3 import HeaderMap, HeaderValue
+    from envoy_data_plane.envoy.service.ext_proc.v3 import HttpHeaders
+
+    return HttpHeaders(
+        headers=HeaderMap(
+            headers=[
+                HeaderValue(key=":status", raw_value=b"200"),
+                HeaderValue(key="content-encoding", raw_value=encoding.encode()),
+            ]
+        )
+    )
+
+
+@pytest.mark.static
+def test_round_trip_encoded_reply_is_refused() -> None:
+    """A compressed reply cannot be read, so it is refused rather than passed unscanned."""
+    from envoy_data_plane.envoy.service.ext_proc.v3 import ProcessingRequest
+
+    responses = _round_trip(
+        [
+            ProcessingRequest(response_headers=_encoded_headers("gzip")),
+            ProcessingRequest(response_body=_body(gzip.compress(json.dumps(VERTEX_REPLY).encode()))),
+        ]
+    )
+    refused = responses[1].immediate_response
+    assert refused is not None, f"a gzip reply passed unscanned: {responses[1]!r}"
+    assert refused.status.code == 502
+    assert json.loads(refused.body)["blocked_by"] == "llm-guard"
+
+
+@pytest.mark.static
+def test_content_encoding_is_read_from_the_response_headers() -> None:
+    assert adapter.content_encoding(_encoded_headers("GZIP")) == "gzip"
+    assert adapter.content_encoding(_headers()) == ""
+
+
+@pytest.mark.static
+def test_sanitized_openai_prompt_is_refused_not_forwarded() -> None:
+    """The gateway would send the unsanitized original to Vertex, so the net refuses instead."""
+    body = json.dumps({"model": "gemini-3-pro", "messages": [{"role": "user", "content": "mail a@b.co"}]}).encode()
+    response = adapter.scanned_body("llm-guard", True, body, [(("messages", 0, "content"), "mail [REDACTED]")])
+    refused = response.immediate_response
+    assert refused is not None, f"a rewrite the gateway drops was forwarded: {response!r}"
+    assert refused.status.code == 403
+    assert json.loads(refused.body)["blocked_by"] == "llm-guard"
+
+
+@pytest.mark.static
+@pytest.mark.parametrize(
+    ("request_side", "body", "path"),
+    [
+        (True, {"prompt": "mail a@b.co"}, ("prompt",)),
+        (False, VERTEX_REPLY, ("candidates", 0, "content", "parts", 0, "text")),
+        (False, {"reply": "mail a@b.co"}, ("reply",)),
+    ],
+    ids=["audience-prompt", "vertex-reply", "audience-reply"],
+)
+def test_sanitized_text_that_reaches_its_reader_is_rewritten(request_side: bool, body: dict, path: tuple) -> None:
+    response = adapter.scanned_body("llm-guard", request_side, json.dumps(body).encode(), [(path, "[REDACTED]")])
+    passed = response.request_body if request_side else response.response_body
+    assert passed is not None, f"expected the rewritten body to pass: {response!r}"
+    node = json.loads(passed.response.body_mutation.body)
+    for key in path:
+        node = node[key]
+    assert node == "[REDACTED]"
 
 
 # --- live: the adapters run and the net bites on the cluster ----------------
