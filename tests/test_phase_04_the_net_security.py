@@ -113,7 +113,7 @@ def test_falco_rules_tagged_burritbot_the_net() -> None:
 @pytest.mark.live
 def test_kyverno_admission_controller_running(k8s_core_v1) -> None:
     pods = k8s_core_v1.list_namespaced_pod(
-        namespace="kyverno",
+        namespace="security",
         label_selector="app.kubernetes.io/component=admission-controller",
     )
     running = [p for p in pods.items if p.status and p.status.phase == "Running"]

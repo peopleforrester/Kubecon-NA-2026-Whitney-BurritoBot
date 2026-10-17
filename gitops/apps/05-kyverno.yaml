@@ -1,5 +1,5 @@
 # ABOUTME: Wave -5: Kyverno admission controller; chart values adapted from kubeauto-ai-day.
-# ABOUTME: Webhook exclusions guard against system-namespace deadlocks; per-controller limits set.
+# ABOUTME: Webhook exclusions guard against system-namespace deadlocks; webhooks listen on 10250.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -36,8 +36,26 @@ spec:
                     - kube-system
                     - kube-public
                     - kube-node-lease
+        # Private nodes: GKE's "-master" firewall rule lets the control
+        # plane reach pods on TCP 443 and 10250 only, so the chart's 9443
+        # would time out every admission call. 10250 is the port the
+        # cert-manager and AI Gateway controller webhooks already use.
+        # The chart's webhook NetworkPolicies hardcode 9443; keep them off.
         admissionController:
           replicas: 1
+          webhookServer:
+            port: 10250
+          # The chart's probes hardcode 9443; point them at the named
+          # webhook port. Helm merges the rest of each probe from the chart.
+          startupProbe:
+            httpGet:
+              port: https
+          livenessProbe:
+            httpGet:
+              port: https
+          readinessProbe:
+            httpGet:
+              port: https
           resources:
             requests:
               cpu: 100m
@@ -54,6 +72,19 @@ spec:
               cpu: 200m
               memory: 256Mi
         cleanupController:
+          server:
+            port: 10250
+          # The chart's probes hardcode 9443; point them at the named
+          # webhook port. Helm merges the rest of each probe from the chart.
+          startupProbe:
+            httpGet:
+              port: https
+          livenessProbe:
+            httpGet:
+              port: https
+          readinessProbe:
+            httpGet:
+              port: https
           resources:
             requests:
               cpu: 50m

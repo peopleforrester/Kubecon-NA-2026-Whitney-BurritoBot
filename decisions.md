@@ -1680,3 +1680,52 @@ phone page still shows a guardrails 403 as "Something went wrong
 (HTTP 403)". That is raised as a follow-up. This is deploy
 configuration and application code, and as with #66, #90, #91 and #92
 it waits for Michael's review before any cluster syncs it.
+
+## 2026-10-17T00:11:56Z · decision · Kyverno's webhooks move from 9443 to 10250, not a new firewall rule (issue #96)
+
+The cluster has private nodes and a `master_ipv4_cidr_block` (VPC
+peering). GKE's auto-created `-master` firewall rule lets the control
+plane reach nodes, and the pods on them, on TCP 443 and 10250 only
+(https://docs.cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules).
+Kyverno chart 3.7.1 serves its admission webhook on 9443, so every
+admission call would time out on the live cluster.
+
+The issue offered two ways out: a Terraform firewall rule (master CIDR
+to the node tag on TCP 9443) or a move of Kyverno's port. This run
+moves the port, as #68 did for the AI Gateway controller:
+
+- It keeps one rule for every webhook in the cluster: listen on 10250,
+  which cert-manager, External Secrets and the AI Gateway controller
+  already use. A firewall rule would open 9443 on every node for one
+  component, and the Terraform would have to track the node tag GKE
+  generates.
+- It stays in the ArgoCD Application, with no Terraform apply.
+
+What moves, in `gitops/apps/05-kyverno.yaml`:
+
+- `admissionController.webhookServer.port: 10250` (sets
+  `--webhookServerPort` and the container's `https` port).
+- `cleanupController.server.port: 10250`. The cleanup controller serves
+  the validating webhook for CleanupPolicy and ClusterCleanupPolicy, so
+  it has the same exposure. The background and reports controllers serve
+  no webhook the control plane calls, so they stay on the default.
+- The chart hardcodes 9443 in the startup, liveness and readiness probes
+  of both controllers. Each probe's `httpGet.port` is now the named
+  `https` port. Helm merges the rest of each probe from the chart.
+- The chart's webhook NetworkPolicies hardcode 9443 as well. They are
+  off by default and stay off. A test guards this.
+
+The Services keep port 443 with `targetPort: https`, so the webhook
+configurations Kyverno registers need no change. Pods are not on the
+host network, so 10250 in the pod does not clash with the kubelet.
+
+`tests/test_phase_b7_kyverno_install.py` checks the two ports, the
+probes and the NetworkPolicies. A live test checks the `https` container
+port on both Deployments in `security`. The phase-04 live check for a
+running admission controller looked in a `kyverno` namespace. Kyverno is
+installed in `security`, so that check now looks there.
+
+Not verified here: nothing has run on a cluster (#18), and the chart was
+read, not rendered (no helm here). This is deploy configuration, and as
+with #66 and #68 it waits for Michael's review before any cluster syncs
+it.
