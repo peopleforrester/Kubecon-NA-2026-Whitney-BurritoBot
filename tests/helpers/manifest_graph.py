@@ -504,6 +504,67 @@ def synced_paths(root: Path, manifests: list[Manifest]) -> set[str]:
     return out
 
 
+def synced_manifests(root: Path) -> list[Manifest]:
+    """Every cluster object some ArgoCD Application applies, read from the files it syncs.
+
+    Unlike load_manifests this reaches files outside MANIFEST_ROOTS, such as
+    resources a delivery overlay under presentations/ adds. An object with no
+    metadata.namespace takes its Application's destination namespace, as
+    ArgoCD applies it there.
+    """
+    resolved = root.resolve()
+    out: list[Manifest] = []
+    for app, source in _app_source_paths(load_manifests(resolved)):
+        kind = source_type(resolved, source)
+        if kind == "Kustomize":
+            paths = kustomization_files(resolved, resolved / source["path"])
+        elif kind == "Directory":
+            paths = directory_files(resolved, source["path"], source.get("directory") or {})
+        elif kind == "Plugin":
+            raise ValueError(f"{app.label}: plugin sources are not modelled")
+        else:
+            continue
+        namespace = (app.doc["spec"].get("destination") or {}).get("namespace")
+        for rel in sorted(p for p in paths if p.endswith((".yaml", ".yml"))):
+            with (resolved / rel).open(encoding="utf-8") as fh:
+                for doc in yaml.safe_load_all(fh):
+                    if not (isinstance(doc, dict) and {"apiVersion", "kind", "metadata"} <= doc.keys()):
+                        continue
+                    if namespace and not doc["metadata"].get("namespace"):
+                        doc = {**doc, "metadata": {**doc["metadata"], "namespace": namespace}}
+                    out.append(Manifest(rel, doc))
+    return out
+
+
+def synced_patches(root: Path) -> list[tuple[str, dict | None, Any]]:
+    """(kustomization path, target, patch) for every patch a synced kustomization applies, nested ones included.
+
+    A patch from a file or an inline string comes back parsed: a mapping is a
+    strategic-merge patch, a list is a JSON 6902 patch. The target is the
+    entry's target selector, or None where the entry has none.
+    """
+    resolved = root.resolve()
+    out: list[tuple[str, dict | None, Any]] = []
+    for _, _, directory in _kustomize_roots(resolved, load_manifests(resolved)):
+        directories = [directory] + [t for _, _, t in _kustomization_resources(directory) if t.is_dir()]
+        for d in directories:
+            kustomization_path = d / "kustomization.yaml"
+            kustomization = yaml.safe_load(kustomization_path.read_text(encoding="utf-8"))
+            entries = [
+                *(kustomization.get("patches") or []),
+                *(kustomization.get("patchesStrategicMerge") or []),
+                *(kustomization.get("patchesJson6902") or []),
+            ]
+            for entry in entries:
+                if isinstance(entry, str):
+                    # patchesStrategicMerge takes a file path or an inline patch.
+                    entry = {"patch": entry} if "\n" in entry else {"path": entry}
+                text = (d / entry["path"]).read_text(encoding="utf-8") if "path" in entry else entry["patch"]
+                rel = str(kustomization_path.resolve().relative_to(resolved))
+                out.extend((rel, entry.get("target"), doc) for doc in yaml.safe_load_all(text) if doc)
+    return out
+
+
 def unsynced_manifests(manifests: list[Manifest], synced: set[str]) -> dict[str, str]:
     """Cluster manifests in the repo that no ArgoCD Application applies, keyed "path: Kind namespace/name"."""
     return {
