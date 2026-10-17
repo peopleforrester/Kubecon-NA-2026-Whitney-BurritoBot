@@ -1,4 +1,4 @@
-# ABOUTME: Each timeout on the guarded path outlasts every hop inside it (#92, #109): a GKE load balancer's backend
+# ABOUTME: Each timeout on the guarded path outlasts every hop inside it (#92, #109, #119): a GKE load balancer's backend
 # ABOUTME: timeout, the frontend's guarded timeout, the burritbot-audience route, BurritBot's gateway and Vertex route.
 
 from __future__ import annotations
@@ -14,7 +14,15 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT
-from helpers.manifest_graph import GATEWAY_API, Manifest, collect_refs, load_manifests
+from helpers.manifest_graph import (
+    GATEWAY_API,
+    ROUTE_KINDS,
+    Manifest,
+    collect_refs,
+    load_manifests,
+    synced_manifests,
+    synced_patches,
+)
 
 
 GATEWAY_FILE = PROJECT_ROOT / "ai-gateway" / "envoy" / "gateway.yaml"
@@ -194,6 +202,57 @@ def load_balancer_violations(manifests: list[Manifest], frontend_timeout: float)
     return out
 
 
+def frontend_exposure_violations(manifests: list[Manifest], patches: list[tuple[str, dict | None, object]]) -> list[str]:
+    """Every way to the frontend from outside the cluster that load_balancer_violations cannot see.
+
+    That rule reads only GKE Gateway routes and the GCPBackendPolicy on the
+    Service. A LoadBalancer or NodePort Service, an Ingress (whose backend
+    timeout a BackendConfig sets, also 30s by default) or a route through
+    another Gateway would put phones in front of the frontend with a
+    timeout nothing here holds above GUARDED_TIMEOUT_SECONDS.
+    """
+    out: list[str] = []
+    namespace, name = FRONTEND_SERVICE
+    for m in manifests:
+        if (m.group, m.kind, m.namespace, m.name) == ("", "Service", namespace, name):
+            kind = m.doc["spec"].get("type", "ClusterIP")
+            if kind != "ClusterIP":
+                out.append(f"{m.label} is type {kind}; phones reach it only through the GKE Gateway")
+    for path, target, patch in patches:
+        if isinstance(patch, dict):
+            if (patch.get("kind"), (patch.get("metadata") or {}).get("name")) == ("Service", name):
+                kind = (patch.get("spec") or {}).get("type")
+                if kind not in (None, "ClusterIP"):
+                    out.append(f"{path} patches Service {namespace}/{name} to type {kind}")
+        elif (target or {}).get("kind") == "Service" and (target or {}).get("name") in (None, name):
+            out.append(f"{path} has a JSON 6902 patch on Service {namespace}/{name}, which this check does not read")
+    for m in manifests:
+        if (m.group, m.kind) != ("networking.k8s.io", "Ingress") or m.namespace != namespace:
+            continue
+        spec = m.doc["spec"]
+        backends = [spec.get("defaultBackend") or {}] + [
+            p.get("backend") or {} for r in spec.get("rules") or [] for p in (r.get("http") or {}).get("paths") or []
+        ]
+        if any((b.get("service") or {}).get("name") == name for b in backends):
+            out.append(f"{m.label} routes to Service {namespace}/{name}; phones reach it only through the GKE Gateway")
+    gateways = {(m.namespace, m.name): m for m in manifests if (m.group, m.kind) == (GATEWAY_API, "Gateway")}
+    for ref in collect_refs(manifests):
+        route = ref.source
+        if ref.field != "backendRef" or (ref.group, ref.kind, ref.namespace, ref.name) != ("", "Service", namespace, name):
+            continue
+        if route.kind not in ROUTE_KINDS:
+            continue
+        for parent in route.doc["spec"].get("parentRefs") or []:
+            gateway = gateways.get((parent.get("namespace", route.namespace), parent["name"]))
+            gateway_class = gateway.doc["spec"].get("gatewayClassName", "") if gateway else ""
+            if route.kind != "HTTPRoute" or not gateway_class.startswith(GKE_GATEWAY_CLASS_PREFIX):
+                out.append(
+                    f"{route.label} routes to Service {namespace}/{name} through Gateway {parent['name']} "
+                    f"(class {gateway_class or 'not in the repo'}), which the GKE load-balancer rule does not read"
+                )
+    return out
+
+
 def _gateway_timeout() -> float:
     return _load(BURRITBOT_APP, "burritbot_app_timeout_budget").GATEWAY_TIMEOUT_SECONDS
 
@@ -343,4 +402,151 @@ def test_mutation_short_load_balancer_timeout_is_caught(
 ) -> None:
     frontend = _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS
     violations = load_balancer_violations(_gke_exposure(policy_timeout, route_timeout), frontend)
+    assert any(expected in v for v in violations), violations
+
+
+# --- what ArgoCD syncs, delivery overlays included (#119) ----------------------
+#
+# The audience Application syncs presentations/<event>/deploy/audience, not
+# deploy/audience. The #57 Gateway's hostname and certificate are per
+# delivery, so it and its GCPBackendPolicy may land in that overlay, which
+# load_manifests does not read.
+
+
+def _repo_manifests(root: Path) -> list[Manifest]:
+    return synced_manifests(root)
+
+
+def _delivery_tree(
+    root: Path, resources: list[dict], patches: list | None = None, target: dict | None = None
+) -> Path:
+    """A repo shaped like this one: the audience Application syncs a delivery overlay of deploy/audience."""
+    namespace, name = FRONTEND_SERVICE
+    overlay = "presentations/event/deploy/audience"
+    kustomization: dict = {"resources": ["../../../../deploy/audience", "delivery-exposure.yaml"]}
+    files: dict[str, object] = {
+        "gitops/apps/30-audience.yaml": [{
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "Application",
+            "metadata": {"name": "audience", "namespace": "argocd"},
+            "spec": {
+                "source": {"repoURL": "https://example.invalid/repo.git", "path": overlay},
+                "destination": {"server": "https://kubernetes.default.svc", "namespace": namespace},
+            },
+        }],
+        "deploy/audience/kustomization.yaml": [{"resources": ["../../apps/audience-frontend/k8s"]}],
+        "apps/audience-frontend/k8s/kustomization.yaml": [{"resources": ["service.yaml"]}],
+        "apps/audience-frontend/k8s/service.yaml": [{
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {"name": name, "namespace": namespace},
+            "spec": {"type": "ClusterIP", "ports": [{"name": "http", "port": 80}]},
+        }],
+        f"{overlay}/delivery-exposure.yaml": resources,
+    }
+    if patches:
+        entry: dict = {"path": "delivery-patch.yaml"}
+        if target:
+            entry["target"] = target
+        kustomization["patches"] = [entry]
+        files[f"{overlay}/delivery-patch.yaml"] = patches
+    files[f"{overlay}/kustomization.yaml"] = [kustomization]
+    for rel, docs in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(yaml.safe_dump_all(docs), encoding="utf-8")
+    return root
+
+
+def _overlay_docs(policy_timeout: int | None) -> list[dict]:
+    """The #57 shape as a delivery overlay would write it: no metadata.namespace, the Application's applies."""
+    docs = [copy.deepcopy(m.doc) for m in _gke_exposure(policy_timeout)]
+    for doc in docs:
+        del doc["metadata"]["namespace"]
+    return docs
+
+
+@pytest.mark.static
+def test_gke_load_balancer_outlasts_the_frontend_in_what_argocd_syncs(monkeypatch: pytest.MonkeyPatch) -> None:
+    manifests = _repo_manifests(PROJECT_ROOT)
+    assert {("", "Service", *FRONTEND_SERVICE)} <= {(m.group, m.kind, m.namespace, m.name) for m in manifests}
+    violations = load_balancer_violations(manifests, _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS)
+    assert not violations, "\n".join(violations)
+
+
+@pytest.mark.static
+def test_frontend_has_no_exposure_the_load_balancer_rule_cannot_see() -> None:
+    violations = frontend_exposure_violations(_repo_manifests(PROJECT_ROOT), synced_patches(PROJECT_ROOT))
+    assert not violations, "\n".join(violations)
+
+
+@pytest.mark.static
+@pytest.mark.parametrize(
+    ("policy_timeout", "expected"),
+    [(None, "no GCPBackendPolicy"), (30, "timeoutSec 30 is not above"), (125, "timeoutSec 125 is not above")],
+    ids=["no-policy", "load-balancer-default", "equal-to-frontend"],
+)
+def test_mutation_gateway_in_the_delivery_overlay_is_caught(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, policy_timeout: int | None, expected: str
+) -> None:
+    frontend = _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS
+    root = _delivery_tree(tmp_path, _overlay_docs(policy_timeout))
+    violations = load_balancer_violations(_repo_manifests(root), frontend)
+    assert any(expected in v for v in violations), violations
+
+
+@pytest.mark.static
+def test_gateway_in_the_delivery_overlay_above_the_frontend_timeout_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    frontend = _frontend(monkeypatch).GUARDED_TIMEOUT_SECONDS
+    root = _delivery_tree(tmp_path, _overlay_docs(int(frontend) + 10))
+    assert load_balancer_violations(_repo_manifests(root), frontend) == []
+    assert frontend_exposure_violations(_repo_manifests(root), synced_patches(root)) == []
+
+
+def _service(kind: str) -> dict:
+    namespace, name = FRONTEND_SERVICE
+    return {"apiVersion": "v1", "kind": "Service", "metadata": {"name": name, "namespace": namespace}, "spec": {"type": kind}}
+
+
+def _ingress() -> dict:
+    namespace, name = FRONTEND_SERVICE
+    return {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "metadata": {"name": "audience", "namespace": namespace},
+        "spec": {"rules": [{"http": {"paths": [
+            {"path": "/", "pathType": "Prefix", "backend": {"service": {"name": name, "port": {"number": 80}}}},
+        ]}}]},
+    }
+
+
+def _envoy_route() -> list[dict]:
+    """The frontend behind the in-cluster Envoy gateway, whose route default is 15s."""
+    docs = _overlay_docs(None)
+    docs[0]["spec"]["gatewayClassName"] = "envoy-ai-gateway"
+    return docs
+
+
+@pytest.mark.static
+@pytest.mark.parametrize(
+    ("resources", "patches", "target", "expected"),
+    [
+        ([_service("LoadBalancer")], None, None, "is type LoadBalancer"),
+        ([_service("NodePort")], None, None, "is type NodePort"),
+        ([_ingress()], None, None, "delivery-exposure.yaml) routes to Service audience/audience-frontend"),
+        (_envoy_route(), None, None, "(class envoy-ai-gateway), which the GKE load-balancer rule does not read"),
+        ([], [{"apiVersion": "v1", "kind": "Service", "metadata": {"name": FRONTEND_SERVICE[1]}, "spec": {"type": "LoadBalancer"}}],
+         None, "patches Service audience/audience-frontend to type LoadBalancer"),
+        ([], [[{"op": "replace", "path": "/spec/type", "value": "LoadBalancer"}]],
+         {"kind": "Service", "name": FRONTEND_SERVICE[1]}, "JSON 6902 patch on Service audience/audience-frontend"),
+    ],
+    ids=["load-balancer-service", "node-port-service", "ingress", "envoy-gateway-route", "overlay-patch", "overlay-json-patch"],
+)
+def test_mutation_exposure_outside_the_gke_gateway_is_caught(
+    tmp_path: Path, resources: list[dict], patches: list | None, target: dict | None, expected: str
+) -> None:
+    configmap = {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "x"}}
+    root = _delivery_tree(tmp_path, resources or [configmap], patches, target)
+    violations = frontend_exposure_violations(_repo_manifests(root), synced_patches(root))
     assert any(expected in v for v in violations), violations

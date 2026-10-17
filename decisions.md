@@ -2089,3 +2089,47 @@ What it changes, in three children of #95:
 Not applied to a cluster: there is none yet (#17, #18); ArgoCD syncs the
 manifest once there is one. `docs/CRITICAL-FIXES-PLAN.md` is a dated plan
 and stays as written.
+
+## 2026-10-17T10:30:00Z · decision · The GKE load-balancer rule reads what ArgoCD syncs, and fails on any frontend exposure it cannot see; the backend timeout itself still waits for the #57 Gateway (issue #119)
+
+Test review run 2044 found that `test_gke_load_balancer_outlasts_the_frontend`
+checks nothing today: the only `gatewayClassName` in the repo is
+`envoy-ai-gateway`, so `load_balancer_violations` returns early. It asked
+for a test that fails when "the GKE Gateway backend timeout is above the
+frontend's guarded timeout" stops holding.
+
+A test that requires the GCPBackendPolicy to exist would fail now, and
+the repo cannot make it pass. The #109 entry above keeps the policy out
+until the #57 Gateway lands: without `gateway_api_config` (#97) the CRD
+is not served and the `audience` sync would fail, and the Gateway, its
+hostname and its certificate are deploy configuration for Michael. So
+this change narrows how the rule can stay silent instead.
+
+What changes:
+
+- **The rule reads what ArgoCD syncs.** The `audience` Application syncs
+  `presentations/kubecon-na-2026/deploy/audience`, not `deploy/audience`.
+  The #57 Gateway's hostname and certificate are per delivery, so it may
+  land in that overlay, which `load_manifests` never read: the rule would
+  have stayed silent after #57 as well. `synced_manifests`
+  (`tests/helpers/manifest_graph.py`) parses every file an Application
+  syncs, Kustomize and Directory sources alike, and gives an object with
+  no `metadata.namespace` its Application's destination namespace, as
+  ArgoCD applies it. `test_gke_load_balancer_outlasts_the_frontend_in_what_argocd_syncs`
+  runs the rule on that set. Mutation cases put the #57 shape, without a
+  namespace, in a delivery overlay of a tmp repo: no policy, 30s and
+  125s are caught, 135s passes. With `load_manifests` in its place, all
+  three cases fail.
+- **No other way in.** `frontend_exposure_violations` fails on any way to
+  `audience/audience-frontend` that the rule does not read: a Service
+  type other than ClusterIP, an overlay patch that sets one, a JSON 6902
+  patch on the Service (not modelled, so refused), an Ingress (its
+  BackendConfig timeout also defaults to 30s), or a route through a
+  Gateway whose class is not `gke-l7-*` (the Envoy gateway's route
+  default is 15s). `synced_patches` reads the patches of every synced
+  kustomization. The repo has none of these.
+- The #109 tests are unchanged.
+
+Not done here: the repo still sets no backend timeout above 125s. The
+GCPBackendPolicy goes in beside the #57 Gateway, and the rule fails
+until it does. That waits for Michael.
