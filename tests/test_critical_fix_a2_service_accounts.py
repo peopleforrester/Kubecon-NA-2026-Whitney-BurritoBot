@@ -80,3 +80,65 @@ def test_burritbot_guarded_sa_has_no_wif_annotation() -> None:
         f"{annotations.get(WIF_ANNOTATION_KEY)!r}; only the gateway proxy's GSA "
         f"may reach Vertex"
     )
+
+
+GUARDED_SA_PATH = APPS_DIR / "burritbot" / "k8s" / "serviceaccount-burritbot-guarded.yaml"
+
+# The labels the guarded SA carried before #116 dropped its WIF annotation;
+# that change left them alone, and Kyverno and the dashboards select on them.
+GUARDED_SA_LABELS = {
+    "app.kubernetes.io/name": "burritbot",
+    "app.kubernetes.io/part-of": "burritbot",
+    "burritbot.io/layer": "application",
+    "burritbot.io/guarded": "true",
+}
+
+
+def _aboutme_lines(path: Path) -> list[str]:
+    return [
+        line
+        for line in path.read_text().splitlines()
+        if line.startswith("# ABOUTME:")
+    ]
+
+
+@pytest.mark.static
+def test_burritbot_guarded_sa_aboutme_does_not_claim_wif_binding() -> None:
+    """The guarded SA's ABOUTME lines must not say it is bound via WIF to the
+    workload GSA, which it no longer is (#116, question 163)."""
+    lines = _aboutme_lines(GUARDED_SA_PATH)
+    assert len(lines) == 2, (
+        f"{GUARDED_SA_PATH.name} must open with two ABOUTME lines, found {lines!r}"
+    )
+    for line in lines:
+        lowered = line.lower()
+        assert "bound via wif" not in lowered, (
+            f"{GUARDED_SA_PATH.name} ABOUTME still claims a WIF binding: {line!r}"
+        )
+        assert "workload gsa" not in lowered, (
+            f"{GUARDED_SA_PATH.name} ABOUTME still names the workload GSA: {line!r}"
+        )
+        assert "gsa email" not in lowered, (
+            f"{GUARDED_SA_PATH.name} ABOUTME still mentions a GSA email "
+            f"placeholder: {line!r}"
+        )
+
+
+@pytest.mark.static
+def test_burritbot_guarded_sa_labels_and_token_automount_unchanged() -> None:
+    """Dropping the WIF annotation (#116) left the guarded SA's labels and
+    automountServiceAccountToken as they were."""
+    docs = _load_yaml_docs(GUARDED_SA_PATH)
+    assert len(docs) == 1, f"{GUARDED_SA_PATH.name} must hold one document"
+    sa = docs[0]
+    assert sa.get("kind") == "ServiceAccount"
+    md = sa.get("metadata", {})
+    assert (md.get("name"), md.get("namespace")) == ("burritbot", "burritbot-guarded")
+
+    assert md.get("labels") == GUARDED_SA_LABELS, (
+        f"{GUARDED_SA_PATH.name} labels changed: {md.get('labels')!r}"
+    )
+    assert sa.get("automountServiceAccountToken") is True, (
+        f"{GUARDED_SA_PATH.name} automountServiceAccountToken must stay true, "
+        f"found {sa.get('automountServiceAccountToken')!r}"
+    )
