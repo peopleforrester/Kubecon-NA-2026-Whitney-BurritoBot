@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from conftest import PROJECT_ROOT, TERRAFORM_DIR
-from helpers.manifest_graph import kustomized_paths, load_manifests
+from helpers.manifest_graph import load_manifests, synced_paths
 
 
 GITOPS_APPS = PROJECT_ROOT / "gitops" / "apps"
@@ -215,7 +215,7 @@ def test_gatewayclass_is_owned_by_envoy_gateway() -> None:
 
 @pytest.mark.static
 def test_gatewayclass_is_synced() -> None:
-    synced = kustomized_paths(PROJECT_ROOT, load_manifests(PROJECT_ROOT))
+    synced = synced_paths(PROJECT_ROOT, load_manifests(PROJECT_ROOT))
     assert str(GATEWAYCLASS_FILE.relative_to(PROJECT_ROOT)) in synced
 
 

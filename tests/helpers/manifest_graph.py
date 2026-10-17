@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -349,13 +351,165 @@ def kustomized_paths(root: Path, manifests: list[Manifest]) -> set[str]:
 
     Applications whose source path holds a kustomization.yaml render exactly
     its resources; any other file in the repo is never applied by them.
-    Helm-chart Applications (no path) contribute nothing.
+    Helm-chart Applications (no path) contribute nothing. Directory sources
+    are not counted here; synced_paths is everything ArgoCD applies.
     """
     resolved = root.resolve()
     return {
         path
         for _, _, directory in _kustomize_roots(resolved, manifests)
         for path in kustomization_files(resolved, directory)
+    }
+
+
+# File names a Directory source reads (reposerver manifestFile), and the
+# marker that makes it pass a file over.
+DIRECTORY_MANIFEST = re.compile(r"^.*\.(yaml|yml|json|jsonnet)$")
+SKIP_RENDERING_MARKER = "+argocd:skip-file-rendering"
+
+# Source blocks that set the type explicitly, as ArgoCD's ExplicitType reads them.
+EXPLICIT_SOURCE_TYPES = {"directory": "Directory", "helm": "Helm", "kustomize": "Kustomize", "plugin": "Plugin"}
+
+
+def _glob_regex(pattern: str) -> str:
+    """Translate a gobwas/glob pattern compiled with no separators into a regex.
+
+    ArgoCD's glob.Match(include, relPath) passes no separators, so `*` and
+    `**` both match any run of characters, `/` included. A pattern that does
+    not compile raises: ArgoCD would log it and match nothing.
+    """
+    out: list[str] = []
+    depth = 0
+    i = 0
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\":
+            if i + 1 == len(pattern):
+                raise ValueError(f"glob {pattern!r} ends in an escape")
+            out.append(re.escape(pattern[i + 1]))
+            i += 2
+            continue
+        if c == "*":
+            out.append(".*")
+        elif c == "?":
+            out.append(".")
+        elif c == "[":
+            end = pattern.find("]", i + 1)
+            if end == -1:
+                raise ValueError(f"glob {pattern!r} has an unclosed [")
+            body = pattern[i + 1:end]
+            negate = body.startswith("!")
+            body = body[1:] if negate else body
+            if not body:
+                raise ValueError(f"glob {pattern!r} has an empty character class")
+            chars = "".join(ch if ch == "-" else re.escape(ch) for ch in body)
+            out.append(f"[{'^' if negate else ''}{chars}]")
+            i = end
+        elif c == "{":
+            out.append("(?:")
+            depth += 1
+        elif c == "," and depth:
+            out.append("|")
+        elif c == "}" and depth:
+            out.append(")")
+            depth -= 1
+        else:
+            out.append(re.escape(c))
+        i += 1
+    if depth:
+        raise ValueError(f"glob {pattern!r} has an unclosed {{")
+    return "".join(out)
+
+
+def glob_match(pattern: str, text: str) -> bool:
+    """ArgoCD's glob.Match(pattern, text) for a directory source's include or exclude."""
+    return re.fullmatch(_glob_regex(pattern), text, re.DOTALL) is not None
+
+
+def source_type(root: Path, source: dict) -> str | None:
+    """The type ArgoCD gives an Application source, or None for a chart from a Helm repository.
+
+    An explicit directory/helm/kustomize/plugin block wins; two of them is an
+    error, as in ArgoCD. Otherwise the path is detected: a kustomization file
+    makes it Kustomize, a Chart.yaml Helm, anything else Directory.
+    """
+    path = source.get("path")
+    if "chart" in source or not path:
+        return None
+    explicit = [t for key, t in EXPLICIT_SOURCE_TYPES.items() if source.get(key) is not None]
+    if len(explicit) > 1:
+        raise ValueError(f"source {path!r} sets multiple application source types: {explicit}")
+    if explicit:
+        return explicit[0]
+    directory = root / path
+    if any((directory / n).is_file() for n in KUSTOMIZATION_NAMES):
+        return "Kustomize"
+    if (directory / "Chart.yaml").is_file():
+        return "Helm"
+    return "Directory"
+
+
+def directory_files(root: Path, path: str, directory: dict) -> set[str]:
+    """Repo-relative files a Directory source on path reads, as ArgoCD's reposerver walks it.
+
+    Subdirectories only with recurse; only manifest extensions unless
+    disableExtensionFilter; exclude and include are globs on the path
+    relative to the source path; files carrying the skip marker are passed
+    over. A path that names no directory raises, as the sync would fail.
+    """
+    resolved = root.resolve()
+    top = resolved / path
+    if not top.is_dir():
+        raise FileNotFoundError(f"directory source path {path!r} does not exist under {resolved}")
+    include = directory.get("include") or ""
+    exclude = directory.get("exclude") or ""
+    out: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(top):
+        if not directory.get("recurse"):
+            dirnames.clear()
+        for name in filenames:
+            if not directory.get("disableExtensionFilter") and not DIRECTORY_MANIFEST.match(name):
+                continue
+            file = Path(dirpath) / name
+            rel = file.relative_to(top).as_posix()
+            if exclude and glob_match(exclude, rel):
+                continue
+            if include and not glob_match(include, rel):
+                continue
+            if SKIP_RENDERING_MARKER in file.read_text(encoding="utf-8"):
+                continue
+            out.add(file.relative_to(resolved).as_posix())
+    return out
+
+
+def synced_paths(root: Path, manifests: list[Manifest]) -> set[str]:
+    """Repo-relative files that some ArgoCD Application applies, Kustomize and Directory sources alike.
+
+    A Kustomize source renders exactly its kustomization's resources; a
+    Directory source reads the files directory_files finds. Helm sources,
+    local charts included, contribute nothing: their templates are not
+    cluster manifests until rendered. A plugin source raises, since what it
+    renders cannot be read from the repo.
+    """
+    resolved = root.resolve()
+    out: set[str] = set()
+    for app, source in _app_source_paths(manifests):
+        kind = source_type(resolved, source)
+        if kind == "Kustomize":
+            out |= kustomization_files(resolved, resolved / source["path"])
+        elif kind == "Directory":
+            out |= directory_files(resolved, source["path"], source.get("directory") or {})
+        elif kind == "Plugin":
+            raise ValueError(f"{app.label}: plugin sources are not modelled")
+    return out
+
+
+def unsynced_manifests(manifests: list[Manifest], synced: set[str]) -> dict[str, str]:
+    """Cluster manifests in the repo that no ArgoCD Application applies, keyed "path: Kind namespace/name"."""
+    return {
+        f"{m.path}: {m.kind} {m.namespace}/{m.name}": f"{m.label}: no ArgoCD Application syncs {m.path}"
+        for m in manifests
+        if m.path not in synced
     }
 
 
@@ -408,7 +562,7 @@ def files_outside_kustomization_root(root: Path, manifests: list[Manifest]) -> d
 
 
 def unsynced_reference_grants(manifests: list[Manifest], synced: set[str]) -> dict[str, str]:
-    """ReferenceGrants defined in the repo but rendered by no synced Kustomization.
+    """ReferenceGrants defined in the repo but applied by no ArgoCD Application (synced_paths).
 
     missing_reference_grants reads every YAML file, so a grant dropped from
     its kustomization still satisfies it while ArgoCD never applies the
@@ -416,7 +570,7 @@ def unsynced_reference_grants(manifests: list[Manifest], synced: set[str]) -> di
     """
     return {
         f"ReferenceGrant {m.namespace}/{m.name}": (
-            f"{m.label}: no ArgoCD-synced kustomization.yaml lists {m.path}, so the grant never reaches the cluster"
+            f"{m.label}: no ArgoCD Application syncs {m.path}, so the grant never reaches the cluster"
         )
         for m in manifests
         if m.group == GATEWAY_API and m.kind == "ReferenceGrant" and m.path not in synced
