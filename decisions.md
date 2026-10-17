@@ -1984,3 +1984,36 @@ Gateway, its hostname, its certificate and `gateway_api_config` are
 the #57 deploy configuration, and they wait for Michael. When they
 land, the policy goes beside them with `timeoutSec` above 125. The
 test fails until it does.
+
+## 2026-10-17T08:23:20Z · amendment · Readiness rows 6 and 8 and step 3 follow the #102 rail rewrite; row 8 is READY-STATIC (issue #113)
+
+`presentations/kubecon-na-2026/docs/ABSTRACT-READINESS.md` was assessed
+at f226129, before #102. Row 6 said three of the four NeMo rails
+`config.yaml` enables do not exist, row 8 said `burrito-only.co` lists
+"what are your hours" as off-topic, and step 3 of "What closes the gap"
+said to rename the config's flows. #102 (fcab044, 94cde24, question 170)
+rewrote the rails as phrase checks under the enabled names instead, and
+`tests/test_nemo_rail_flows.py` runs them in real `LLMRails`. The #75 and
+#104 entries above stand as written; this one brings the three places up
+to date.
+
+What it changes:
+
+- Row 6 stays PARTIAL: what counts as mid-inference is still the call
+  with Michael and Whitney (talks-knowledge#29). Its rail sentence now
+  says every enabled rail resolves under nemoguardrails 0.24.1, that the
+  rails match listed phrases and call no model, and that the 25.07
+  container (#18) and its `engine: vertexai` models (#100) are
+  unverified.
+- Row 8 moves from PARTIAL to READY-STATIC. Its only gap was the rail
+  the config could not find; the rail now resolves, refuses the seven
+  canonical Act 1 asks and passes twelve menu asks, "what are your
+  hours" among them, in the static suite. It has never run on a
+  cluster, which is what READY-STATIC says. The verdict becomes three
+  READY-STATIC, three PARTIAL, three MISSING; still not ready.
+- Step 3 is marked done statically. What is left of it is live: settle
+  the NeMo model engine (#100), then load the rails in the 25.07
+  container (#18).
+- `tests/test_abstract_readiness.py` holds rows 6 and 8 to citing #102
+  and `tests/test_nemo_rail_flows.py`, and fails if either row says an
+  enabled rail is missing or step 3 asks for the rename again.

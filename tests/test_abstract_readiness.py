@@ -53,6 +53,11 @@ UNASSESSED = {
     "Kubernetes layers": "before the LLM layer",
     "Recorded fallback for the live input": "venue network",
 }
+
+# The rows that rest on the NeMo rails. #102 (question 170) rewrote the rails
+# under the names config.yaml enables, and this test runs them in real LLMRails.
+RAIL_ROWS = ("Pre- and mid-inference guardrails", "Ends selling burritos only")
+RAIL_TEST = "tests/test_nemo_rail_flows.py"
 REPO_DIRS = (
     "ai-gateway",
     "apps",
@@ -138,6 +143,19 @@ def test_unassessed_ready_means_parts_wait_on_the_live_bring_up() -> None:
         if part not in rows[point] or "#18" not in rows[point]
     ]
     assert not gaps, f"rows that do not name their unassessed part and #18: {gaps}"
+
+
+@pytest.mark.static
+def test_rail_rows_rest_on_the_rails_as_rewritten() -> None:
+    """Rows 6 and 8 cite the test that runs every enabled rail, and no longer say rails are missing."""
+    rows = _checklist_rows()
+    uncited = [p for p in RAIL_ROWS if RAIL_TEST not in rows[p] or "#102" not in rows[p]]
+    assert not uncited, f"rows that do not cite #102 and {RAIL_TEST}: {uncited}"
+    stale = [p for p in RAIL_ROWS if "do not exist" in rows[p] or "cannot find" in rows[p]]
+    assert not stale, f"rows still saying an enabled rail is missing: {stale}"
+    text = READINESS.read_text(encoding="utf-8")
+    closing = text[text.index("## What closes the gap"):]
+    assert "make the flow names" not in closing, "'What closes the gap' still asks for the rename #102 replaced"
 
 
 @pytest.mark.static
