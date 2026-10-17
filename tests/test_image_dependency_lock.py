@@ -12,6 +12,7 @@ import pytest
 
 from conftest import PROJECT_ROOT
 from helpers.image_requirements import (
+    DERIVED_IMAGES,
     IMAGES,
     Image,
     export,
@@ -52,15 +53,16 @@ def _pip_installs(dockerfile: Path) -> list[str]:
 
 @pytest.mark.static
 def test_every_dockerfile_is_a_known_image() -> None:
-    """A new Dockerfile has to join IMAGES, so it is held to the same lock."""
+    """A new Dockerfile has to join IMAGES (or DERIVED_IMAGES), so its pins are checked."""
     found = {
         path
         for path in PROJECT_ROOT.rglob("Dockerfile")
         if not any(part.startswith(".") for part in path.relative_to(PROJECT_ROOT).parts)
     }
-    assert found == {image.dockerfile for image in IMAGES}, (
-        f"Dockerfiles not in helpers.image_requirements.IMAGES: "
-        f"{sorted(str(p.relative_to(PROJECT_ROOT)) for p in found - {i.dockerfile for i in IMAGES})}"
+    known = {image.dockerfile for image in IMAGES} | {image.dockerfile for image in DERIVED_IMAGES}
+    assert found == known, (
+        f"Dockerfiles not in helpers.image_requirements IMAGES or DERIVED_IMAGES: "
+        f"{sorted(str(p.relative_to(PROJECT_ROOT)) for p in found ^ known)}"
     )
 
 

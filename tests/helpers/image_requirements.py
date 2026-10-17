@@ -44,6 +44,29 @@ IMAGES = (
     ),
 )
 
+
+
+@dataclass(frozen=True)
+class DerivedImage:
+    """An upstream image plus a thin layer; its few packages are hand-pinned against the base (#108)."""
+
+    name: str
+    dockerfile: Path
+    requirements: Path
+    base: str
+
+
+# laiyer/llm-guard-api 0.3.16 runs Python 3.12; uv.lock resolves for >=3.13 and
+# holds no cp312 wheels, so this image's requirements cannot be a uv export.
+DERIVED_IMAGES = (
+    DerivedImage(
+        "llm-guard-api",
+        PROJECT_ROOT / "ai-gateway" / "llm-guard" / "Dockerfile",
+        PROJECT_ROOT / "ai-gateway" / "llm-guard" / "requirements.txt",
+        "laiyer/llm-guard-api:0.3.16@sha256:bea3efb1220ad18149b73de625c55e6d835bf8b45023a089a3762012a86550ba",
+    ),
+)
+
 # A requirement line in `uv export` output: `name==version`, an optional
 # `; marker`, then the `\` continuation into the --hash lines.
 _PIN = re.compile(r"([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?==([^\s;\\]+)")

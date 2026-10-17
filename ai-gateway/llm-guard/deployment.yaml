@@ -1,5 +1,5 @@
 # ABOUTME: LLM Guard scanner service — Deployment + Service in burritbot-net, with the burritbot-extproc sidecar.
-# ABOUTME: ProtectAI llm-guard-api 0.3.16 loads /config/config.yaml via CONFIG_FILE; downloads ~4.3 GiB of scanner models.
+# ABOUTME: llm-guard-api 0.3.16 (derived image, ./Dockerfile) loads /config/config.yaml via CONFIG_FILE; downloads ~4.3 GiB of models.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -35,10 +35,13 @@ spec:
         - name: llm-guard
           # Pinned tag; bump deliberately, never use :latest. 0.3.16 is the
           # last release: protectai/llm-guard was archived on 2026-07-08.
+          # Built from ai-gateway/llm-guard/Dockerfile: laiyer/llm-guard-api:0.3.16
+          # by digest plus spaCy's zh_core_web_sm, which Anonymize and Sensitive
+          # load; without it spaCy pip-installs on the read-only root and exits.
           # The image runs as uid 1000 (HOME /home/user); every file in it is
           # world-readable, so it also runs as 1001 when its writes land on
           # the emptyDirs below.
-          image: laiyer/llm-guard-api:0.3.16
+          image: us-west1-docker.pkg.dev/kk-community-projects/burritbot/llm-guard-api:0.3.16-burritbot.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 816 passed, 54 deselected after the
-  #122 guarded SA ABOUTME, labels and token automount tests
+  (ruff check, then static suite) 834 passed, 55 deselected after the
+  #108 derived llm-guard image
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -97,6 +97,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #95 question 163 (decided by hecaton's research under Michael's standing rules), first child #116: the guarded BurritBot KSA (`burritbot-guarded/burritbot`) drops its `iam.gke.io/gcp-service-account` annotation, since guarded BurritBot reaches Vertex only through the AI gateway's GSA (#67); `tests/test_critical_fix_a2_service_accounts.py::test_burritbot_guarded_sa_has_no_wif_annotation` replaces the old has-annotation test; removing `workload_wif_binding` from iam.tf and the readiness record are the next two children (decisions.md); 802 static green
 - 2026-10-17 · #119 (partial) the #109 GKE load-balancer rule now reads what ArgoCD syncs: `synced_manifests` (tests/helpers/manifest_graph.py) parses every file an Application syncs, delivery overlays under `presentations/` included, with the Application's destination namespace on objects that set none, so a #57 Gateway or GCPBackendPolicy in `presentations/<event>/deploy/audience` is checked (it was invisible to `load_manifests`); `frontend_exposure_violations` fails on any way to `audience/audience-frontend` that rule cannot see (a non-ClusterIP Service, an overlay patch to one, a JSON 6902 patch on it, an Ingress, a route through a non-GKE Gateway); `synced_patches` reads the overlays' patches. The repo still sets no backend timeout: the GCPBackendPolicy goes in with the #57 Gateway, which waits for Michael (decisions.md); 814 static green
 - 2026-10-17 · #122 test for #116's untested criterion: `tests/test_critical_fix_a2_service_accounts.py` gains `test_burritbot_guarded_sa_aboutme_does_not_claim_wif_binding` (two ABOUTME lines, none saying "bound via WIF", "workload GSA" or "GSA email") and `test_burritbot_guarded_sa_labels_and_token_automount_unchanged` (the four app.kubernetes.io and burritbot.io labels exactly, `automountServiceAccountToken: true`); the pre-#116 manifest, a changed label and a false automount each fail them; 816 static green
+- 2026-10-17 · #108 question 192 (decided by hecaton's research under Michael's standing rules): llm-guard runs a derived image, `ai-gateway/llm-guard/Dockerfile`, FROM `laiyer/llm-guard-api:0.3.16` by index digest plus spaCy's `zh_core_web_sm` 3.8.0 and `spacy-pkuseg` 1.0.1 from a hand-pinned hashed `requirements.txt` (`pip --no-deps --require-hashes --user`; uv.lock holds no cp312 wheels), so Anonymize/Sensitive's en+zh analyzer no longer pip-installs on the read-only root; the Deployment runs `us-west1-docker.pkg.dev/kk-community-projects/burritbot/llm-guard-api:0.3.16-burritbot.1`, which Michael builds and pushes; `tests/test_llm_guard_derived_image.py` holds it, the live install test passes; 834 static green
 
 ---
 
@@ -434,7 +435,16 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 816 static tests green. Live tests fail loudly when
+- Derived llm-guard image (17), #108: Anonymize and Sensitive load an
+  en+zh analyzer, so every language needs its spaCy model in the image
+  (base or added layer); the Dockerfile is the 0.3.16 base by digest plus
+  one `--no-deps --require-hashes --user` install and a build-time
+  `spacy.load`, overriding nothing else; requirements.txt is exactly
+  spacy-pkuseg 1.0.1 and zh_core_web_sm 3.8.0, hashed, the model matching
+  the base's spaCy minor; mutation tests drop, unhash and drift each; the
+  live test installs the pins onto the base's spaCy 3.8.6 on Python 3.12
+  and loads the model
+- **Total: 834 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
