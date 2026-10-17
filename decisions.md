@@ -1813,3 +1813,41 @@ cluster the hand-over needs a step that keeps the CRDs, so it is
 cheapest before #18's first sync. This is deploy configuration, and as
 with #68 and #96 it waits for Michael's review before any cluster syncs
 it.
+
+## 2026-10-17T03:56:43Z · decision · #100 restates #90, already fixed by 1ee3d4e; the 25.07 docs support only OpenAI-compatible providers, so `engine: vertexai` is a follow-up (issue #100)
+
+#100 reports the same mismatch #90 did: port 8000, `/config`,
+`NEMO_GUARDRAILS_CONFIG_PATH` and `/v1/rails/configs` probes, where the
+25.07 microservice expects 7331, `CONFIG_STORE_PATH` and `/v1/health`.
+Commit 1ee3d4e fixed it before this run, and
+`tests/test_nemo_guardrails_microservice.py` holds it. The Deployment sets
+`GUARDRAILS_PORT=7331`, mounts the two ConfigMaps at
+`/config-store/burritbot/{config.yml,rails/}` with
+`CONFIG_STORE_PATH=/config-store` and `DEFAULT_CONFIG_ID=burritbot`, and
+probes `/v1/health`. The adapter's `SCANNER_URL` is
+`http://127.0.0.1:7331`. The Deployment is unchanged here. The one leftover
+was a stale comment in `ai-gateway/envoy/gateway.yaml` naming "the
+scanner's own port 8000". It now names 7331 for nemo-guardrails and 8000
+for llm-guard.
+
+#100 also asked whether the image supports `engine: vertexai`. The image
+still cannot be pulled without an NGC key, so this run read NVIDIA's
+25.7.0 tutorial "Custom LLM Providers"
+(archive.docs.nvidia.com/nemo/microservices/25.7.0/guardrails/tutorials/custom-llm-providers.html,
+read 2026-10-17). It says: "Only OpenAI compatible LLM providers are
+supported." Its examples use only `engine: nim` and `engine: openai`, each
+with a `parameters.base_url`, and it never mentions Vertex AI. The
+open-source `nemoguardrails` library does support `vertexai` through
+LangChain, but those are library docs, not the 25.07 container's. Read
+literally, `config.yaml`'s two `engine: vertexai` models, and the
+delivery overlay that patches their labels, will not load in the
+microservice.
+
+The fix needs a choice of OpenAI-compatible route to Gemini, so it is
+left as a follow-up rather than made here. Vertex AI's own
+OpenAI-compatible endpoint needs a short-lived OAuth token as the API
+key. The Envoy AI Gateway's OpenAI→GCPVertexAI route is the other
+option. The choice also touches the #73 labels overlay and its tests.
+This run adds no static test for it, because one would fail on the
+current config. This is deploy configuration, and as with #90 it waits
+for Michael's review before any cluster syncs it.
