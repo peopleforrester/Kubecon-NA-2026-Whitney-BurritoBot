@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,51 @@ EXPECTED_NAMESPACES = [
 
 # Grafana demo credentials (base64 of admin:admin) for wget in test pods.
 GRAFANA_BASIC_AUTH = "Basic YWRtaW46YWRtaW4="
+
+
+# --- Per-worktree temp dirs (issue #115) --------------------------------
+#
+# pytest's default basetemp is a numbered dir under the shared
+# /tmp/pytest-of-<user>. Concurrent runs under one OS user share that dir,
+# and when the host's /tmp runs out of inodes every tmp_path fails setup
+# with "could not create numbered dir ... after 10 tries"; pytest's output
+# capture in probe sessions fails the same way through `tempfile`. Each
+# session keeps its temp files under its own rootdir instead, off /tmp:
+# `basetemp/` for tmp_path (pytest clears it at session start) and `tmp/`
+# as TMPDIR for `tempfile` here and in every subprocess. The dir is
+# gitignored and skipped by the tree-walking tests.
+
+WORKTREE_TMP_DIRNAME = ".pytest-tmp"
+
+
+def worktree_basetemp(rootdir: Path) -> Path:
+    """The basetemp for sessions rooted at `rootdir`: inside that worktree."""
+    return rootdir.resolve() / WORKTREE_TMP_DIRNAME / "basetemp"
+
+
+def worktree_tmpdir(rootdir: Path) -> Path:
+    """The TMPDIR for sessions rooted at `rootdir`: inside that worktree."""
+    return rootdir.resolve() / WORKTREE_TMP_DIRNAME / "tmp"
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config: pytest.Config) -> None:
+    """Keep this session's temp files in its worktree.
+
+    Runs before pytest's tmpdir plugin reads --basetemp. A --basetemp
+    given on the command line, or a TMPDIR already set, is left as given.
+    Keyed on the session's rootdir, so a nested probe session rooted in
+    its own tmp dir never clears the outer session's basetemp.
+    """
+    if config.option.basetemp is None:
+        basetemp = worktree_basetemp(config.rootpath)
+        basetemp.parent.mkdir(exist_ok=True)
+        config.option.basetemp = str(basetemp)
+    if not os.environ.get("TMPDIR"):
+        tmpdir = worktree_tmpdir(config.rootpath)
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        os.environ["TMPDIR"] = str(tmpdir)
+        tempfile.tempdir = str(tmpdir)
 
 
 # --- Live-cluster fixtures ----------------------------------------------

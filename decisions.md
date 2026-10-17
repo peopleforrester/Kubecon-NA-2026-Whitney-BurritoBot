@@ -2255,3 +2255,59 @@ Not verified: that the 25.07 microservice loads the model-less config and
 serves `/v1/guardrail/checks`. Nothing has run in its container (#18).
 #18's first container run must prove both. If it does not, that run
 reports it and option (a) is taken.
+## 2026-10-17T09:25:21Z · decision · The test suite keeps its temp files in each worktree, off the shared /tmp, because the setup errors are /tmp inode exhaustion as well as a shared dir (issue #115)
+
+#115 reports static runs ending with dozens of setup errors, "could not
+create numbered dir with prefix pytest- in /tmp/pytest-of-<user> after
+10 tries", and suggests a per-worktree basetemp because concurrent runs
+share that dir.
+
+What this run found on the host:
+
+- /tmp is a 32G tmpfs with 1,048,576 inodes, and all of them were in use
+  (0 to 4 free) while only about 8G of space was used. Almost all of those
+  inodes sit in dirs owned by other pool users, which this run cannot read.
+  `make_numbered_dir` swallows the OSError on each of its 10 tries, so
+  ENOSPC reads the same as a race.
+- A per-worktree basetemp still in /tmp (`/tmp/burritbot-pytest-<hash>`)
+  failed the same way: 66 setup errors, "could not create numbered dir
+  with prefix config-store in /tmp/burritbot-pytest-<hash>".
+- With the basetemp moved into the worktree, the nested probe sessions in
+  `tests/test_live_fixtures_fail_loudly.py` still failed, and one run
+  failed outright at startup. In both cases pytest's fd capture opens a
+  `tempfile.TemporaryFile` in /tmp: `[Errno 28] No space left on device`.
+
+What it decides:
+
+- `tests/conftest.py` `pytest_configure` (tryfirst, ahead of pytest's
+  tmpdir plugin) keeps the session's temp files under
+  `<rootdir>/.pytest-tmp/`: `--basetemp` is `basetemp/` when none is
+  given, and TMPDIR plus `tempfile.tempdir` are `tmp/` when TMPDIR is not
+  already set. Subprocesses, including the probe pytests, inherit it. An
+  explicit `--basetemp` or TMPDIR still wins.
+- It is keyed on the session's rootdir, not on conftest's location, so
+  probe sessions that load conftest with `-p conftest --rootdir <tmp>`
+  get a basetemp under their own tmp dir and never clear the outer
+  session's.
+- `.pytest-tmp/` is gitignored (so ruff skips it too). It is added to
+  SKIP_DIRS in the two tests that walk the whole tree
+  (event-name and accepted-title checks). Like any given basetemp, pytest
+  clears `basetemp/` at the start of each session. Two pytest runs at once
+  in the *same* worktree would clear each other's dir, which is out of
+  scope; one run per worktree is how the dispatcher works.
+- What remains: pytest opens its global capture files
+  (`tempfile.TemporaryFile`) before any conftest loads. Python's
+  `tempfile` skips a /tmp it cannot write to and uses /var/tmp, but a run
+  that starts while /tmp still has an inode free, then loses it before
+  capture opens, crashes at startup with `[Errno 28] No space left on
+  device: '/tmp/tmp...'`. That is one loud crash, not dozens of setup
+  errors, and it happened once in seven full runs here. Nothing in this
+  repo runs early enough to stop it: the project has no build system to
+  give a plugin an entry point, and a `-p` plugin in addopts is imported
+  before `pythonpath` puts `tests/` on sys.path. The levers are the
+  host's /tmp (raised as a follow-up), TMPDIR in the Test command, or
+  `--capture=sys` in addopts. The last two change the project's Test
+  command or capture for everyone, so they are not taken here.
+- Evidence: five runs in a row of the Test command, 806 passed each, with
+  /tmp at 0 to 2 free inodes; with the conftest block off, the new tests
+  fail with the issue's exact error.

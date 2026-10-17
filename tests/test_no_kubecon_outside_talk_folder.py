@@ -38,6 +38,7 @@ SKIP_DIRS = {
     ".venv",
     "__pycache__",
     ".pytest_cache",
+    ".pytest-tmp",  # per-worktree pytest basetemp (issue #115)
     "node_modules",
     "presentations",  # the entire presentations/ subtree is allowed to mention kubecon
     # claude-ai-context/ is a gitignored, local-only archive of imported
