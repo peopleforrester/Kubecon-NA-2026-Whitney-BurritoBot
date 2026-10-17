@@ -1,5 +1,5 @@
 # ABOUTME: ArgoCD Application for Envoy Gateway — the Gateway API controller that programs the AI gateway proxy.
-# ABOUTME: Installs the Gateway API + Envoy Gateway CRDs and hands xDS to the AI Gateway extension server.
+# ABOUTME: Installs no CRDs (envoy-gateway-crds does) and hands xDS to the AI Gateway extension server.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -7,8 +7,8 @@ metadata:
   name: envoy-gateway
   namespace: argocd
   annotations:
-    # Before the ai-gateway Application (Gateway, Backend, EnvoyProxy,
-    # EnvoyExtensionPolicy need these CRDs) and the AI Gateway controller.
+    # After envoy-gateway-crds (wave -2), so the controller finds its CRDs at
+    # startup; before the ai-gateway Application and the AI Gateway controller.
     argocd.argoproj.io/sync-wave: "-1"
   labels:
     burritbot.io/layer: the-net
@@ -26,11 +26,12 @@ spec:
     targetRevision: v1.9.2
     helm:
       valuesObject:
-        # The chart's crds subchart carries the Gateway API CRDs (GatewayClass,
-        # Gateway, HTTPRoute, BackendTLSPolicy) and the gateway.envoyproxy.io
-        # CRDs. GKE-managed Gateway API CRDs must stay off on this cluster.
+        # The envoy-gateway-crds Application installs the gateway.envoyproxy.io
+        # CRDs and, until GKE's Gateway API takes them, the Gateway API CRDs.
+        # The chart's crds subchart would add a second, experimental-channel
+        # copy of the Gateway API CRDs.
         crds:
-          enabled: true
+          enabled: false
         # Its webhook listens on 9443, which the GKE control plane cannot reach
         # on private nodes; zone-aware routing is not used here.
         topologyInjector:
@@ -80,9 +81,6 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
-      # The Gateway API and EnvoyProxy CRDs are larger than the 256 KiB
-      # last-applied annotation that client-side apply writes.
-      - ServerSideApply=true
     retry:
       limit: 5
       backoff:

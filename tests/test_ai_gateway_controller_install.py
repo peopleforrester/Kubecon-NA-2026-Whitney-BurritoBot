@@ -17,6 +17,7 @@ from helpers.manifest_graph import kustomized_paths, load_manifests
 GITOPS_APPS = PROJECT_ROOT / "gitops" / "apps"
 NAMESPACES_FILE = PROJECT_ROOT / "gitops" / "namespaces" / "namespaces.yaml"
 EG_APP = GITOPS_APPS / "envoy-gateway.yaml"
+EG_CRDS_APP = GITOPS_APPS / "envoy-gateway-crds.yaml"
 AIGW_CRDS_APP = GITOPS_APPS / "ai-gateway-crds.yaml"
 AIGW_CONTROLLER_APP = GITOPS_APPS / "ai-gateway-controller.yaml"
 AI_GATEWAY_APP = GITOPS_APPS / "20-ai-gateway.yaml"
@@ -31,6 +32,7 @@ CHART_REPO = "docker.io/envoyproxy"
 # Agent Router (formerly Envoy AI Gateway) v1.2.0 builds against Envoy Gateway
 # v1.9.2; decision #53 checked gateway.yaml against both.
 EG_CHART = ("gateway-helm", "v1.9.2")
+EG_CRDS_CHART = ("gateway-crds-helm", "v1.9.2")
 AIGW_CRDS_CHART = ("ai-gateway-crds-helm", "v1.2.0")
 AIGW_CONTROLLER_CHART = ("ai-gateway-helm", "v1.2.0")
 
@@ -82,13 +84,18 @@ def _declared_namespaces() -> set[str]:
     return {d["metadata"]["name"] for d in _docs(NAMESPACES_FILE) if d.get("kind") == "Namespace"}
 
 
-# --- the three Applications --------------------------------------------------
+# --- the four Applications --------------------------------------------------
 
 
 @pytest.mark.static
 @pytest.mark.parametrize(
     "path,chart",
-    [(EG_APP, EG_CHART), (AIGW_CRDS_APP, AIGW_CRDS_CHART), (AIGW_CONTROLLER_APP, AIGW_CONTROLLER_CHART)],
+    [
+        (EG_APP, EG_CHART),
+        (EG_CRDS_APP, EG_CRDS_CHART),
+        (AIGW_CRDS_APP, AIGW_CRDS_CHART),
+        (AIGW_CONTROLLER_APP, AIGW_CONTROLLER_CHART),
+    ],
     ids=lambda x: x.name if isinstance(x, Path) else x[0],
 )
 def test_chart_is_pinned(path: Path, chart: tuple[str, str]) -> None:
@@ -104,7 +111,7 @@ def test_crds_and_controller_are_the_same_release() -> None:
 
 
 @pytest.mark.static
-@pytest.mark.parametrize("path", [EG_APP, AIGW_CRDS_APP], ids=lambda p: p.name)
+@pytest.mark.parametrize("path", [EG_CRDS_APP, AIGW_CRDS_APP], ids=lambda p: p.name)
 def test_crd_apps_apply_server_side(path: Path) -> None:
     """The Gateway API and EnvoyProxy CRDs exceed the 256 KiB last-applied
     annotation that client-side apply writes; ArgoCD must apply them server-side."""
@@ -113,14 +120,14 @@ def test_crd_apps_apply_server_side(path: Path) -> None:
 
 @pytest.mark.static
 def test_crds_chart_installs_no_gateway_api_crds() -> None:
-    """Envoy Gateway's chart already carries the Gateway API CRDs; the AI
-    Gateway CRD chart carries only aigateway.envoyproxy.io."""
+    """The envoy-gateway-crds Application carries the Gateway API CRDs (or GKE
+    does); the AI Gateway CRD chart carries only aigateway.envoyproxy.io."""
     values = _app(AIGW_CRDS_APP)["spec"]["source"].get("helm", {}).get("valuesObject", {})
     assert not values, f"ai-gateway-crds-helm takes no values; found {values}"
 
 
 @pytest.mark.static
-@pytest.mark.parametrize("path", [EG_APP, AIGW_CRDS_APP, AIGW_CONTROLLER_APP], ids=lambda p: p.name)
+@pytest.mark.parametrize("path", [EG_APP, EG_CRDS_APP, AIGW_CRDS_APP, AIGW_CONTROLLER_APP], ids=lambda p: p.name)
 def test_destination_namespace_is_declared(path: Path) -> None:
     namespace = _app(path)["spec"]["destination"]["namespace"]
     assert namespace in _declared_namespaces(), f"{namespace} is not in {NAMESPACES_FILE.name}"
@@ -264,7 +271,7 @@ def test_mcp_session_seed_is_not_regenerated_or_committed() -> None:
 @pytest.mark.static
 def test_controllers_sync_before_the_gateway_resources() -> None:
     gateway = _wave(AI_GATEWAY_APP)
-    assert _wave(NAMESPACES_APP) < _wave(EG_APP) < gateway
+    assert _wave(NAMESPACES_APP) < _wave(EG_CRDS_APP) < _wave(EG_APP) < gateway
     assert _wave(NAMESPACES_APP) < _wave(AIGW_CRDS_APP) < gateway
     assert _wave(CERT_MANAGER_APP) < _wave(AIGW_CONTROLLER_APP) < gateway
     assert _wave(EG_APP) <= _wave(AIGW_CONTROLLER_APP)

@@ -8,63 +8,27 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pytest
-import yaml
 
 from conftest import PROJECT_ROOT
-
-
-Files = dict[str, str]  # repo-relative path -> text
-
-
-def load_files() -> Files:
-    paths = [
-        *sorted((PROJECT_ROOT / "infrastructure" / "terraform").glob("*.tf")),
-        *sorted((PROJECT_ROOT / "gitops" / "apps").glob("*.yaml")),
-    ]
-    return {str(p.relative_to(PROJECT_ROOT)): p.read_text(encoding="utf-8") for p in paths}
-
-
-def _terraform(files: Files) -> str:
-    """All Terraform in one string, with # comments removed."""
-    return "\n".join(
-        line.split("#", 1)[0]
-        for path, text in files.items()
-        if path.endswith(".tf")
-        for line in text.splitlines()
-    )
+from helpers.gateway_api_crds import (
+    Files,
+    applications,
+    gateway_api_chart_owners,
+    gke_manages_gateway_api,
+    load_files,
+)
+from helpers.gateway_api_crds import terraform_text as _terraform
 
 
 def _helm_charts(files: Files) -> set[str]:
     """Charts installed by the ArgoCD Applications under gitops/apps."""
     charts: set[str] = set()
-    for path, text in files.items():
-        if not path.startswith("gitops/apps/"):
-            continue
-        for doc in yaml.safe_load_all(text):
-            if not doc or doc.get("kind") != "Application":
-                continue
-            spec = doc["spec"]
-            for source in [spec.get("source") or {}, *(spec.get("sources") or [])]:
-                if "chart" in source:
-                    charts.add(source["chart"])
+    for _, app in applications(files):
+        spec = app["spec"]
+        for source in [spec.get("source") or {}, *(spec.get("sources") or [])]:
+            if "chart" in source:
+                charts.add(source["chart"])
     return charts
-
-
-def _eg_bundles_gateway_api_crds(files: Files) -> bool:
-    """An Application installs Envoy Gateway's gateway-helm with its crds subchart on."""
-    for path, text in files.items():
-        if not path.startswith("gitops/apps/"):
-            continue
-        for doc in yaml.safe_load_all(text):
-            if not doc or doc.get("kind") != "Application":
-                continue
-            source = doc["spec"].get("source") or {}
-            if source.get("chart") != "gateway-helm":
-                continue
-            values = (source.get("helm") or {}).get("valuesObject") or {}
-            if (values.get("crds") or {}).get("enabled", True):
-                return True
-    return False
 
 
 @dataclass(frozen=True)
@@ -105,13 +69,12 @@ FALCO_DAEMONSET = Setting(
 )
 GKE_GATEWAY_API = Setting(
     "GKE-managed Gateway API CRDs (gateway_api_config with a channel other than CHANNEL_DISABLED)",
-    lambda f: bool(
-        re.search(r'gateway_api_config\s*{[^}]*channel\s*=\s*"CHANNEL_(?!DISABLED")', _terraform(f))
-    ),
+    gke_manages_gateway_api,
 )
 EG_GATEWAY_API_CRDS = Setting(
-    "Envoy Gateway chart (gateway-helm) installing its Gateway API CRDs in gitops/apps",
-    _eg_bundles_gateway_api_crds,
+    "an Envoy Gateway chart installing the Gateway API CRDs in gitops/apps "
+    "(gateway-helm crds.enabled or gateway-crds-helm crds.gatewayAPI.enabled)",
+    lambda f: bool(gateway_api_chart_owners(f)),
 )
 
 INCOMPATIBLE: dict[str, IncompatiblePair] = {
@@ -135,21 +98,21 @@ INCOMPATIBLE: dict[str, IncompatiblePair] = {
         "Autopilot forbids privileged containers; the Falco DaemonSet needs "
         "them for its modern-eBPF driver.",
     ),
-    # #68: Envoy Gateway's gateway-helm README: where the provider manages the
-    # Gateway API CRDs, leave the chart's copy off rather than mix two copies.
+    # #68, #97: Envoy Gateway's gateway-crds-helm README: where the provider
+    # manages the Gateway API CRDs, leave the chart's copy off rather than mix
+    # two copies.
     "gke-gateway-api-vs-envoy-gateway-crds": IncompatiblePair(
         GKE_GATEWAY_API,
         EG_GATEWAY_API_CRDS,
         "GKE then owns the Gateway API CRDs and reconciles its own version and "
-        "channel over the copy ArgoCD applies from gateway-helm. Set gateway-helm "
-        "crds.enabled false and install only the Envoy Gateway CRDs "
-        "(gateway-crds-helm, crds.gatewayAPI.enabled false), once GKE's Gateway "
-        "API serves what the ai-gateway manifests use (Gateway API v1.4+, for "
-        "BackendTLSPolicy v1 in vertex-ai-backend.yaml).",
+        "channel over the copy ArgoCD applies from the chart. Turning "
+        "gateway_api_config on sets envoy-gateway-crds crds.gatewayAPI.enabled "
+        "false in the same change, with a min_master_version whose GKE bundle "
+        "serves the manifests (tests/test_gateway_api_crd_owner.py).",
     ),
 }
 
-FILES = load_files()
+FILES = load_files(PROJECT_ROOT)
 
 
 def _violations(files: Files) -> list[str]:
