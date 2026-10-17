@@ -24,7 +24,9 @@ Approved plans land here with ts + sha256.)_
 
 ## Current Plan
 Nothing in flight. The last cycle (Dependabot bumps, promoted
-2026-10-15) is complete. The live path is the critical path in the
+2026-10-15) is complete. Spec 001 (#114) sets the dated milestones
+to delivery; its working copy and milestone status are in
+`specs/001-ready-by-11-08-delivered-11-12.md`. The live path is the critical path in the
 "Open Work" section below: `#17 → #18 → #20` (#22, #23 and #24 are
 fixed statically).
 
@@ -32,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 795 passed, 54 deselected after the
-  #113 readiness rows 6 and 8 refresh
+  (ruff check, then static suite) 802 passed, 54 deselected after the
+  #114 spec 001 working copy
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -91,6 +93,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #109 GKE load-balancer timeout: `tests/test_guarded_timeout_budget.py` now holds any GKE Gateway (`gke-l7-*` GatewayClass) route to `audience/audience-frontend` to a GCPBackendPolicy on that Service with `spec.default.timeoutSec` above the frontend's `GUARDED_TIMEOUT_SECONDS` (125s; the load balancer's default is 30s), and any `timeouts.request` on that route above it too; mutation cases cover no policy, the 30s default, a timeout equal to the frontend's and a short route timeout. No Gateway or GCPBackendPolicy manifest is added: the #57 Gateway, its hostname, certificate and `gateway_api_config` wait for Michael, and without GKE's Gateway controller the GCPBackendPolicy CRD does not exist, so the audience sync would fail (decisions.md); 780 static green
 - 2026-10-17 · #110 guardrails refusal on the phone page: the audience backend's `upstream_failure` relays a 403 whose JSON names a scanner in `blocked_by` and says why in `detail` (the net's block on either hop, and guarded BurritBot's relay of one since #94) as that JSON plus `target`, where it used to quote it inside an HTTPException detail; every other upstream error keeps its status. `app.js` reads a 403's body and, when `refusalOf` finds the net's refusal, `showRefusal` shows its detail as a `BurritBot · guarded` reply styled `reply refused`, not "Something went wrong (HTTP 403)"; a net 502/503 still reads as unreachable. New `tests/test_phase_07_guardrails_refusal.py`; 794 static green
 - 2026-10-17 · #113 ABSTRACT-READINESS.md follows the #102 rail rewrite: row 6 (still PARTIAL, mid-inference is the talks-knowledge#29 call) says every enabled NeMo rail resolves in real `LLMRails` (`tests/test_nemo_rail_flows.py`), as phrase checks that call no model, with the 25.07 container (#18) and its `engine: vertexai` models (#100) unverified; row 8 PARTIAL → READY-STATIC (the burrito-only rail resolves, refuses the seven Act 1 asks, passes "what are your hours"); verdict 3 READY-STATIC, 3 PARTIAL, 3 MISSING, still not ready; step 3 done statically, live part left to #100 and #18; `tests/test_abstract_readiness.py` holds rows 6 and 8 to #102 and the rail test (decisions.md); 795 static green
+- 2026-10-17 · #114 spec 001 working copy: `specs/001-ready-by-11-08-delivered-11-12.md` names its source (personal-knowledge `specs/talks/burritobot/001-ready-by-11-08-delivered-11-12.md`) and sha256, carries the delivered text between markers, and tracks M1 to M9 (M3 and M5 OPEN, the rest WAITING on #17 → #83 → #18 or a date); `tests/test_spec_001_working_copy.py` holds the text to the sha256 bar Corrections and the status rows to the spec's milestones, dates and KRs; Open Work points to it; 802 static green
 
 ---
 
@@ -104,6 +107,16 @@ history._
 # Project State — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 
 ## Open Work
+
+### Spec 001: ready by 11-08, delivered 11-12
+The approved spec (#114, personal-knowledge
+`specs/talks/burritobot/001-ready-by-11-08-delivered-11-12.md`) sets
+milestones M1 to M9 from the live bring-up (2026-10-23) to delivery
+(2026-11-12) and the campaign after it. The working copy, with each
+milestone's status and what it waits on, is
+`specs/001-ready-by-11-08-delivered-11-12.md`. Corrections go in its
+Corrections section; changes to the spec go back to personal-knowledge
+as an issue. The critical path below is M1.
 
 ### The 2026-08-26 pause has ended
 Michael paused this project on 2026-08-26 until after DevOpsDays
@@ -407,13 +420,18 @@ commit.
   old suffixed name and is rejected; `check_async` blocks each rail's asks
   and leak replies under its own name and passes menu asks and replies;
   both ConfigMaps mirror their sources
+- Spec 001 working copy (7), #114: the working copy names its source and
+  sha256, its spec text hashes to the delivered file with Corrections put
+  back as delivered (mutations: a correction passes, a moved date and a
+  dropped milestone fail), the milestone status rows follow the spec's
+  milestones, dates and KRs, and Open Work points to it
 - Synced manifests (37), #106: every cluster manifest is applied by an
   ArgoCD Application through a Kustomize or Directory source, the
   hand-applied root excepted; Directory walks honour recurse, include,
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 795 static tests green. Live tests fail loudly when
+- **Total: 802 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

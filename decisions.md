@@ -2017,3 +2017,33 @@ What it changes:
 - `tests/test_abstract_readiness.py` holds rows 6 and 8 to citing #102
   and `tests/test_nemo_rail_flows.py`, and fails if either row says an
   enabled rail is missing or step 3 asks for the rename again.
+
+## 2026-10-17T08:54:23Z · decision · Spec 001's working copy is held to the delivered sha256, with Corrections the only part that may change, and allowlisted outside presentations/ (issue #114)
+
+#114 delivers spec 001 (personal-knowledge
+`specs/talks/burritobot/001-ready-by-11-08-delivered-11-12.md`, sha256
+`fdc5f074…2d16`, approved by Michael 2026-10-17) and asks for a working
+copy at `specs/001-ready-by-11-08-delivered-11-12.md` naming the source
+and sha256. The source repo is not reachable from a run; the spec text
+quoted in the issue, with its trailing newline, hashes to the stated
+sha256, so that is the text copied.
+
+What it decides:
+
+- The working copy is a header (source, sha256, issue, the corrections
+  rule), a milestone status table, then the delivered text between
+  `<!-- BEGIN SPEC 001 -->` and `<!-- END SPEC 001 -->`. The status table
+  sits outside the markers because it is this repo's tracking, not the
+  spec.
+- `tests/test_spec_001_working_copy.py` puts the Corrections section back
+  to "None yet." and checks the hash, so corrections can be added here
+  while any other edit to the spec text fails the suite. The status rows
+  must carry the spec's milestones, dates and KRs, so a milestone closes
+  with the KR or metric it moved.
+- The platform-genericness test (no event name outside `presentations/`)
+  allowlists the working copy. The issue sets its path, and its text
+  cannot be scrubbed without breaking the hash.
+- Status as read today: M3 (abstract points) and M5 (deck) are OPEN;
+  M1 waits on #17, #83 and #18, and every later milestone waits on M1 or
+  a date. Milestones without an issue here (M5 deck, M6 run-throughs) are
+  raised as follow-ups, as is M1's credential block for gcp-management.

@@ -54,6 +54,9 @@ FILE_ALLOWLIST = {
     "docs/PHASE-G-GENERICIZE-PLAN.md",
     "tests/test_no_kubecon_outside_talk_folder.py",
     "README.md",
+    # Spec 001's working copy: issue #114 sets its path, and its spec text
+    # is held byte for byte to the delivered sha256, so it cannot be scrubbed.
+    "specs/001-ready-by-11-08-delivered-11-12.md",
 }
 
 # Filename glob patterns to skip entirely (e.g. binary files, lockfiles
