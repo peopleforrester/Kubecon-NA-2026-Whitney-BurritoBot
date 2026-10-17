@@ -24,6 +24,7 @@ SKIP_DIRS = {
     ".venv",
     "__pycache__",
     ".pytest_cache",
+    ".pytest-tmp",  # per-worktree pytest basetemp (issue #115)
     "node_modules",
     # Gitignored local-only archive of imported conversations; never public.
     "claude-ai-context",

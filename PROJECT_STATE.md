@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 802 passed, 54 deselected after the
-  #114 spec 001 working copy
+  (ruff check, then static suite) 806 passed, 54 deselected after the
+  #115 per-worktree temp dirs
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -94,6 +94,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #110 guardrails refusal on the phone page: the audience backend's `upstream_failure` relays a 403 whose JSON names a scanner in `blocked_by` and says why in `detail` (the net's block on either hop, and guarded BurritBot's relay of one since #94) as that JSON plus `target`, where it used to quote it inside an HTTPException detail; every other upstream error keeps its status. `app.js` reads a 403's body and, when `refusalOf` finds the net's refusal, `showRefusal` shows its detail as a `BurritBot · guarded` reply styled `reply refused`, not "Something went wrong (HTTP 403)"; a net 502/503 still reads as unreachable. New `tests/test_phase_07_guardrails_refusal.py`; 794 static green
 - 2026-10-17 · #113 ABSTRACT-READINESS.md follows the #102 rail rewrite: row 6 (still PARTIAL, mid-inference is the talks-knowledge#29 call) says every enabled NeMo rail resolves in real `LLMRails` (`tests/test_nemo_rail_flows.py`), as phrase checks that call no model, with the 25.07 container (#18) and its `engine: vertexai` models (#100) unverified; row 8 PARTIAL → READY-STATIC (the burrito-only rail resolves, refuses the seven Act 1 asks, passes "what are your hours"); verdict 3 READY-STATIC, 3 PARTIAL, 3 MISSING, still not ready; step 3 done statically, live part left to #100 and #18; `tests/test_abstract_readiness.py` holds rows 6 and 8 to #102 and the rail test (decisions.md); 795 static green
 - 2026-10-17 · #114 spec 001 working copy: `specs/001-ready-by-11-08-delivered-11-12.md` names its source (personal-knowledge `specs/talks/burritobot/001-ready-by-11-08-delivered-11-12.md`) and sha256, carries the delivered text between markers, and tracks M1 to M9 (M3 and M5 OPEN, the rest WAITING on #17 → #83 → #18 or a date); `tests/test_spec_001_working_copy.py` holds the text to the sha256 bar Corrections and the status rows to the spec's milestones, dates and KRs; Open Work points to it; 802 static green
+- 2026-10-17 · #115 per-worktree temp dirs: the "could not create numbered dir ... after 10 tries" setup errors came from the host's /tmp tmpfs running out of inodes (1,048,576 of 1,048,576 in use, nearly all in other pool users' dirs), not only from runs sharing `/tmp/pytest-of-<user>`; a basetemp per worktree but still in /tmp failed the same way, and pytest's capture in probe sessions failed through `tempfile`. `tests/conftest.py` `pytest_configure` now keeps temp files under `<rootdir>/.pytest-tmp/` (`basetemp/` as `--basetemp`, `tmp/` as TMPDIR and `tempfile.tempdir`) unless given; the dir is gitignored and skipped by the two tree-walking tests; `tests/test_pytest_basetemp.py` runs real probe sessions for two worktrees and for an explicit `--basetemp`/TMPDIR; five full static runs green with /tmp at 0 to 2 free inodes (decisions.md); 806 static green
 
 ---
 
@@ -431,7 +432,12 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 802 static tests green. Live tests fail loudly when
+- Per-worktree temp dirs (4), #115: the suite's basetemp and TMPDIR sit
+  under `<rootdir>/.pytest-tmp/`, off the shared /tmp; real probe
+  sessions rooted in two worktrees, and their subprocesses, keep temp
+  files in their own root; an explicit `--basetemp` and TMPDIR are used
+  as given; the dir is gitignored
+- **Total: 806 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
