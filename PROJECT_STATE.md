@@ -32,8 +32,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 773 passed, 54 deselected after the
-  #106 synced-manifest check
+  (ruff check, then static suite) 780 passed, 54 deselected after the
+  #109 GKE load-balancer timeout check
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -88,6 +88,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #102 question 170 (decided by hecaton's research under Michael's standing rules): the four NeMo rails test the lower-cased `$user_message`/`$bot_message` against phrase lists from the old examples and `stop`, under the names `config.yaml` already enables (Colang 1.0 input rails run before any user intent exists, so intent-matching rails wait forever); `tests/test_nemo_rail_flows.py` builds the mounted ConfigMaps with real `LLMRails` (every enabled flow resolves; the old suffixed name is rejected) and runs `check_async`: 35 asks and replies blocked by their rail, 14 menu asks and replies pass (decisions.md); 733 static green
 - 2026-10-17 · #104 readiness points checked against the accepted wording (talks-knowledge#29): same nine points, same order; ABSTRACT-READINESS.md drops the unchecked caveat, rows 4 and 6 quote the accepted text, rows 5 and 9 name the "Ready means" parts left for #18 (Kubernetes layers before the LLM layer; live input over the venue network); scope calls are with Michael and Whitney; ratings unchanged; 736 static green
 - 2026-10-17 · #106 synced-manifest check widened to Directory sources: `synced_paths` (tests/helpers/manifest_graph.py) takes every Application source by ArgoCD's type (explicit block, else kustomization → Kustomize, Chart.yaml → Helm, else Directory) and walks Directory sources as the reposerver does (recurse, manifest extensions, include/exclude as gobwas globs with no separators, skip-file-rendering marker); the ReferenceGrant, dashboard ConfigMap and GatewayClass sync tests use it; new `tests/test_synced_paths.py` holds every cluster manifest in the repo to some Application, the hand-applied root `gitops/bootstrap/app-of-apps.yaml` the one exception, with mutation cases dropping cert-manager-issuers and the root; no manifest was unsynced; 773 static green
+- 2026-10-17 · #109 GKE load-balancer timeout: `tests/test_guarded_timeout_budget.py` now holds any GKE Gateway (`gke-l7-*` GatewayClass) route to `audience/audience-frontend` to a GCPBackendPolicy on that Service with `spec.default.timeoutSec` above the frontend's `GUARDED_TIMEOUT_SECONDS` (125s; the load balancer's default is 30s), and any `timeouts.request` on that route above it too; mutation cases cover no policy, the 30s default, a timeout equal to the frontend's and a short route timeout. No Gateway or GCPBackendPolicy manifest is added: the #57 Gateway, its hostname, certificate and `gateway_api_config` wait for Michael, and without GKE's Gateway controller the GCPBackendPolicy CRD does not exist, so the audience sync would fail (decisions.md); 780 static green
 
 ---
 
@@ -403,7 +404,7 @@ commit.
   exclude, the extension filter and the skip marker; type detection and
   gobwas glob cases pin ArgoCD's behaviour; mutation tests drop
   cert-manager-issuers and the root
-- **Total: 773 static tests green. Live tests fail loudly when
+- **Total: 780 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
