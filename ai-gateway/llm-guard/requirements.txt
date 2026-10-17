@@ -1,0 +1,9 @@
+# The packages laiyer/llm-guard-api:0.3.16 lacks for Anonymize and Sensitive (#108),
+# installed with --no-deps --require-hashes: spacy-pkuseg's numpy and srsly come
+# from the base image's spaCy 3.8.6. Hand-pinned, not a uv export: the base runs
+# Python 3.12 and uv.lock holds no cp312 wheels. tests/test_llm_guard_derived_image.py.
+spacy-pkuseg==1.0.1 \
+    --hash=sha256:ffb982053b2af6c3f1475e77d66f053f0df253e0ed6ec9a3ed6e5df4a8a8896f \
+    --hash=sha256:d258101aa9ead907e58fead6c7dffc2fae7e96c5436c8dcd08cc1e96870d37d2
+zh-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/zh_core_web_sm-3.8.0/zh_core_web_sm-3.8.0-py3-none-any.whl \
+    --hash=sha256:7de3bd267176b9b2a8defb6997c1cd296da16c57b5e712f72ea44a51755421c8

@@ -2311,3 +2311,78 @@ What it decides:
 - Evidence: five runs in a row of the Test command, 806 passed each, with
   /tmp at 0 to 2 free inodes; with the conftest block off, the new tests
   fail with the issue's exact error.
+## 2026-10-17T08:44:30Z · decision · question 192: llm-guard runs a derived image that adds spaCy's zh_core_web_sm and spacy-pkuseg (issue #108)
+
+Question 192 asked how the llm-guard pod should get spaCy's
+`zh_core_web_sm`. In llm_guard 0.3.16, Anonymize (input) and Sensitive
+(output) build their Presidio analyzer for `["en", "zh"]` whatever their
+params say (`ALL_SUPPORTED_LANGUAGES`; fixed upstream in ba489b0, never
+released). `analyzer._get_nlp_engine` runs `spacy.cli.download` for any
+`<lang>_core_web_sm` that `spacy.util.is_package` cannot find.
+`laiyer/llm-guard-api:0.3.16` ships spaCy 3.8.6 and `en_core_web_sm` 3.8.0,
+but not the zh model or its dependency `spacy-pkuseg` (read from the file
+listings of its amd64 layers). On the pod's read-only root as uid 1001
+that pip install fails, spaCy exits and the API never starts. The C3
+hardening test rules out a writable root as uid 1000.
+
+Answer: A, a derived image, FROM laiyer/llm-guard-api:0.3.16 (pinned by
+digest), adding only zh_core_web_sm 3.8.0 and spacy-pkuseg 1.0.1 from a
+hashed requirements file (pip --no-deps --require-hashes, as in #78). It
+adds about 50 MB and goes to the burritbot Artifact Registry next to
+burritbot-extproc. Michael builds and pushes it. Scanner models still
+download from Hugging Face on each fresh pod.
+
+Decided by hecaton's research under Michael's standing rules, not by
+Michael.
+
+What it changes:
+- `ai-gateway/llm-guard/Dockerfile` is new. Its base is
+  `laiyer/llm-guard-api:0.3.16@sha256:bea3efb1220ad18149b73de625c55e6d835bf8b45023a089a3762012a86550ba`,
+  the multi-arch index digest. It runs one
+  `pip install --no-cache-dir --no-deps --require-hashes --user` into the
+  base's user site `/home/user/.local`, then
+  `spacy.load('zh_core_web_sm')`, so a model that does not load fails the
+  build, not the pod. It sets no USER, ENV, WORKDIR, ENTRYPOINT or CMD, so
+  #91's checks of uid, HOME, PYTHONPATH and the entrypoint still hold.
+- `ai-gateway/llm-guard/requirements.txt` pins the two packages. They are
+  new to the project. Both pins are current as of 2026-10-17, and the
+  image needs them for the reason above:
+  - `spacy-pkuseg==1.0.1` (PyPI, 2025-07-14), with the cp312 manylinux
+    x86_64 and aarch64 wheel hashes. It is the latest release, and
+    zh_core_web_sm requires `>=1.0.0,<2.0.0`.
+  - `zh-core-web-sm` 3.8.0, the wheel from spaCy's GitHub model releases
+    (sha256 7de3bd26…). Its `meta.json` takes spaCy `>=3.8.0,<3.9.0`,
+    which matches the base's 3.8.6.
+
+  The file is hand-pinned, not a `uv export`. The base runs Python 3.12,
+  and uv.lock resolves for `>=3.13`, so it holds no cp312 wheels. An
+  export would also pull in numpy and srsly, and with `--no-deps` those
+  would shadow the base's own copies. spacy-pkuseg's numpy and srsly come
+  from the base's spaCy. `tests/helpers/image_requirements.py` lists the
+  image under `DERIVED_IMAGES`, apart from the uv-exported `IMAGES`, so
+  the known-Dockerfile check still covers every Dockerfile. #39's
+  advisory guard reads uv.lock and does not cover these two packages.
+- The llm-guard container runs
+  `us-west1-docker.pkg.dev/kk-community-projects/burritbot/llm-guard-api:0.3.16-burritbot.1`:
+  the upstream version, then a burritbot build number. That image does
+  not exist until Michael builds and pushes it. This is deploy
+  configuration, and as with #90 and #91 it waits for Michael's review
+  before any cluster syncs it.
+- Tests: `tests/test_llm_guard_derived_image.py` (static) checks four
+  things:
+  - Every analyzer language of the configured Presidio scanners has its
+    spaCy model in the image.
+  - The requirements are exactly the two packages, each with a hash, the
+    model from spaCy's releases and on the base's spaCy minor version.
+  - The Dockerfile is the digest-pinned base plus that one install and
+    the load check, with no `spacy download`.
+
+  Thirteen mutation cases each break one of these, and each is caught.
+  `tests/test_llm_guard_api_image.py` now requires the derived image and
+  flags the plain upstream tag as lacking `zh_core_web_sm`. Its docs pin
+  still compares against the upstream 0.3.16. The live test builds a
+  Python 3.12 venv with the base's spaCy 3.8.6 and numpy 2.2.6 (PyPI as
+  of 2025-05-20, the day after the image was built), runs the hashed
+  install, then runs `pip check` and loads `zh_core_web_sm`. It passed in
+  this run. The image itself was not built, because the docker daemon is
+  closed to runs. Live confirmation in the pod rides on #18.

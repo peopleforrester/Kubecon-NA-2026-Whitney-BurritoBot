@@ -53,7 +53,11 @@ CONFIG_CONFIGMAP = "llm-guard-config"
 # - app/app.py create_app(): the config file is os.getenv("CONFIG_FILE",
 #   "./config/scanners.yml"). Nothing reads LLM_GUARD_CONFIG.
 # - entrypoint.sh: uvicorn on --port=8000, --workers=$APP_WORKERS.
-IMAGE = "laiyer/llm-guard-api:0.3.16"
+UPSTREAM_IMAGE = "laiyer/llm-guard-api:0.3.16"
+# The pod runs the derived image (#108, ai-gateway/llm-guard/Dockerfile): the
+# upstream image by digest plus spaCy's zh_core_web_sm, which Anonymize and
+# Sensitive load. Its tag is the upstream version plus a burritbot build number.
+IMAGE = "us-west1-docker.pkg.dev/kk-community-projects/burritbot/llm-guard-api:0.3.16-burritbot.1"
 IMAGE_HOME = "/home/user"
 API_PORT = 8000
 HEALTH_PATHS = frozenset({"/healthz", "/readyz"})
@@ -217,7 +221,12 @@ def deployment_violations(deploy: dict, config: dict, configmap: dict) -> list[s
     env = _env(scanner)
     adapter_env = _env(_container(deploy, SIDECAR))
 
-    if scanner["image"] != IMAGE:
+    if scanner["image"] == UPSTREAM_IMAGE:
+        out.append(
+            f"{SCANNER} runs {UPSTREAM_IMAGE!r}, which lacks zh_core_web_sm; "
+            f"Anonymize and Sensitive need {IMAGE}, built from ai-gateway/llm-guard/Dockerfile"
+        )
+    elif scanner["image"] != IMAGE:
         out.append(f"{SCANNER} runs {scanner['image']!r}; these checks hold for {IMAGE}")
 
     # Port: entrypoint.sh hardcodes uvicorn --port=8000.
@@ -340,11 +349,12 @@ def version_claims() -> list[tuple[str, str]]:
 @pytest.mark.static
 def test_docs_pin_the_deployed_version() -> None:
     """0.3.16 is the last release; a "0.3.17+" pin names a version that does not exist."""
-    tag = IMAGE.rsplit(":", 1)[1]
+    tag = UPSTREAM_IMAGE.rsplit(":", 1)[1]
+    assert IMAGE.rsplit(":", 1)[1].startswith(f"{tag}-"), f"{IMAGE} is not tagged as a build of {UPSTREAM_IMAGE}"
     claims = version_claims()
     assert claims, "no LLM Guard version pin found in the docs"
     wrong = [f"{where} says {version}" for where, version in claims if version != tag]
-    assert not wrong, f"docs disagree with the deployed {IMAGE}:\n  " + "\n  ".join(wrong)
+    assert not wrong, f"docs disagree with the deployed {UPSTREAM_IMAGE}:\n  " + "\n  ".join(wrong)
 
 
 @pytest.mark.static
@@ -389,6 +399,13 @@ def _set_size_limit(volume: str, limit: str) -> Callable[[dict], None]:
     return mutate
 
 
+def _set_image(image: str) -> Callable[[dict], None]:
+    def mutate(deploy: dict) -> None:
+        _container(deploy, SCANNER)["image"] = image
+
+    return mutate
+
+
 def _pre_91(deploy: dict) -> None:
     """The Deployment as #66 left it: 0.3.9, LLM_GUARD_CONFIG, the cache under a HOME the image does not use."""
     _container(deploy, SCANNER)["image"] = "laiyer/llm-guard-api:0.3.9"
@@ -417,6 +434,7 @@ def _pre_91(deploy: dict) -> None:
         (_set_mount("tmp", "/var/tmp"), "/tmp is not an emptyDir"),
         (_set_env("SCANNER_URL", "http://127.0.0.1:8080", container=SIDECAR), "SCANNER_URL"),
         (_set_probe("readinessProbe", "/v1/health"), "readinessProbe asks '/v1/health'"),
+        (_set_image(UPSTREAM_IMAGE), "which lacks zh_core_web_sm"),
     ],
     ids=[
         "pre-91-image",
@@ -433,6 +451,7 @@ def _pre_91(deploy: dict) -> None:
         "no-tmp",
         "adapter-url-drift",
         "probe-path",
+        "pre-108-upstream-image",
     ],
 )
 def test_mutation_deployment_drift_is_caught(mutate: Callable[[dict], None], expected: str) -> None:
