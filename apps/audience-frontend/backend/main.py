@@ -59,6 +59,9 @@ BURRITBOT_GUARDED_HOST: str = os.environ.get(
 # ext_proc on the request and on the response (2 x 2 x 10s messageTimeout),
 # around the burritbot-audience route's 80s timeout, which itself covers
 # BurritBot's own gateway pass to Vertex (tests/test_guarded_timeout_budget.py).
+# A GKE Gateway in front of this Service needs a GCPBackendPolicy whose
+# timeoutSec sits above GUARDED_TIMEOUT_SECONDS; the load balancer's own
+# default is 30s (#109).
 UNGUARDED_TIMEOUT_SECONDS = 10.0
 GUARDED_TIMEOUT_SECONDS = 125.0
 

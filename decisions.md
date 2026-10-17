@@ -1945,3 +1945,42 @@ What it changes:
 - `tests/test_abstract_readiness.py` holds the paragraph to the citation
   without the caveat, rows 4 and 6 to the accepted wording, and rows 5
   and 9 to their unassessed part and #18.
+
+## 2026-10-17T12:00:00Z · decision · The GKE load balancer's backend timeout is held above the frontend's guarded timeout by test, ahead of the #57 Gateway (issue #109)
+
+#92 raised the frontend's `GUARDED_TIMEOUT_SECONDS` to 125s. The #57
+exposure path is a GKE Gateway with GatewayClass
+`gke-l7-global-external-managed`. Its backend service timeout defaults
+to 30s, and a GCPBackendPolicy on the Service changes it
+(`networking.gke.io/v1`, `spec.default.timeoutSec`, a single
+`targetRef`). Source:
+https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources
+(backend service timeout), read 2026-10-17.
+
+What changes:
+
+- `load_balancer_violations` in `tests/test_guarded_timeout_budget.py`
+  finds every HTTPRoute attached to a Gateway whose class starts with
+  `gke-l7-` and finds the rules that route to `audience/audience-frontend`.
+  The Service then needs a GCPBackendPolicy with `timeoutSec` above
+  `GUARDED_TIMEOUT_SECONDS`. A policy with no `timeoutSec` counts as the
+  30s default. A `timeouts.request` on such a rule has to be above it
+  too. The rule reads every manifest the repo syncs, so it holds as
+  soon as #57 adds the Gateway.
+- Mutation cases build the #57 shape (Gateway, HTTPRoute, policy) and
+  catch no policy, `timeoutSec: 30`, `timeoutSec: 125` and a 60s route
+  timeout. A policy at 135s passes. Another test checks that the
+  frontend Service still exists under that name, so a rename cannot
+  leave the rule checking nothing. With the rule body removed, all four
+  mutation cases fail.
+- `apps/audience-frontend/backend/main.py` notes the requirement next
+  to the constant.
+
+Not done here: no Gateway, HTTPRoute or GCPBackendPolicy manifest is
+added. The GCPBackendPolicy CRD is served only when GKE's Gateway
+controller is on (`gateway_api_config`). That stays off (#97), so a
+synced policy would fail the `audience` Application's sync. The
+Gateway, its hostname, its certificate and `gateway_api_config` are
+the #57 deploy configuration, and they wait for Michael. When they
+land, the policy goes beside them with `timeoutSec` above 125. The
+test fails until it does.
