@@ -1,5 +1,5 @@
 # ABOUTME: The active delivery's overlay writes its slug into every Vertex AI call's cost labels (#82, question 152):
-# ABOUTME: unguarded BurritBot's env, the AI gateway's labels bodyMutation, and both NeMo vertexai models.
+# ABOUTME: unguarded BurritBot's env and the AI gateway's labels bodyMutation; NeMo has no model to label (#112).
 
 from __future__ import annotations
 
@@ -27,7 +27,6 @@ from helpers.manifest_graph import kustomization_files, load_manifests
 
 GITOPS_APPS = PROJECT_ROOT / "gitops" / "apps"
 BURRITBOT_APP = PROJECT_ROOT / "apps" / "burritbot" / "app.py"
-NEMO_CONFIG = PROJECT_ROOT / "ai-gateway" / "nemo-guardrails" / "config.yaml"
 BASE_UNGUARDED = PROJECT_ROOT / "apps" / "burritbot" / "k8s" / "deployment-unguarded.yaml"
 
 # Application name → the platform kustomization its delivery overlay wraps.
@@ -73,12 +72,6 @@ def _slug(name: str) -> str:
     return runbook_slug(event_of(_overlay(name)))
 
 
-def _vertex_models(config: dict) -> list[dict]:
-    models = [m for m in config["models"] if m.get("engine") == "vertexai"]
-    assert models, "the NeMo config has no vertexai models"
-    return models
-
-
 def _gateway_labels(backend: dict) -> dict[str, str]:
     sets = [s for s in backend["spec"]["bodyMutation"]["set"] if s["path"] == "labels"]
     assert len(sets) == 1, f"expected one labels bodyMutation, got {sets}"
@@ -113,6 +106,13 @@ def test_application_syncs_a_delivery_overlay_of_the_platform(name: str, base: s
 
 
 @pytest.mark.static
+def test_ai_gateway_overlay_patches_only_the_gateway_backend() -> None:
+    """No NeMo model is left to label (#112, question 207), so the overlay patches the gateway alone."""
+    kustomization = yaml.safe_load((_overlay("ai-gateway") / "kustomization.yaml").read_text(encoding="utf-8"))
+    assert [entry["path"] for entry in kustomization["patches"]] == ["delivery-vertex-backend.yaml"]
+
+
+@pytest.mark.static
 @pytest.mark.parametrize("name", sorted(LABELLED_APPS))
 def test_every_patch_targets_an_object_the_base_renders(name: str) -> None:
     """kustomize fails the build on a patch that matches nothing; catch it before ArgoCD does."""
@@ -128,7 +128,7 @@ def test_every_patch_targets_an_object_the_base_renders(name: str) -> None:
             assert key in objects, f"{overlay / entry['path']} patches {key}, which {LABELLED_APPS[name]} does not render"
 
 
-# --- the three call sites carry the runbook's slug ---------------------------
+# --- the two call sites carry the runbook's slug -----------------------------
 
 
 @pytest.mark.static
@@ -150,19 +150,6 @@ def test_gateway_vertex_calls_get_the_delivery_labels() -> None:
     assert labels == terraform_cost_labels(_slug("ai-gateway"))
 
 
-@pytest.mark.static
-def test_nemo_overlay_is_the_base_config_with_the_slug() -> None:
-    """The overlay replaces config.yaml whole; it may differ from the base by the slug only."""
-    patch = _patch("ai-gateway", "ConfigMap")
-    assert patch["metadata"] == {"name": "nemo-guardrails-config", "namespace": "burritbot-net"}
-    slug = _slug("ai-gateway")
-    overlaid = yaml.safe_load(patch["data"]["config.yaml"])
-    base = yaml.safe_load(NEMO_CONFIG.read_text(encoding="utf-8").replace(PLACEHOLDER, slug))
-    assert overlaid == base, "the overlay's NeMo config has drifted from ai-gateway/nemo-guardrails/config.yaml"
-    for model in _vertex_models(overlaid):
-        assert model["parameters"]["labels"] == terraform_cost_labels(slug), model["type"]
-
-
 # --- without an overlay, model calls are refused, never mislabelled ----------
 
 
@@ -173,8 +160,6 @@ def test_base_carries_a_placeholder_no_label_accepts(monkeypatch: pytest.MonkeyP
     backend = next(d for d in _docs(PROJECT_ROOT / "ai-gateway" / "envoy" / "vertex-ai-backend.yaml")
                    if d["kind"] == "AIServiceBackend")
     assert _gateway_labels(backend) == expected
-    for model in _vertex_models(yaml.safe_load(NEMO_CONFIG.read_text(encoding="utf-8"))):
-        assert model["parameters"]["labels"] == expected, model["type"]
 
     monkeypatch.setenv(DELIVERY_ENV, PLACEHOLDER)
     with pytest.raises(RuntimeError, match="not a GCP label value"):
@@ -221,7 +206,3 @@ def test_kustomize_renders_the_delivery_labels(name: str) -> None:
     else:
         backend = next(d for d in docs if d["kind"] == "AIServiceBackend")
         assert _gateway_labels(backend)[DELIVERY_LABEL] == slug
-        configmap = next(d for d in docs if d["kind"] == "ConfigMap"
-                         and d["metadata"]["name"] == "nemo-guardrails-config")
-        for model in _vertex_models(yaml.safe_load(configmap["data"]["config.yaml"])):
-            assert model["parameters"]["labels"][DELIVERY_LABEL] == slug

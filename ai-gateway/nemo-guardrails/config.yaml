@@ -1,34 +1,6 @@
-# ABOUTME: NeMo Guardrails config wiring Colang 2.0 rails to Vertex AI gemini-3-pro.
+# ABOUTME: NeMo Guardrails config for the four Colang 1.0 rails; no rail calls a model (#112, question 207).
 # ABOUTME: Loaded by the nemo-guardrails sidecar in burritbot-net.
 ---
-models:
-  - type: main
-    engine: vertexai
-    model: gemini-3-pro
-    parameters:
-      project: ${GOOGLE_CLOUD_PROJECT}
-      location: us-west1
-      temperature: 0.3
-      max_output_tokens: 512
-      # Cost labels on each Vertex AI request: ChatVertexAI sends `labels`
-      # (docs/BILLING-EXPORT.md). NeMo does not expand ${VAR} here, so the
-      # delivery overlay (presentations/<event>/deploy/) writes the slug in.
-      # ChatVertexAI refuses this placeholder (over 63 characters), so NeMo
-      # fails to start without an overlay instead of mislabelling spend.
-      labels:
-        burritbot-io_owner: burritbot
-        burritbot-io_delivery: unset-the-delivery-overlay-under-presentations-sets-burritbot-io-delivery
-
-  - type: content_safety
-    engine: vertexai
-    model: gemini-3-pro
-    parameters:
-      project: ${GOOGLE_CLOUD_PROJECT}
-      location: us-west1
-      labels:
-        burritbot-io_owner: burritbot
-        burritbot-io_delivery: unset-the-delivery-overlay-under-presentations-sets-burritbot-io-delivery
-
 rails:
   input:
     flows:

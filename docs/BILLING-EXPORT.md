@@ -31,7 +31,7 @@ terraform -chdir=infrastructure/terraform apply -var delivery=<event>-<year>
 
 Every Vertex AI request burritbot makes carries the same two labels, so
 model spend sums by `burritbot-io_delivery` like the cluster's. There
-are three call sites:
+are two call sites:
 
 - **Unguarded BurritBot** (`apps/burritbot/app.py`) sets `labels` on each
   `generateContent` request. It reads the slug from `BURRITBOT_DELIVERY`.
@@ -41,15 +41,15 @@ are three call sites:
   Vertex AI translator has no `labels` field, so the `vertex-ai-gemini`
   AIServiceBackend sets them with a `bodyMutation`, which runs on the
   translated body.
-- **NeMo Guardrails** passes each `vertexai` model's `parameters` to
-  LangChain's `ChatVertexAI`, which sends `labels`. NeMo does not expand
-  `${VAR}` in `config.yaml`, so the slug is written in.
 
-The platform tree names no delivery. The gateway and NeMo manifests
-carry a placeholder that is too long to be a label value. Each delivery
-has a Kustomize overlay under `presentations/<event>/deploy/`
-(`burritbot/` and `ai-gateway/`) that writes its slug into all three
-places. The ArgoCD `burritbot` and `ai-gateway` Applications sync the
+NeMo Guardrails makes no Vertex AI call of its own: its rails test the
+text and call no model, and its config declares no model (#112, question
+207). So it carries no labels.
+
+The platform tree names no delivery. The gateway manifest carries a
+placeholder that is too long to be a label value. Each delivery has a
+Kustomize overlay under `presentations/<event>/deploy/` (`burritbot/`
+and `ai-gateway/`) that writes its slug into both places. The ArgoCD `burritbot` and `ai-gateway` Applications sync the
 active delivery's overlay. A sync of the bare platform has its guarded
 model calls refused and its unguarded `/chat` answered with a `502`, so
 no call is ever billed under the wrong delivery. The slug in the overlay
@@ -57,10 +57,8 @@ must be the one Terraform applies with. `tests/test_delivery_overlay.py`
 holds the overlay to the runbook's `-var delivery=`.
 
 To present at a new delivery, copy the two overlay directories to
-`presentations/<new-event>/deploy/`, change the slug in their three
-patches, and point the two Applications at them. The NeMo patch holds
-the whole `config.yaml`, so when `ai-gateway/nemo-guardrails/config.yaml`
-changes, the patch must change with it. The test fails until they match.
+`presentations/<new-event>/deploy/`, change the slug in their patches,
+and point the two Applications at them.
 
 ## One-time setup, out of band
 

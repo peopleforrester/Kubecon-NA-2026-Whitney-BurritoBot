@@ -2210,3 +2210,48 @@ What it changes: no tag or release is cut. Issue #15 stays deferred until
 Michael gives an explicit go-ahead himself, or is closed if a dated release
 is no longer wanted before `v0.1.0`. The #11 rubric item for a dated
 point-in-time reference stays open in the meantime.
+## 2026-10-18T14:45:06Z · decision · question 207: NeMo Guardrails declares no model; the models section and the NeMo billing labels are removed (issue #112)
+
+Question 207 asked how NeMo Guardrails microservice 25.07 should reach
+Gemini, given its docs say "Only OpenAI compatible LLM providers are
+supported" (25.7.0 tutorial, read 2026-10-17). The options were (a)
+`engine: openai` against Vertex AI's OpenAI-compatible endpoint, with a
+refreshed OAuth token as the key, (b) `engine: openai` against an Envoy AI
+Gateway OpenAI→GCPVertexAI route, (c) the open-source nemoguardrails
+server, and (d) no model at all. The answer is (d). Since #102 no rail
+calls a model, so the models section goes and the microservice needs none.
+
+Decided by the coordinator under Michael's standing rules, not by
+Michael. The thread records the verdict as overridden, through
+`hec answer`.
+
+What it changes:
+
+- `ai-gateway/nemo-guardrails/config.yaml` and `configmap-config.yaml`
+  drop the `models` section: the two `vertexai` models, their
+  `${GOOGLE_CLOUD_PROJECT}` parameters and their labels with the
+  placeholder. Their ABOUTME lines no longer say Colang 2.0 or Vertex AI.
+- `presentations/kubecon-na-2026/deploy/ai-gateway/delivery-nemo-config.yaml`
+  is deleted and its entry leaves the overlay's kustomization. The NeMo
+  half of the #73 labels is dropped. The gateway's `vertex-ai-gemini`
+  labels stay, and so does their overlay patch.
+- `tests/test_delivery_overlay.py` no longer checks NeMo models or labels.
+  It asserts that the ai-gateway overlay patches only the gateway backend.
+- `tests/test_nemo_rail_flows.py` builds `LLMRails` from the config as the
+  cluster mounts it, without dropping a `models` section. Two static tests
+  are new: no mounted config declares a model, and no rail flow calls one.
+  Before this change the fixture failed with "No default base_url for
+  provider 'vertexai'", the failure #112 describes.
+- `docs/BILLING-EXPORT.md` says NeMo carries no labels and that there are
+  two call sites.
+
+Not changed here: the microservice Deployment
+(`ai-gateway/nemo-guardrails/deployment.yaml`) still sets
+`GOOGLE_CLOUD_PROJECT`, and the config's general `instructions` block
+stays although no model reads it. Both wait for Michael's review with the
+deploy configuration.
+
+Not verified: that the 25.07 microservice loads the model-less config and
+serves `/v1/guardrail/checks`. Nothing has run in its container (#18).
+#18's first container run must prove both. If it does not, that run
+reports it and option (a) is taken.
