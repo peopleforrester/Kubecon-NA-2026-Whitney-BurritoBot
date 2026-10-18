@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 826 passed, 56 deselected after the
-  #120 talk deck and its 16:9 PDF
+  (ruff check, then static suite) 828 passed, 56 deselected after the
+  #112 NeMo models removal
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -441,7 +441,7 @@ commit.
   from its file, Act 1 keeps attacks with the presenters, and cut or
   unbuilt points stay off the slides (mutation: row 2 marked CUT); two
   live tests render it in Chromium and check the layout
-- **Total: 826 static tests green. Live tests fail loudly when
+- **Total: 828 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
