@@ -2386,3 +2386,66 @@ What it changes:
   install, then runs `pip check` and loads `zh_core_web_sm`. It passed in
   this run. The image itself was not built, because the docker daemon is
   closed to runs. Live confirmation in the pod rides on #18.
+
+## 2026-10-18T22:06:34Z · decision · question 206: GKE's Gateway API owns the Gateway API CRDs off the Envoy Gateway matrix, at GKE 1.35.2-gke.1842000 (issue #111)
+
+Question 206 asked how the audience Gateway (#57) should get Gateway API
+on GKE. GKE's newest bundle is v1.5.0 (GKE 1.35.2-gke.1842000+,
+gatewayclass-capabilities table, page updated 2026-10-13). The Envoy
+Gateway v1.9 matrix, which Agent Router v1.2.0 needs, lists Gateway API
+v1.6.1. Every Gateway API object the repo applies validates against GKE's
+v1.4.0 and v1.5.0 bundles (#97), so the gap is the matrix listing, not a
+known schema failure. The options were (a) accept it off-matrix now, (b)
+wait for a GKE v1.6 bundle, and (c) expose the audience frontend without
+GKE's Gateway API. The answer is (a): in gke.tf add
+`gateway_api_config { channel = "CHANNEL_STANDARD" }` and set
+`min_master_version = "1.35.2-gke.1842000"` (bundle v1.5.0, the closest).
+In envoy-gateway-crds.yaml set `crds.gatewayAPI.enabled: false`. Keep the
+live installed-CRD checks. Do it before #18's first sync, so ArgoCD's
+prune never deletes live Gateway API CRDs.
+
+Decided by the coordinator under Michael's standing rules, not by
+Michael. The thread records the verdict as overridden, through
+`hec answer`.
+
+What it changes:
+
+- `infrastructure/terraform/gke.tf` adds `gateway_api_config` with
+  `CHANNEL_STANDARD` and `min_master_version = "1.35.2-gke.1842000"`.
+  This replaces the comment that said how to make the flip.
+- `gitops/apps/envoy-gateway-crds.yaml` sets `crds.gatewayAPI.enabled:
+  false`. It keeps `crds.envoyGateway.enabled: true`, because no provider
+  installs the gateway.envoyproxy.io CRDs, and it keeps wave -2 and
+  `channel: standard`. The channel only matters again if the chart takes
+  the CRDs back, and then it matches what GKE serves. The ABOUTME lines
+  and comments here and in `gitops/apps/envoy-gateway.yaml` now name GKE
+  as the owner.
+- `tests/test_gateway_api_crd_owner.py` takes the GKE-owned shape as its
+  baseline. A new static test checks three things: GKE manages the
+  Gateway API, the chart's copy is off, and `min_master_version` is the
+  newest bundle's GKE version. Its mutations used to insert
+  `gateway_api_config` into a cluster that had none. They now edit the
+  real block and line:
+  - any floor from 1.34.1-gke.1822000 up stays clean;
+  - the flip back to the chart (#97's shape) is clean;
+  - eight ways to get it wrong are each reported: the chart back on;
+    gateway-helm's CRDs back on; no floor; a v1.3 floor; a short `1.34`;
+    a floor below the table; GKE off with the chart off; and
+    `CHANNEL_DISABLED` with the chart off.
+
+  The channel test no longer depends on the chart being on.
+- `tests/test_incompatible_settings.py` now treats GKE's Gateway API as
+  the enabled half the repo relies on. The pair's mutations turn a
+  chart's copy back on (gateway-crds-helm, then gateway-helm). The
+  `CHANNEL_DISABLED` case now replaces the real channel.
+- The live check `test_installed_gateway_api_crds_come_from_one_bundle`
+  is unchanged. On a cluster it asserts one standard-channel bundle at or
+  above the manifests' v1.4 floor, so it covers GKE's v1.5.0.
+
+Not verified here: no `terraform plan` or apply ran (nothing has run on a
+cluster, #18). This includes whether the REGULAR release channel offers
+1.35.2-gke.1842000 or later in the cluster's region when the cluster is
+created. This is deploy configuration, and as with #90, #91 and #108 it
+waits for Michael's review before anything applies it. The #57 Gateway
+itself, with its hostname, certificate and GCPBackendPolicy, is still not
+in the repo.

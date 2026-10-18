@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 828 passed, 56 deselected after the
-  #112 NeMo models removal
+  (ruff check, then static suite) 852 passed, 57 deselected after the
+  #111 GKE Gateway API flip
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -110,6 +110,7 @@ history._
 - 2026-10-18 · #112 question 207 (decided by the coordinator under Michael's standing rules): NeMo Guardrails declares no model, since no rail calls one (#102); the `models` section, the NeMo overlay patch and NeMo's billing labels are removed, and the rails test loads the mounted config as it is; #18's container run must prove the model-less config loads; 796 static green
 - 2026-10-17 · #115 per-worktree temp dirs: the "could not create numbered dir ... after 10 tries" setup errors came from the host's /tmp tmpfs running out of inodes (1,048,576 of 1,048,576 in use, nearly all in other pool users' dirs), not only from runs sharing `/tmp/pytest-of-<user>`; a basetemp per worktree but still in /tmp failed the same way, and pytest's capture in probe sessions failed through `tempfile`. `tests/conftest.py` `pytest_configure` now keeps temp files under `<rootdir>/.pytest-tmp/` (`basetemp/` as `--basetemp`, `tmp/` as TMPDIR and `tempfile.tempdir`) unless given; the dir is gitignored and skipped by the two tree-walking tests; `tests/test_pytest_basetemp.py` runs real probe sessions for two worktrees and for an explicit `--basetemp`/TMPDIR; five full static runs green with /tmp at 0 to 2 free inodes (decisions.md); 806 static green
 - 2026-10-17 · #108 question 192 (decided by hecaton's research under Michael's standing rules): llm-guard runs a derived image, `ai-gateway/llm-guard/Dockerfile`, FROM `laiyer/llm-guard-api:0.3.16` by index digest plus spaCy's `zh_core_web_sm` 3.8.0 and `spacy-pkuseg` 1.0.1 from a hand-pinned hashed `requirements.txt` (`pip --no-deps --require-hashes --user`; uv.lock holds no cp312 wheels), so Anonymize/Sensitive's en+zh analyzer no longer pip-installs on the read-only root; the Deployment runs `us-west1-docker.pkg.dev/kk-community-projects/burritbot/llm-guard-api:0.3.16-burritbot.1`, which Michael builds and pushes; `tests/test_llm_guard_derived_image.py` holds it, the live install test passes; 834 static green
+- 2026-10-18 · #111 question 206 (decided by the coordinator under Michael's standing rules): GKE owns the Gateway API CRDs, off the Envoy Gateway v1.9 matrix (Gateway API v1.6.1); `infrastructure/terraform/gke.tf` adds `gateway_api_config { channel = "CHANNEL_STANDARD" }` and `min_master_version = "1.35.2-gke.1842000"` (bundle v1.5.0, GKE's newest), `envoy-gateway-crds` sets `crds.gatewayAPI.enabled: false` and keeps the Envoy Gateway CRDs; the owner and incompatible-pair tests now start from the GKE-owned shape (mutations turn a chart's copy back on, drop or lower the floor, and flip back cleanly); the live installed-CRD checks stay; the flip lands before #18's first sync, so ArgoCD's prune never deletes live Gateway API CRDs; 852 static green
 
 # Project State — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 
@@ -416,12 +417,14 @@ commit.
   above the ext_proc both ways plus the AIGatewayRoute's Vertex timeout;
   neither route is left on its default; mutation tests restore the old
   10s, drop each route timeout and shorten or swell each hop
-- Gateway API CRD owner (27), #97: exactly one of gateway-helm,
+- Gateway API CRD owner (29), #97, #111: exactly one of gateway-helm,
   gateway-crds-helm and GKE's `gateway_api_config` installs the Gateway
-  API CRDs; the CRD chart is Envoy Gateway's release, syncs before it and
-  uses the standard channel; with GKE on, `min_master_version` must reach
-  the GKE version whose bundle serves the manifests' floor; mutation tests
-  make the flip cleanly and get it wrong eight ways
+  API CRDs, and it is GKE at `min_master_version` 1.35.2-gke.1842000, the
+  newest bundle (question 206); the CRD chart is Envoy Gateway's release,
+  syncs before it and keeps the standard channel; with GKE on,
+  `min_master_version` must reach the GKE version whose bundle serves the
+  manifests' floor; mutation tests take any floor from there, flip back to
+  the chart cleanly and get it wrong eight ways
 - NeMo rail flows (59), #102: every flow `config.yaml` enables is defined
   and real `LLMRails` loads the mounted ConfigMaps; a mutation restores the
   old suffixed name and is rejected; `check_async` blocks each rail's asks
@@ -443,7 +446,7 @@ commit.
   from its file, Act 1 keeps attacks with the presenters, and cut or
   unbuilt points stay off the slides (mutation: row 2 marked CUT); two
   live tests render it in Chromium and check the layout
-- **Total: 828 static tests green. Live tests fail loudly when
+- **Total: 852 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the

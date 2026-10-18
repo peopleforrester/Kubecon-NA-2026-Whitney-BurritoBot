@@ -1,5 +1,5 @@
 # ABOUTME: Known-incompatible setting pairs, asserted apart — each entry records why the two cannot coexist.
-# ABOUTME: Mutation tests inject the missing half of every pair into the real files and confirm it is reported.
+# ABOUTME: Mutation tests add the missing half of every pair to the real files and confirm it is reported.
 
 from __future__ import annotations
 
@@ -104,11 +104,11 @@ INCOMPATIBLE: dict[str, IncompatiblePair] = {
     "gke-gateway-api-vs-envoy-gateway-crds": IncompatiblePair(
         GKE_GATEWAY_API,
         EG_GATEWAY_API_CRDS,
-        "GKE then owns the Gateway API CRDs and reconciles its own version and "
-        "channel over the copy ArgoCD applies from the chart. Turning "
-        "gateway_api_config on sets envoy-gateway-crds crds.gatewayAPI.enabled "
-        "false in the same change, with a min_master_version whose GKE bundle "
-        "serves the manifests (tests/test_gateway_api_crd_owner.py).",
+        "GKE owns the Gateway API CRDs and reconciles its own version and "
+        "channel over any copy ArgoCD applies from a chart. Handing them back "
+        "to envoy-gateway-crds (crds.gatewayAPI.enabled true) turns "
+        "gateway_api_config off in the same change "
+        "(tests/test_gateway_api_crd_owner.py).",
     ),
 }
 
@@ -131,7 +131,7 @@ def test_no_incompatible_pair_is_set() -> None:
 
 @pytest.mark.static
 @pytest.mark.parametrize(
-    "setting", [DATAPLANE_V2, FALCO_DAEMONSET, EG_GATEWAY_API_CRDS], ids=lambda s: s.description
+    "setting", [DATAPLANE_V2, FALCO_DAEMONSET, GKE_GATEWAY_API], ids=lambda s: s.description
 )
 def test_enabled_half_is_still_detected(setting: Setting) -> None:
     """Each pair has one half the repo relies on; if its detector goes blind
@@ -143,31 +143,54 @@ def test_enabled_half_is_still_detected(setting: Setting) -> None:
 
 GKE_TF = "infrastructure/terraform/gke.tf"
 CLUSTER_OPEN = 'resource "google_container_cluster" "burritbot" {\n'
+GKE_GATEWAY_API_ON = '  gateway_api_config {\n    channel = "CHANNEL_STANDARD"\n  }\n'
 
 
-def _inject_into_cluster(snippet: str) -> Files:
-    files = dict(FILES)
-    assert CLUSTER_OPEN in files[GKE_TF], "cluster resource header moved; update the mutation anchor"
-    files[GKE_TF] = files[GKE_TF].replace(CLUSTER_OPEN, CLUSTER_OPEN + snippet, 1)
+def _replace(files: Files, path: str, old: str, new: str) -> Files:
+    files = dict(files)
+    assert files[path].count(old) == 1, f"{old!r} moved in {path}; update the mutation anchor"
+    files[path] = files[path].replace(old, new, 1)
     return files
 
 
-MUTATIONS = {
-    "dataplane-v2-vs-calico-policy": [
+def _inject_into_cluster(snippet: str) -> Files:
+    return _replace(FILES, GKE_TF, CLUSTER_OPEN, CLUSTER_OPEN + snippet)
+
+
+def _eg_crds_gateway_api_on() -> Files:
+    return _replace(
+        FILES,
+        "gitops/apps/envoy-gateway-crds.yaml",
+        "gatewayAPI:\n            enabled: false",
+        "gatewayAPI:\n            enabled: true",
+    )
+
+
+def _gateway_helm_crds_on() -> Files:
+    return _replace(FILES, "gitops/apps/envoy-gateway.yaml", "crds:\n          enabled: false", "crds:\n          enabled: true")
+
+
+MUTATIONS: dict[str, dict[str, Callable[[], Files]]] = {
+    "dataplane-v2-vs-calico-policy": {
         # #22 as shipped.
-        "  network_policy {\n    enabled  = true\n    provider = \"CALICO\"\n  }\n",
-        "  network_policy {\n    enabled = false\n  }\n",
-    ],
-    "dataplane-v2-vs-calico-addon": [
-        "  addons_config {\n    network_policy_config {\n      disabled = false\n    }\n  }\n",
-    ],
-    "autopilot-vs-falco": [
-        "  enable_autopilot = true\n",
-    ],
-    "gke-gateway-api-vs-envoy-gateway-crds": [
-        '  gateway_api_config {\n    channel = "CHANNEL_STANDARD"\n  }\n',
-        '  gateway_api_config {\n    channel = "CHANNEL_EXPERIMENTAL"\n  }\n',
-    ],
+        "calico-provider": lambda: _inject_into_cluster(
+            "  network_policy {\n    enabled  = true\n    provider = \"CALICO\"\n  }\n"
+        ),
+        "network-policy-block": lambda: _inject_into_cluster("  network_policy {\n    enabled = false\n  }\n"),
+    },
+    "dataplane-v2-vs-calico-addon": {
+        "addon": lambda: _inject_into_cluster(
+            "  addons_config {\n    network_policy_config {\n      disabled = false\n    }\n  }\n"
+        ),
+    },
+    "autopilot-vs-falco": {
+        "autopilot": lambda: _inject_into_cluster("  enable_autopilot = true\n"),
+    },
+    # GKE's Gateway API is on (#111); the missing half is a chart's copy.
+    "gke-gateway-api-vs-envoy-gateway-crds": {
+        "gateway-crds-helm": _eg_crds_gateway_api_on,
+        "gateway-helm": _gateway_helm_crds_on,
+    },
 }
 
 
@@ -178,11 +201,11 @@ def test_every_pair_has_a_mutation() -> None:
 
 @pytest.mark.static
 @pytest.mark.parametrize(
-    "pair,snippet",
-    [(pair, snippet) for pair, snippets in MUTATIONS.items() for snippet in snippets],
+    "pair,case",
+    [(pair, case) for pair, cases in MUTATIONS.items() for case in cases],
 )
-def test_mutation_is_reported(pair: str, snippet: str) -> None:
-    violations = _violations(_inject_into_cluster(snippet))
+def test_mutation_is_reported(pair: str, case: str) -> None:
+    violations = _violations(MUTATIONS[pair][case]())
     assert any(v.startswith(f"{pair}:") for v in violations), violations
 
 
@@ -194,5 +217,7 @@ def test_mutation_in_a_comment_is_ignored() -> None:
 
 @pytest.mark.static
 def test_disabled_gke_gateway_api_is_not_reported() -> None:
-    snippet = '  gateway_api_config {\n    channel = "CHANNEL_DISABLED"\n  }\n'
-    assert _violations(_inject_into_cluster(snippet)) == []
+    disabled = GKE_GATEWAY_API_ON.replace("STANDARD", "DISABLED")
+    files = _replace(_eg_crds_gateway_api_on(), GKE_TF, GKE_GATEWAY_API_ON, disabled)
+    assert not GKE_GATEWAY_API.holds(files)
+    assert _violations(files) == []

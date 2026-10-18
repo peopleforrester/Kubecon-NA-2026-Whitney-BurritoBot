@@ -27,9 +27,9 @@ spec:
     helm:
       valuesObject:
         # The envoy-gateway-crds Application installs the gateway.envoyproxy.io
-        # CRDs and, until GKE's Gateway API takes them, the Gateway API CRDs.
-        # The chart's crds subchart would add a second, experimental-channel
-        # copy of the Gateway API CRDs.
+        # CRDs; GKE's Gateway API (gateway_api_config) installs the Gateway API
+        # CRDs. The chart's crds subchart would add a second,
+        # experimental-channel copy of the Gateway API CRDs.
         crds:
           enabled: false
         # Its webhook listens on 9443, which the GKE control plane cannot reach

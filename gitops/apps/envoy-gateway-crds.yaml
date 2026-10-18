@@ -1,5 +1,5 @@
-# ABOUTME: ArgoCD Application for Envoy Gateway's CRDs (gateway.envoyproxy.io) and, while GKE's Gateway API is off,
-# ABOUTME: the Gateway API CRDs — their only owner, synced before the Envoy Gateway controller starts.
+# ABOUTME: ArgoCD Application for Envoy Gateway's CRDs (gateway.envoyproxy.io), synced before the controller starts;
+# ABOUTME: its Gateway API CRDs stay off while GKE's Gateway API (gateway_api_config) owns them.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -9,7 +9,8 @@ metadata:
   annotations:
     # Before the envoy-gateway Application (wave -1). Envoy Gateway looks up
     # which optional CRDs exist once, at startup, and skips the watch for any
-    # that are missing (BackendTLSPolicy among them) until it restarts.
+    # that are missing until it restarts. The Gateway API ones, BackendTLSPolicy
+    # among them, come with the cluster from GKE's gateway_api_config.
     argocd.argoproj.io/sync-wave: "-2"
   labels:
     burritbot.io/layer: the-net
@@ -33,12 +34,13 @@ spec:
             enabled: true
           # Gateway API v1.6.1 (GatewayClass, Gateway, HTTPRoute,
           # ReferenceGrant, BackendTLSPolicy) and its safe-upgrades
-          # ValidatingAdmissionPolicy. Turning on gateway_api_config in
-          # infrastructure/terraform/gke.tf hands these to GKE: set this false
-          # in the same change, with a min_master_version whose GKE bundle
-          # serves the manifests (tests/test_gateway_api_crd_owner.py).
+          # ValidatingAdmissionPolicy. Off: gateway_api_config in
+          # infrastructure/terraform/gke.tf hands these to GKE, whose
+          # min_master_version bundle serves the manifests
+          # (tests/test_gateway_api_crd_owner.py). Turning this back on
+          # needs gateway_api_config off in the same change.
           gatewayAPI:
-            enabled: true
+            enabled: false
             # The only channel GKE installs, so rehearsals run on what GKE
             # would serve. Every Gateway API object here is standard.
             channel: standard
