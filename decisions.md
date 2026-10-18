@@ -2169,3 +2169,24 @@ draft for Michael and Whitney to review, since it is public prose. If
 talks-knowledge#29 cuts a point or keeps an unbuilt one, the deck
 changes before the upload. No slide links the repo, which M8 makes
 public after the talk.
+# Decisions
+
+Answered questions that settle open work in this repo, newest last.
+
+## question 101 — issue #14: hero image + author headshots
+
+**Question:** Issue #14 is marked Deferred and needs an explicit go-ahead.
+Is it cleared for work? If it is, what should the 16:9 hero image (no
+baked-in text) show, and who writes the files to the LinkedIn drop folder
+(`/mnt/c/Users/itama/Downloads/LinkedIn Images for Resume/`)?
+
+**Answer:** Keep it deferred: hold the issue until Michael brings it up again.
+
+**Decided by:** the coordinator under Michael's standing rules, not by
+Michael (overridden through `hec answer`).
+
+**What it changes:** Nothing is generated for #14. The hero image, the
+headshot composite and `burritobot-notes.txt` are not produced. The README
+gets no hero or author images. The issue is held until Michael raises it
+again. When he does, he still has to choose the hero subject and say how
+files reach the drop folder, since it is outside the repo clone.
