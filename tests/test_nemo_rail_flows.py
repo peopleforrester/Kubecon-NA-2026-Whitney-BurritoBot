@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 
 import pytest
@@ -99,13 +100,8 @@ def _configmap_data(path: Path) -> dict[str, str]:
 
 
 def _mounted_config(root: Path, config_text: str, rails: dict[str, str]) -> RailsConfig:
-    """Lay the config out as the Deployment mounts it: <config id>/config.yml beside rails/.
-
-    The Vertex AI models are dropped: no rail here calls a model, and ChatVertexAI
-    cannot be built without GCP auth (and #100 questions the engine in 25.07).
-    """
+    """Lay the config out as the Deployment mounts it: <config id>/config.yml beside rails/."""
     config = yaml.safe_load(config_text)
-    del config["models"]
     store = root / "burritbot"
     (store / "rails").mkdir(parents=True)
     (store / "config.yml").write_text(yaml.safe_dump(config))
@@ -141,6 +137,26 @@ def test_every_enabled_flow_is_defined_in_the_rails() -> None:
     }
     missing = [n for n in names if n not in defined]
     assert not missing, f"config.yaml enables rail flows no .co file defines: {missing}; defined: {sorted(defined)}"
+
+
+@pytest.mark.static
+def test_no_mounted_config_declares_a_model() -> None:
+    """No rail calls a model (#102), so no config declares one (#112, question 207)."""
+    mounted = {
+        "configmap-config.yaml": _configmap_data(CONFIGMAP_CONFIG)["config.yaml"],
+        "config.yaml": CONFIG.read_text(),
+    }
+    declared = {name: "models" for name, text in mounted.items() if "models" in yaml.safe_load(text)}
+    assert not declared, f"these NeMo configs still declare models: {sorted(declared)}"
+
+
+@pytest.mark.static
+def test_no_rail_flow_calls_a_model() -> None:
+    """A flow that calls a model would need one configured; these flows only test the text."""
+    for rail in RAILS_DIR.glob("*.co"):
+        code = [line for line in rail.read_text().splitlines() if not line.lstrip().startswith("#")]
+        calls = [line for line in code if re.search(r"\b(execute|await|generate\w*|llm)\b", line, re.IGNORECASE)]
+        assert not calls, f"{rail.name} calls a model: {calls}"
 
 
 @pytest.mark.static

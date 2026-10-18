@@ -107,6 +107,7 @@ _Everything below this line is the pre-lifecycle body. The migration
 block, the known gaps since fixed). The earlier text is in git
 history._
 - 2026-10-16 · #78 images install from uv.lock: `image-burritbot`, `image-audience-frontend` and `image-extproc` dependency groups resolve with dev; each image's requirements.txt is `uv export` of its group with hashes (scripts/export-image-requirements.sh) and the Dockerfiles run `pip install --no-deps --require-hashes`; shared resolution moves dev to the images' pydantic 2.12.5, protobuf 6.33.6 and kubernetes 36.0.3; 519 static green
+- 2026-10-18 · #112 question 207 (decided by the coordinator under Michael's standing rules): NeMo Guardrails declares no model, since no rail calls one (#102); the `models` section, the NeMo overlay patch and NeMo's billing labels are removed, and the rails test loads the mounted config as it is; #18's container run must prove the model-less config loads; 796 static green
 
 # Project State — burritbot (BurritoBot Said Let's Dance, the Platform Said No)
 

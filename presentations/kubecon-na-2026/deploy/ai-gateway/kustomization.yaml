@@ -1,5 +1,5 @@
 # ABOUTME: This delivery's overlay of deploy/ai-gateway: the guarded path's Vertex AI calls carry its slug.
-# ABOUTME: Patches the gateway's labels bodyMutation and the NeMo Guardrails model labels.
+# ABOUTME: Patches the gateway's Vertex AI labels bodyMutation; NeMo Guardrails has no model to label (#112).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -10,4 +10,3 @@ resources:
 
 patches:
   - path: delivery-vertex-backend.yaml
-  - path: delivery-nemo-config.yaml
