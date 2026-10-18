@@ -61,6 +61,12 @@ GRAFANA_BASIC_AUTH = "Basic YWRtaW46YWRtaW4="
 
 WORKTREE_TMP_DIRNAME = ".pytest-tmp"
 
+# The TMPDIR this session started with ("" when none was set), so a test can
+# tell the dir this conftest chose from one the caller gave. Tests read it
+# through the `given_tmpdir` fixture: `from conftest import` can load a second
+# copy of this module, whose key would not match.
+GIVEN_TMPDIR = pytest.StashKey[str]()
+
 
 def worktree_basetemp(rootdir: Path) -> Path:
     """The basetemp for sessions rooted at `rootdir`: inside that worktree."""
@@ -85,11 +91,18 @@ def pytest_configure(config: pytest.Config) -> None:
         basetemp = worktree_basetemp(config.rootpath)
         basetemp.parent.mkdir(exist_ok=True)
         config.option.basetemp = str(basetemp)
+    config.stash[GIVEN_TMPDIR] = os.environ.get("TMPDIR", "")
     if not os.environ.get("TMPDIR"):
         tmpdir = worktree_tmpdir(config.rootpath)
         tmpdir.mkdir(parents=True, exist_ok=True)
         os.environ["TMPDIR"] = str(tmpdir)
         tempfile.tempdir = str(tmpdir)
+
+
+@pytest.fixture
+def given_tmpdir(request: pytest.FixtureRequest) -> str:
+    """The TMPDIR this session started with, "" when the caller set none."""
+    return request.config.stash[GIVEN_TMPDIR]
 
 
 # --- BurritBot's OTLP export ---------------------------------------------

@@ -2471,3 +2471,22 @@ span in Tempo and the series in Prometheus on the cluster.
 The collector values, egress lock and Deployment env are deploy
 configuration. As with #90 and #100, they wait for Michael's review
 before any cluster syncs them.
+
+## 2026-10-18T23:57:40Z · amendment · The in-session temp-dir test follows the TMPDIR rule as given, so a runner that sets TMPDIR passes (issue #101)
+
+The promotion gate ran the Test command with TMPDIR set, and
+`test_this_session_keeps_its_temp_files_in_the_worktree` failed. Base
+15c6650 fails the same way with TMPDIR set, so #101's change did not cause
+it. The #115 entry above keeps a TMPDIR the caller already set
+("an explicit `--basetemp` or TMPDIR still wins"), and `conftest.py` does
+so. The in-session test, though, always expected the worktree's `tmp/`,
+so it passed only when the caller left TMPDIR unset.
+
+The rule stays as it is. `pytest_configure` now records the TMPDIR the
+session started with in `config.stash`, and a `given_tmpdir` fixture
+returns it. The fixture is needed because `from conftest import` can load
+a second copy of the module, and that copy's stash key would not match.
+The test expects the worktree's `tmp/` when no TMPDIR was given, and the
+given dir otherwise. Basetemp is always the worktree's. The probe-session
+tests still cover both cases in fresh sessions. The full static suite
+passes with TMPDIR unset and with it set.
