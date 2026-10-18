@@ -2190,3 +2190,23 @@ headshot composite and `burritobot-notes.txt` are not produced. The README
 gets no hero or author images. The issue is held until Michael raises it
 again. When he does, he still has to choose the hero subject and say how
 files reach the drop folder, since it is outside the repo clone.
+<!-- ABOUTME: Append-only decision log for the burritbot platform repo. -->
+<!-- ABOUTME: Never edit a prior entry; correct it with a new one. -->
+
+## 2026-10-18 · question 102 · v0.1.0-static release stays deferred (#15)
+
+Question: go-ahead to cut `v0.1.0-static`? Issue #15 is marked deferred
+until Michael says go, and creating a GitHub release is a publish action no
+dispatched run may take. At base `4b435be` the static suite was 203 passed
+with 16 live tests deselected, which still matches the issue's 203-test
+figure.
+
+Answer: keep it deferred, or close it if a dated release is no longer wanted
+before v0.1.0.
+
+Decided by the coordinator under Michael's standing rules, not by Michael.
+
+What it changes: no tag or release is cut. Issue #15 stays deferred until
+Michael gives an explicit go-ahead himself, or is closed if a dated release
+is no longer wanted before `v0.1.0`. The #11 rubric item for a dated
+point-in-time reference stays open in the meantime.
