@@ -1,5 +1,5 @@
 # ABOUTME: Kyverno ClusterPolicy that generates a NetworkPolicy locking guarded BurritBot egress.
-# ABOUTME: Guarded BurritBot can only reach the burritbot-net gateway's proxy pods and DNS.
+# ABOUTME: Guarded BurritBot can only reach the burritbot-net gateway's proxy pods, the OTel collector and DNS.
 ---
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
@@ -13,8 +13,9 @@ metadata:
     policies.kyverno.io/description: >-
       Generates a NetworkPolicy in the burritbot-guarded namespace that
       restricts egress to the proxy pods of the burritbot-net AI gateway
-      (Envoy Gateway runs them in envoy-gateway-system) and kube-system DNS
-      only. If someone deletes the NetworkPolicy by hand, Kyverno re-creates
+      (Envoy Gateway runs them in envoy-gateway-system), the OTel collector's
+      OTLP/gRPC port in monitoring (its spans and metrics) and kube-system
+      DNS only. If someone deletes the NetworkPolicy by hand, Kyverno re-creates
       it on the next reconcile — guarded BurritBot cannot escape the net.
 spec:
   generateExisting: true
@@ -56,6 +57,19 @@ spec:
                 ports:
                   - protocol: TCP
                     port: 8080
+              # The collector DaemonSet's pods behind otel-collector.monitoring.svc
+              # (gitops/apps/otel-collector.yaml); 4317 is OTLP/gRPC.
+              - to:
+                  - namespaceSelector:
+                      matchLabels:
+                        kubernetes.io/metadata.name: monitoring
+                    podSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: opentelemetry-collector
+                        app.kubernetes.io/instance: otel-collector
+                ports:
+                  - protocol: TCP
+                    port: 4317
               - to:
                   - namespaceSelector:
                       matchLabels:

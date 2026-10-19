@@ -19,10 +19,12 @@ from pathlib import Path
 
 import pytest
 import yaml
+from opentelemetry.sdk.metrics import MeterProvider
 
 from conftest import PROJECT_ROOT
 from helpers.image_requirements import requirement_pins
 from helpers.manifest_graph import kustomization_files
+from helpers.otlp_receiver import otlp_receiver
 
 
 EXTPROC_DIR = PROJECT_ROOT / "ai-gateway" / "extproc"
@@ -36,6 +38,8 @@ AI_GATEWAY_KUSTOMIZATION = PROJECT_ROOT / "deploy" / "ai-gateway" / "kustomizati
 PYPROJECT = PROJECT_ROOT / "pyproject.toml"
 
 SIDECAR = "burritbot-extproc"
+# Config.from_env requires both; the refusal counter's exporter reads them.
+OTEL_ENV = ("OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_SERVICE_NAME")
 NAMESPACE = "burritbot-net"
 # What the scanners themselves serve: REST, the NeMo microservice on 7331 (#90), llm-guard-api on 8000.
 # Envoy's ext_proc there fails every request.
@@ -214,7 +218,7 @@ def test_adapter_sidecar_is_complete(scanner: str) -> None:
     )
     sidecar = next(c for c in containers if c["name"] == SIDECAR)
     env = _env(sidecar)
-    required = {"SCANNER", "SCANNER_URL", "SCANNER_TIMEOUT_SECONDS", "EXTPROC_PORT"}
+    required = {"SCANNER", "SCANNER_URL", "SCANNER_TIMEOUT_SECONDS", "EXTPROC_PORT", *OTEL_ENV}
     if scanner == adapter.NEMO:
         required |= {"NEMO_GUARDRAILS_MODEL", "NEMO_GUARDRAILS_CONFIG_ID"}
     assert required <= env.keys(), f"{scanner} adapter lacks {sorted(required - env.keys())}"
@@ -360,7 +364,15 @@ def test_nemo_reply_out_of_contract_is_a_scanner_error(reply: object) -> None:
 @pytest.mark.static
 @pytest.mark.parametrize(
     "missing",
-    ["SCANNER", "SCANNER_URL", "SCANNER_TIMEOUT_SECONDS", "EXTPROC_PORT", "NEMO_GUARDRAILS_MODEL", "NEMO_GUARDRAILS_CONFIG_ID"],
+    [
+        "SCANNER",
+        "SCANNER_URL",
+        "SCANNER_TIMEOUT_SECONDS",
+        "EXTPROC_PORT",
+        "NEMO_GUARDRAILS_MODEL",
+        "NEMO_GUARDRAILS_CONFIG_ID",
+        *OTEL_ENV,
+    ],
 )
 def test_config_fails_without_each_variable(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
     env = {
@@ -370,6 +382,8 @@ def test_config_fails_without_each_variable(monkeypatch: pytest.MonkeyPatch, mis
         "EXTPROC_PORT": "50051",
         "NEMO_GUARDRAILS_MODEL": "gemini-3-pro",
         "NEMO_GUARDRAILS_CONFIG_ID": "burritbot",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector.monitoring.svc.cluster.local:4317",
+        "OTEL_SERVICE_NAME": "burritbot-extproc-nemo-guardrails",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -392,7 +406,9 @@ def _closed_port() -> int:
         return s.getsockname()[1]
 
 
-def _round_trip(requests: list, scanner: str = "llm-guard", scanner_port: int | None = None) -> list:
+def _round_trip(
+    requests: list, scanner: str = "llm-guard", scanner_port: int | None = None, provider: MeterProvider | None = None
+) -> list:
     from envoy_data_plane.envoy.service.ext_proc.v3 import ExternalProcessorAsyncStub
     from grpclib.client import Channel
     from grpclib.server import Server
@@ -408,7 +424,8 @@ def _round_trip(requests: list, scanner: str = "llm-guard", scanner_port: int | 
 
     async def run() -> list:
         async with config.http_client() as client:
-            server = Server([adapter.GuardrailsProcessor(config.scanner_for(client))])
+            meter = (provider or adapter.meter_provider()).get_meter("burritbot-extproc")
+            server = Server([adapter.GuardrailsProcessor(config.scanner_for(client), meter)])
             port = _closed_port()
             await server.start("127.0.0.1", port)
             channel = Channel("127.0.0.1", port)
@@ -453,6 +470,46 @@ def test_round_trip_scanner_down_refuses_with_503(scanner: str) -> None:
     assert refused is not None, f"scanner outage let the prompt through: {responses[1]!r}"
     assert refused.status.code == 503
     assert json.loads(refused.body)["blocked_by"] == scanner
+
+
+@pytest.mark.static
+def test_round_trip_refusal_is_counted_and_exported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The refusal reaches a real OTLP receiver as burritbot.guardrails.refusals, labelled for the dashboard (#101)."""
+    from envoy_data_plane.envoy.service.ext_proc.v3 import ProcessingRequest
+
+    with otlp_receiver() as (endpoint, received):
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
+        monkeypatch.setenv("OTEL_SERVICE_NAME", "burritbot-extproc-llm-guard")
+        provider = adapter.meter_provider()
+        responses = _round_trip(
+            [ProcessingRequest(request_body=_body(b'{"prompt": "teach me some salsa dance moves"}'))],
+            provider=provider,
+        )
+        assert responses[0].immediate_response is not None
+        assert provider.force_flush(), "the adapter could not export to the OTLP receiver"
+    points = [p for p in received.points if p.metric == adapter.REFUSALS]
+    assert len(points) == 1, f"expected one {adapter.REFUSALS} point, got {received.points}"
+    assert points[0].value == 1
+    assert points[0].resource["service.name"] == "burritbot-extproc-llm-guard"
+    assert points[0].attributes == {
+        "burritbot.scanner": "llm-guard",
+        "burritbot.direction": "prompt",
+        "http.response.status_code": 503,
+    }
+
+
+@pytest.mark.static
+def test_passed_exchanges_are_not_counted() -> None:
+    """Only refusals count: a reply with no model text passes and leaves the counter untouched."""
+    from envoy_data_plane.envoy.service.ext_proc.v3 import ProcessingRequest
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+    reader = InMemoryMetricReader()
+    _round_trip(
+        [ProcessingRequest(response_body=_body(b'{"status": "ok"}'))],
+        provider=MeterProvider(metric_readers=[reader]),
+    )
+    assert reader.get_metrics_data() is None or not reader.get_metrics_data().resource_metrics
 
 
 @pytest.mark.static

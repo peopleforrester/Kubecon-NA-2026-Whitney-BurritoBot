@@ -21,6 +21,9 @@ spec:
     targetRevision: "0.145.0"
     helm:
       valuesObject:
+        # Every OTLP sender names otel-collector.monitoring.svc. Without the
+        # override the chart names the Service <release>-opentelemetry-collector.
+        fullnameOverride: otel-collector
         image:
           repository: "otel/opentelemetry-collector-contrib"
         mode: daemonset
@@ -35,6 +38,50 @@ spec:
                   endpoint: 0.0.0.0:4317
                 http:
                   endpoint: 0.0.0.0:4318
+          connectors:
+            # The Eyes score what actually arrives: every GenAI span (one that
+            # names gen_ai.operation.name; failed calls carry no usage, so only
+            # answered ones are scored) is counted, and counted again for each
+            # attribute that conforms to the Weaver registry
+            # (observability/otel-weaver/genai-semconv-registry.yaml) and
+            # orbweaver weighs (observability/spinybacked-orbweaver/config.yaml).
+            # The Eyes dashboard divides them into coverage and the weighted
+            # conformance score. tests/test_genai_telemetry_contract.py derives
+            # every condition from those two files.
+            count/genai:
+              spans:
+                burritbot.genai.spans:
+                  description: GenAI spans of answered calls.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR'
+                burritbot.genai.spans.conformant:
+                  description: GenAI spans carrying every required registry attribute, conforming.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and IsString(attributes["gen_ai.operation.name"]) and (attributes["gen_ai.provider.name"] == "gcp.vertex_ai" or attributes["gen_ai.provider.name"] == "openai" or attributes["gen_ai.provider.name"] == "anthropic") and IsString(attributes["gen_ai.request.model"]) and IsInt(attributes["gen_ai.usage.input_tokens"]) and IsInt(attributes["gen_ai.usage.output_tokens"])'
+                burritbot.genai.spans.conforming.gen_ai.provider.name:
+                  description: GenAI spans whose gen_ai.provider.name is a registry member.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and (attributes["gen_ai.provider.name"] == "gcp.vertex_ai" or attributes["gen_ai.provider.name"] == "openai" or attributes["gen_ai.provider.name"] == "anthropic")'
+                burritbot.genai.spans.conforming.gen_ai.request.model:
+                  description: GenAI spans carrying gen_ai.request.model as a string.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and IsString(attributes["gen_ai.request.model"])'
+                burritbot.genai.spans.conforming.gen_ai.usage.input_tokens:
+                  description: GenAI spans carrying gen_ai.usage.input_tokens as an int.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and IsInt(attributes["gen_ai.usage.input_tokens"])'
+                burritbot.genai.spans.conforming.gen_ai.usage.output_tokens:
+                  description: GenAI spans carrying gen_ai.usage.output_tokens as an int.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and IsInt(attributes["gen_ai.usage.output_tokens"])'
+                burritbot.genai.spans.conforming.burritbot.layer:
+                  description: GenAI spans whose burritbot.layer is a registry member.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and (attributes["burritbot.layer"] == "the-eyes" or attributes["burritbot.layer"] == "the-net" or attributes["burritbot.layer"] == "the-web")'
+                burritbot.genai.spans.conforming.burritbot.guarded:
+                  description: GenAI spans carrying burritbot.guarded as a boolean.
+                  conditions:
+                    - 'attributes["gen_ai.operation.name"] != nil and status.code != STATUS_CODE_ERROR and IsBool(attributes["burritbot.guarded"])'
           processors:
             # memory_limiter MUST come first in every pipeline (collector OOM guard).
             memory_limiter:
@@ -45,15 +92,12 @@ spec:
               timeout: 5s
               send_batch_size: 1024
               send_batch_max_size: 2048
-            # gen_ai.* attribute decoration — keeps BurritBot spans compliant
-            # with the OTel GenAI semconv v1.37.0 (provider value gcp.vertex_ai).
-            # The Eyes layer's spinybacked-orbweaver agent scores spans against
-            # observability/otel-weaver/genai-semconv-registry.yaml.
+            # gen_ai.* attribute decoration (OTel GenAI semconv v1.37.0) for
+            # telemetry that still names the model call with legacy llm.*
+            # attributes; BurritBot sets gen_ai.* itself. Each action copies
+            # only when its llm.* source is present, so it runs on both signals.
             attributes/genai:
               actions:
-                - key: gen_ai.provider.name
-                  value: gcp.vertex_ai
-                  action: insert
                 - key: gen_ai.request.model
                   from_attribute: llm.model_name
                   action: upsert
@@ -63,6 +107,23 @@ spec:
                 - key: gen_ai.usage.output_tokens
                   from_attribute: llm.usage.completion_tokens
                   action: upsert
+            # The provider (canonicalised to gcp.vertex_ai) for those legacy
+            # spans only. Unscoped, the insert stamped gcp.vertex_ai on every
+            # span and every series this collector forwards, HTTP and refusal
+            # counts included. Spans only: the collector refuses attribute
+            # matching in a metrics pipeline.
+            attributes/genai-provider:
+              include:
+                match_type: strict
+                attributes:
+                  - key: llm.model_name
+              actions:
+                - key: gen_ai.provider.name
+                  value: gcp.vertex_ai
+                  action: insert
+            # count/genai emits delta sums; Prometheus remote write takes only
+            # cumulative ones, and drops the rest.
+            deltatocumulative: {}
             resource:
               attributes:
                 - key: cluster.name
@@ -74,10 +135,20 @@ spec:
           exporters:
             prometheusremotewrite:
               endpoint: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+              # Every series this collector writes is burritbot_*, the prefix
+              # the dashboards query (BurritBot's gen_ai.client.operation.duration
+              # lands as burritbot_gen_ai_client_operation_duration_seconds).
+              namespace: burritbot
               tls:
                 insecure: true
               resource_to_telemetry_conversion:
                 enabled: true
+              # Resource attributes already ride on every series (above), so
+              # target_info adds nothing; and its samples from senders that share
+              # a job but no instance land out of order, which makes Prometheus
+              # reject the whole write and the exporter drop every point in it.
+              target_info:
+                enabled: false
             otlp/tempo:
               endpoint: tempo.monitoring.svc.cluster.local:4317
               tls:
@@ -96,6 +167,9 @@ spec:
               metrics:
                 receivers:
                   - otlp
+                  # The chart's self-scrape of this collector's :8888, so the
+                  # Eyes dashboard can plot the spans it accepts.
+                  - prometheus
                 processors:
                   - memory_limiter
                   - attributes/genai
@@ -104,16 +178,28 @@ spec:
                 exporters:
                   - prometheusremotewrite
                   - debug
+              # The span counts count/genai makes from the traces pipeline.
+              metrics/genai:
+                receivers:
+                  - count/genai
+                processors:
+                  - memory_limiter
+                  - deltatocumulative
+                  - batch
+                exporters:
+                  - prometheusremotewrite
               traces:
                 receivers:
                   - otlp
                 processors:
                   - memory_limiter
                   - attributes/genai
+                  - attributes/genai-provider
                   - resource
                   - batch
                 exporters:
                   - otlp/tempo
+                  - count/genai
                   - debug
         service:
           enabled: true

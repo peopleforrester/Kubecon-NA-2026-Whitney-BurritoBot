@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import tempfile
 from pathlib import Path
 
@@ -89,6 +90,30 @@ def pytest_configure(config: pytest.Config) -> None:
         tmpdir.mkdir(parents=True, exist_ok=True)
         os.environ["TMPDIR"] = str(tmpdir)
         tempfile.tempdir = str(tmpdir)
+
+
+# --- BurritBot's OTLP export ---------------------------------------------
+#
+# BurritBot refuses to start without OTEL_EXPORTER_OTLP_ENDPOINT and
+# OTEL_SERVICE_NAME (apps/burritbot/app.py), and many tests import it for its
+# constants and pure functions. They get an endpoint on a loopback port nothing
+# listens on, so nothing they record leaves the host. The tests that prove the
+# export (tests/test_burritbot_telemetry.py) point it at a real OTLP receiver,
+# and the ones that prove the refusal unset it.
+
+
+def closed_loopback_url() -> str:
+    """An http URL on a loopback port nothing listens on."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    return f"http://127.0.0.1:{port}"
+
+
+@pytest.fixture(autouse=True)
+def _burritbot_otel_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", closed_loopback_url())
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "burritbot-tests")
 
 
 # --- Live-cluster fixtures ----------------------------------------------

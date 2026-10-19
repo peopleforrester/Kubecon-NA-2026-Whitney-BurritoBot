@@ -2386,3 +2386,88 @@ What it changes:
   install, then runs `pip check` and loads `zh_core_web_sm`. It passed in
   this run. The image itself was not built, because the docker daemon is
   closed to runs. Live confirmation in the pod rides on #18.
+
+## 2026-10-17T07:44:30Z · decision · BurritBot and the guardrails adapter export OTLP; the collector, egress lock and dashboards are aligned to what is emitted (issue #101)
+
+**What was wrong, checked rather than read.** Beyond what #101 lists,
+rendering `gitops/apps/otel-collector.yaml` through the
+opentelemetry-collector chart 0.145.0 (helm template) showed the Service
+named `otel-collector-opentelemetry-collector`. Every sender (both
+BurritBots, nemo-guardrails, llm-guard) names
+`otel-collector.monitoring.svc`, so nothing could have reached the
+collector. The guarded egress lock also admitted only the gateway and
+DNS, so guarded BurritBot's export would be dropped there too.
+
+**Changes.**
+- BurritBot builds its own TracerProvider and MeterProvider with OTLP/gRPC
+  exporters, and refuses to start without `OTEL_EXPORTER_OTLP_ENDPOINT`
+  and `OTEL_SERVICE_NAME`. The providers are kept local, not set
+  globally, and are shut down on app stop. Each model call is a CLIENT
+  span named `chat <model>` carrying `gen_ai.operation.name`,
+  `gen_ai.provider.name` (`gcp.vertex_ai` on both paths, since the
+  gateway routes to the same Vertex model), request model, temperature,
+  max tokens, usage tokens, `burritbot.guarded`, `burritbot.layer`
+  (`the-eyes`) and, on failure, `error.type` (`guardrails_refused`
+  when the net refused). The GenAI client metrics
+  `gen_ai.client.operation.duration` and `gen_ai.client.token.usage`
+  use the conventions' bucket advice. There is no
+  `opentelemetry-instrument`/distro: the SDK is configured in code.
+- The extproc adapter counts each refusal as
+  `burritbot.guardrails.refusals` with scanner, direction and status
+  code labels (403 is a block; 400/502/503 are the net failing closed).
+  Its sidecars get the OTLP env.
+- Collector values: `fullnameOverride: otel-collector`. Remote write
+  gets `namespace: burritbot` and `target_info.enabled: false`. A
+  local run showed target_info samples arriving out of order, which made
+  Prometheus reject the whole write and the exporter drop all 68 points
+  in it. The chart's self-scrape `prometheus` receiver is back in the
+  metrics pipeline. A `count/genai` connector counts answered GenAI
+  spans per conforming attribute, with conditions derived from the
+  Weaver registry and orbweaver's weights. It feeds a `metrics/genai`
+  pipeline through `deltatocumulative`, because the counts are delta and
+  remote write dropped them silently.
+- The collector's constant `gen_ai.provider.name` insert stamped
+  `gcp.vertex_ai` on every span and series, including HTTP metrics and
+  refusal counts. It now lives in a separate traces-only processor
+  (`attributes/genai-provider`) scoped to spans carrying
+  `llm.model_name`. The collector refuses attribute matching in a
+  metrics pipeline (verified), so the `llm.*` copies stay unscoped in
+  `attributes/genai`. The unused template
+  `observability/otel-collector/config.yaml` is scoped the same way.
+- The registry gains `gen_ai.operation.name` (required).
+- Dashboards: every query now reads an emitted series. Two panels got
+  new meanings, because nothing could emit what they named:
+  `burritbot_cast_net_current_target` became "BurritBot answering (last
+  minute)", from the model-call rate per `burritbot_guarded` (cast-net.sh
+  changes an env var, which no metric sees). The "leak" series became
+  unguarded model calls answered with no `error.type`, which are answers
+  with no scanner in front of them, not a judged leak. Coverage and the
+  orbweaver score are computed in PromQL from the count connector. The
+  Grafana Tempo datasource gets `uid: tempo`, the uid the traces panel
+  names.
+
+**Dependencies (2026-10-17).** `opentelemetry-exporter-otlp==1.41.0`
+is added to the dev group, matching the BurritBot image, so the tests
+can export. `opentelemetry-sdk==1.41.0` and
+`opentelemetry-exporter-otlp-proto-grpc==1.41.0` are added to
+`image-extproc` for the refusal counter. All of them are the same
+releases already locked for BurritBot (#55), so `uv lock` changed only
+group membership, not versions.
+
+**Verification off-cluster.** The rendered chart config was run with
+the official otelcol-contrib 0.145.0 binary (the chart's appVersion), in
+front of Prometheus 3.7.3 (`--web.enable-remote-write-receiver`) and
+Tempo 2.9.0, all on loopback. Real BurritBot `/chat` requests and an
+adapter refusal produced the series the dashboards query. The names
+matched `tests/helpers/genai_telemetry.py`'s translation, and the new
+TraceQL found the model-call spans where the old `{ name =~
+"burritbot.*chat" }` found none. The guarded success path used a
+throwaway loopback stand-in for the gateway, which is not in the repo.
+In the repo, the static tests use an in-process OTLP/gRPC receiver, the
+same pattern as #66's in-process ext_proc round trip.
+`tests/test_burritbot_telemetry.py` has a live test that finds the
+span in Tempo and the series in Prometheus on the cluster.
+
+The collector values, egress lock and Deployment env are deploy
+configuration. As with #90 and #100, they wait for Michael's review
+before any cluster syncs them.

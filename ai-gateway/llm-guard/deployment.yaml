@@ -122,6 +122,11 @@ spec:
               value: "8"
             - name: EXTPROC_PORT
               value: "50051"
+            # The refusal counter (burritbot.guardrails.refusals) goes to the collector over OTLP/gRPC.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.monitoring.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: burritbot-extproc-llm-guard
           readinessProbe:
             tcpSocket:
               port: extproc

@@ -20,11 +20,19 @@ processors:
     send_batch_size: 1024
     timeout: 5s
 
-  # gen_ai.* attribute decoration — keeps BurritBot spans compliant with
-  # the OTel GenAI semantic conventions so the Weaver registry can score them.
+  # gen_ai.* attribute decoration for spans that still name the model call
+  # with legacy llm.* attributes, so the Weaver registry can score them.
   # OTel semconv v1.37.0 canonicalised the provider attribute as
   # `gen_ai.provider.name` with the Vertex AI value `gcp.vertex_ai`.
+  # BurritBot sets gen_ai.* itself. Scoped to spans carrying llm.model_name:
+  # unscoped, the insert stamps gcp.vertex_ai on every span and series. The
+  # collector refuses attribute matching for metrics, so traces only. The
+  # deployed values (gitops/apps/otel-collector.yaml) split it the same way.
   attributes:
+    include:
+      match_type: strict
+      attributes:
+        - key: llm.model_name
     actions:
       - key: gen_ai.provider.name
         value: gcp.vertex_ai
@@ -76,5 +84,5 @@ service:
       exporters: [otlp/grafana, debug]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, attributes, resource, batch]
+      processors: [memory_limiter, resource, batch]
       exporters: [prometheus, debug]
