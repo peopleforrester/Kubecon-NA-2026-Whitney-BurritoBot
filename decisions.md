@@ -2386,3 +2386,29 @@ What it changes:
   install, then runs `pip check` and loads `zh_core_web_sm`. It passed in
   this run. The image itself was not built, because the docker daemon is
   closed to runs. Live confirmation in the pod rides on #18.
+
+## 2026-10-19T06:34:56Z · decision · The outer-session temp-dir test follows the #115 rule when the caller has already set TMPDIR (issue #123)
+
+The gate for #123 ran the Test command with TMPDIR already set, which
+the dispatcher now does. `test_this_session_keeps_its_temp_files_in_the_worktree`
+then failed. It asserted the worktree's `.pytest-tmp/tmp` no matter what,
+while the #115 entry above and `tests/conftest.py` both leave a TMPDIR
+that is already set as given. The test and the decided rule disagreed;
+the conftest was right.
+
+What changes:
+
+- `pytest_configure` records the `--basetemp` and TMPDIR the session
+  started with in `config.stash`, before it fills them in. A
+  `given_temp_dirs` fixture returns them. A fixture is needed because the
+  test module's `from conftest import` loads a second copy of conftest,
+  separate from the plugin pytest registered, so module state or a
+  module-level key would not be shared.
+- The test now asserts that the session's basetemp, `tempfile.gettempdir()`
+  and TMPDIR are exactly what the caller gave, or the worktree dirs where
+  the caller gave none. Nothing is skipped, and with nothing given it
+  asserts the same three equalities as before.
+- Evidence: the Test command passes with TMPDIR set and with it unset
+  (854 passed each). Two mutations were tried. A conftest that overrides
+  a given TMPDIR fails the test with TMPDIR set, and a conftest that never
+  fills TMPDIR fails it with TMPDIR unset.

@@ -65,11 +65,22 @@ def _probe(rootdir: Path, *extra: str, tmpdir_env: str = "") -> dict[str, Path]:
 
 
 @pytest.mark.static
-def test_this_session_keeps_its_temp_files_in_the_worktree(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """The suite's tmp_path and tempfile dirs live under this repo's root."""
-    assert tmp_path_factory.getbasetemp() == worktree_basetemp(PROJECT_ROOT)
-    assert Path(tempfile.gettempdir()) == worktree_tmpdir(PROJECT_ROOT)
-    assert os.environ["TMPDIR"] == str(worktree_tmpdir(PROJECT_ROOT))
+def test_this_session_keeps_its_temp_files_in_the_worktree(
+    tmp_path_factory: pytest.TempPathFactory,
+    given_temp_dirs: tuple[str | None, str | None],
+) -> None:
+    """The suite's tmp_path and tempfile dirs live under this repo's root unless the caller gave its own.
+
+    A caller (the dispatcher's gate, say) may start the Test command with
+    TMPDIR already set; per the #115 decision that TMPDIR wins, and this
+    session must use it exactly. Without one, the worktree dirs apply.
+    """
+    given_basetemp, given_tmpdir = given_temp_dirs
+    basetemp = Path(given_basetemp).resolve() if given_basetemp else worktree_basetemp(PROJECT_ROOT)
+    tmpdir = Path(os.path.abspath(given_tmpdir)) if given_tmpdir else worktree_tmpdir(PROJECT_ROOT)
+    assert tmp_path_factory.getbasetemp() == basetemp
+    assert Path(tempfile.gettempdir()) == tmpdir
+    assert Path(os.environ["TMPDIR"]) == tmpdir
 
 
 @pytest.mark.static

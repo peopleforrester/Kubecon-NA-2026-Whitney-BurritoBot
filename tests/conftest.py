@@ -71,6 +71,17 @@ def worktree_tmpdir(rootdir: Path) -> Path:
     return rootdir.resolve() / WORKTREE_TMP_DIRNAME / "tmp"
 
 
+# The --basetemp and TMPDIR the session was started with, before
+# pytest_configure fills them in; None where the caller gave none.
+GIVEN_TEMP_DIRS = pytest.StashKey[tuple[str | None, str | None]]()
+
+
+@pytest.fixture
+def given_temp_dirs(pytestconfig: pytest.Config) -> tuple[str | None, str | None]:
+    """The (--basetemp, TMPDIR) this session was started with, None where not given."""
+    return pytestconfig.stash[GIVEN_TEMP_DIRS]
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
     """Keep this session's temp files in its worktree.
@@ -80,6 +91,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Keyed on the session's rootdir, so a nested probe session rooted in
     its own tmp dir never clears the outer session's basetemp.
     """
+    config.stash[GIVEN_TEMP_DIRS] = (config.option.basetemp, os.environ.get("TMPDIR") or None)
     if config.option.basetemp is None:
         basetemp = worktree_basetemp(config.rootpath)
         basetemp.parent.mkdir(exist_ok=True)
