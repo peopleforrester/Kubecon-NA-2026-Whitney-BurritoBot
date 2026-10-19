@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 885 passed, 58 deselected after the
-  #101 GenAI telemetry export
+  (ruff check, then static suite) 890 passed, 58 deselected after the
+  #124 Phase History and C2 row test
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -100,6 +100,7 @@ _(append-only. Each phase transition adds one line, oldest first.)_
 - 2026-10-17 · #120 spec 001 M5 deck: `presentations/kubecon-na-2026/deck/slides.html` in RUNBOOK segment order, exported by `export_pdf.py` (Playwright Chromium) to the 16:9 `burritobot-said-lets-dance.pdf` (22 pages, 1440x810pt) with `export.json` holding source and PDF sha256; `tests/test_talk_deck.py` holds the PDF to the source, the rules on screen to their files, and cut or unbuilt points off the slides; the Sessionize upload is the presenters' (decisions.md); 826 static green
 - 2026-10-18 · #101 The Eyes see: BurritBot exports OTLP/gRPC through its own SDK providers (refuses to start without `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_SERVICE_NAME`) and wraps each model call in a `chat <model>` CLIENT span with `gen_ai.*` attributes plus `gen_ai.client.operation.duration`/`token.usage`; the extproc adapter counts refusals as `burritbot.guardrails.refusals`; the collector Service was really `otel-collector-opentelemetry-collector` (chart render) and is now `otel-collector`, remote write is `burritbot_`-namespaced without target_info (out-of-order drops), self-scrape restored, a `count/genai` connector scores spans against the Weaver registry with orbweaver weights, the unscoped `gen_ai.provider.name` insert is scoped to legacy spans; guarded egress admits the collector; every dashboard query reads an emitted series (checked against otelcol-contrib 0.145.0, Prometheus 3.7.3, Tempo 2.9.0, decisions.md); 885 static green
 - 2026-10-18 · #101 gate fix: `test_this_session_keeps_its_temp_files_in_the_worktree` failed under a runner that sets TMPDIR (base 15c6650 too), because it always expected the worktree's `tmp/` although #115's conftest keeps a given TMPDIR; `pytest_configure` records the starting TMPDIR in `config.stash`, the `given_tmpdir` fixture returns it, and the test expects the given dir or else the worktree's (decisions.md); 885 static green with TMPDIR unset and set
+- 2026-10-19 · #124 test for #116's untested criterion: `tests/test_critical_fix_a2_service_accounts.py` gains `test_phase_history_has_one_line_for_95_first_child` (exactly one Phase History line tagged #95 naming first child #116, question 163, `burritbot-guarded/burritbot`, the annotation key and the replacing test) and `test_critical_fixes_c2_row_says_guarded_sa_has_no_wif_annotation` (one C2 row, saying the guarded SA has no WIF annotation, not "WIF annotation on guarded SA", naming the A2 test file); the pre-#116 text, a doubled line and a C2 row restating the annotation each fail them; 890 static green
 
 ---
 
@@ -455,7 +456,7 @@ commit.
   constant; guarded egress admits the collector; every dashboard metric
   and label is one the code and collector emit, and the seven queries
   #101 found are refused
-- **Total: 885 static tests green. Live tests fail loudly when
+- **Total: 890 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
