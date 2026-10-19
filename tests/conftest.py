@@ -71,6 +71,11 @@ def worktree_tmpdir(rootdir: Path) -> Path:
     return rootdir.resolve() / WORKTREE_TMP_DIRNAME / "tmp"
 
 
+# The --basetemp and TMPDIR the session started with, before
+# pytest_configure fills in the worktree ones (None when not given).
+GIVEN_TEMP_DIRS = pytest.StashKey[tuple[str | None, str | None]]()
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
     """Keep this session's temp files in its worktree.
@@ -80,6 +85,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Keyed on the session's rootdir, so a nested probe session rooted in
     its own tmp dir never clears the outer session's basetemp.
     """
+    config.stash[GIVEN_TEMP_DIRS] = (config.option.basetemp, os.environ.get("TMPDIR") or None)
     if config.option.basetemp is None:
         basetemp = worktree_basetemp(config.rootpath)
         basetemp.parent.mkdir(exist_ok=True)
@@ -89,6 +95,16 @@ def pytest_configure(config: pytest.Config) -> None:
         tmpdir.mkdir(parents=True, exist_ok=True)
         os.environ["TMPDIR"] = str(tmpdir)
         tempfile.tempdir = str(tmpdir)
+
+
+@pytest.fixture(scope="session")
+def given_temp_dirs(request: pytest.FixtureRequest) -> tuple[str | None, str | None]:
+    """The (--basetemp, TMPDIR) this session was started with; None for each one not given.
+
+    A fixture rather than an import: a test's `from conftest import` loads a
+    second copy of this module, whose StashKey is not the one stored here.
+    """
+    return request.config.stash[GIVEN_TEMP_DIRS]
 
 
 # --- Live-cluster fixtures ----------------------------------------------

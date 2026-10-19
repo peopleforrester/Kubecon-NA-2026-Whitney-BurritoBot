@@ -65,11 +65,20 @@ def _probe(rootdir: Path, *extra: str, tmpdir_env: str = "") -> dict[str, Path]:
 
 
 @pytest.mark.static
-def test_this_session_keeps_its_temp_files_in_the_worktree(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """The suite's tmp_path and tempfile dirs live under this repo's root."""
-    assert tmp_path_factory.getbasetemp() == worktree_basetemp(PROJECT_ROOT)
-    assert Path(tempfile.gettempdir()) == worktree_tmpdir(PROJECT_ROOT)
-    assert os.environ["TMPDIR"] == str(worktree_tmpdir(PROJECT_ROOT))
+def test_this_session_keeps_its_temp_files_in_the_worktree(
+    given_temp_dirs: tuple[str | None, str | None], tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The suite's tmp_path and tempfile dirs live under this repo's root, unless the run gave its own.
+
+    A runner that starts the suite with TMPDIR (or --basetemp) already set
+    keeps it; the unset case is probed in fresh sessions below.
+    """
+    given_basetemp, given_tmpdir = given_temp_dirs
+    basetemp = Path(given_basetemp).resolve() if given_basetemp else worktree_basetemp(PROJECT_ROOT)
+    tmpdir = Path(given_tmpdir) if given_tmpdir else worktree_tmpdir(PROJECT_ROOT)
+    assert tmp_path_factory.getbasetemp() == basetemp
+    assert Path(tempfile.gettempdir()) == tmpdir
+    assert os.environ["TMPDIR"] == str(tmpdir)
 
 
 @pytest.mark.static
