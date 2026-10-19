@@ -34,8 +34,8 @@ fixed statically).
 - Branch: `staging` (default working branch)
 - Working tree: clean
 - Last CI: n/a (no CI workflows in this repo); local Test command
-  (ruff check, then static suite) 828 passed, 56 deselected after the
-  #112 NeMo models removal
+  (ruff check, then static suite) 854 passed, 57 deselected after the
+  #123 question 163 decision-entry test
 - Remote: `origin → https://github.com/peopleforrester/burritobot`
 
 ## Phase History
@@ -443,7 +443,12 @@ commit.
   from its file, Act 1 keeps attacks with the presenters, and cut or
   unbuilt points stay off the slides (mutation: row 2 marked CUT); two
   live tests render it in Chromium and check the layout
-- **Total: 828 static tests green. Live tests fail loudly when
+- Question 163 decision entry (4), #123: decisions.md holds exactly one
+  entry naming question 163 and #95; it states answer A, carries the
+  exact standing-rules sentence, claims no approval by Michael, and lists
+  what the answer changes (mutations: answer B, an approval claim, a
+  dropped changes part, a wrong issue and a duplicate entry each fail)
+- **Total: 854 static tests green. Live tests fail loudly when
   kubeconfig, GCP auth or terraform is absent — no skips, no mocks, no
   fallbacks.** Drift in this
   number is asserted against `pytest --collect-only -m static` by the
